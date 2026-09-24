@@ -6,6 +6,7 @@ import { registerBroadcastRoutes } from "./broadcastRoutes";
 import { registerCustomerExtraRoutes } from "./customerExtraRoutes";
 import { tenantAuthMiddleware } from "./tenantAuth";
 import { attachEmployee, guardTenantRoutes } from "./employeeAuth";
+import { enforceTenantOwnership } from "./tenantScope";
 import { callerIdService } from "./callerIdService";
 import { whatsappService } from "./whatsappService";
 import {
@@ -24,6 +25,8 @@ import { runShamCashMigrations } from "./shamcash";
 import { runWholesaleMigrations } from "./wholesale";
 import { registerWholesaleRoutes } from "./wholesaleRoutes";
 import { runLoyaltyMigrations } from "./deliveryService";
+import { runServerMigrations } from "./serverMigrations";
+import { storeCurrency } from "./storeTime";
 import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
 import { TERMS_HTML, IMPRINT_HTML } from "./site/legal";
 import { isSitePath, renderSitePage, findSiteAsset, SITEMAP_PATHS } from "./site";
@@ -53,6 +56,11 @@ if (!usingMySql) {
 }
 
 const app = express();
+// Password hashes never leave the server, whatever a handler passes to
+// res.json (GET /api/delivery/auth/me and the customer lists used to return
+// customers.password_hash verbatim).
+const SECRET_JSON_KEYS = new Set(["passwordHash", "password_hash"]);
+app.set("json replacer", (key: string, value: unknown) => (SECRET_JSON_KEYS.has(key) ? undefined : value));
 const log = console.log;
 
 // ── Security headers ─────────────────────────────────────────────────────────
@@ -427,7 +435,7 @@ function configureExpoAndLanding(app: express.Application) {
             return res.status(200).json({
               name: "Kassenta", short_name: "Kassenta",
               start_url: "/customer/", display: "standalone", scope: "/customer/",
-              theme_color: "#FF5722", background_color: "#070A12",
+              theme_color: "#0A6E65", background_color: "#ffffff",
               icons: [{ src: "/api/delivery-app/icons/icon-192.png", sizes: "192x192", type: "image/png" },
                       { src: "/api/delivery-app/icons/icon-512.png", sizes: "512x512", type: "image/png" }],
             });
@@ -444,7 +452,9 @@ function configureExpoAndLanding(app: express.Application) {
             basePath: req.path.startsWith("/api/") ? "/api" : "",
             currency: process.env.DEFAULT_CURRENCY || "CHF",
             stripePublishableKey: await getBrowserSafeStripeKey(),
-            language: (req.query.lang as string) || "en",
+            // Only an explicit ?lang= is passed on; otherwise the app picks
+            // (saved choice / device language) instead of being forced to "en".
+            ...(req.query.lang ? { language: String(req.query.lang) } : {}),
           });
           shell = shell.replace("__KASSENTA_CONFIG__", customerConfig);
 
@@ -546,17 +556,8 @@ function configureExpoAndLanding(app: express.Application) {
         const isBrandAlias = slug === "barmagly";
         config = await storage.getLandingPageConfigBySlug(isBrandAlias ? "pizza-lemon" : slug);
 
-        // If slug not found in DB, this is a demo restaurant — use primary tenant data
-        // but override the display name based on the slug
-        if (!config) {
-          config = await storage.getLandingPageConfigBySlug("pizza-lemon");
-          if (config) {
-            // Convert slug back to readable name for display
-            const displayName = slug.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-            (config as any).storeName = displayName;
-            (config as any).heroTitle = displayName;
-          }
-        }
+        // An unknown slug is a 404. It used to show Pizza Lemon's menu (and
+        // take orders into Pizza Lemon) under whatever name was in the URL.
         if (isBrandAlias && config) {
           (config as any).storeName = "Kassenta";
           (config as any).heroTitle = "Kassenta Delivery";
@@ -578,7 +579,9 @@ function configureExpoAndLanding(app: express.Application) {
           basePath: isApiPrefixed ? "/api" : "",
           primaryColor: (config as any).primaryColor || "#FF5722",
           accentColor: (config as any).accentColor || "#2FD3C6",
-          currency: (tenant as any).currency || process.env.DEFAULT_CURRENCY || "CHF",
+          // The main branch's currency — the one prices and payments use
+          // (tenant.currency is CHF even for Syrian stores).
+          currency: await storeCurrency(tenantId),
           language: (config as any).language || "en",
           storeName: config.storeName || (config as any).heroTitle || (config as any).name || tenant.businessName,
           logo: (config as any).logo || config.logoUrl || "",
@@ -719,7 +722,7 @@ function configureExpoAndLanding(app: express.Application) {
         html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
         html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config?.primaryColor || "#2FD3C6");
         html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config?.accentColor || "#6366F1");
-        html = html.replace(/\{\{CURRENCY\}\}/g, (tenant as any).currency || "CHF");
+        html = html.replace(/\{\{CURRENCY\}\}/g, await storeCurrency(tenantId));
         html = html.replace(/\{\{LANGUAGE\}\}/g, config?.language || "en");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
@@ -1217,6 +1220,7 @@ async function initStripe() {
   await runShamCashMigrations();
   await runWholesaleMigrations();
   await runLoyaltyMigrations();
+  await runServerMigrations();
 
   setupCors(app);
 
@@ -1233,6 +1237,9 @@ async function initStripe() {
   // check inside requireRole.
   app.use(attachEmployee());
   app.use(guardTenantRoutes());
+  // Every :id / branchId / customerId … a tenant request names must belong
+  // to the licence's store (server/tenantScope.ts).
+  app.use(enforceTenantOwnership());
 
 
   configureExpoAndLanding(app);

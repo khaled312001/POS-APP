@@ -1,5 +1,7 @@
 import { db, pool } from "./db";
-import { eq, desc, sql, and, gte, lte, like, or, isNull } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte, like, or, isNull, inArray, ne } from "drizzle-orm";
+import { storeTimeZone, dayStart, daysAgoStart, monthStart as storeMonthStart } from "./storeTime";
+import { asciiDigits } from "./phone";
 import * as fs from "fs";
 import {
   branches, employees, categories, products, inventory,
@@ -87,7 +89,14 @@ function normalizeOnlineOrderRecord<T extends Record<string, any> | undefined>(o
   };
 }
 
+/** Branch ids of a store; sales, shifts, returns … are scoped through these. */
+async function tenantBranchIds(tenantId: number): Promise<number[]> {
+  const rows = await db.select({ id: branches.id }).from(branches).where(eq(branches.tenantId, tenantId));
+  return rows.map((r) => r.id);
+}
+
 export const storage = {
+  tenantBranchIds,
   seedLog(msg: string) {
     const timestamp = new Date().toISOString();
     try {
@@ -184,6 +193,9 @@ export const storage = {
   async deleteCategory(id: number) {
     await db.update(categories).set({ isActive: false }).where(eq(categories.id, id));
   },
+  async detachProductsFromCategory(categoryId: number) {
+    await db.update(products).set({ categoryId: null, updatedAt: new Date() }).where(eq(products.categoryId, categoryId));
+  },
 
   // Products
   async getProducts(search?: string) {
@@ -228,8 +240,13 @@ export const storage = {
     return prod;
   },
   async getProductByBarcode(barcode: string, tenantId: number) {
+    // A deleted (inactive) product must not ring up at the till.
     const [prod] = await db.select().from(products)
-      .where(and(eq(products.barcode, barcode), eq(products.tenantId, tenantId)));
+      .where(and(
+        eq(products.barcode, barcode),
+        eq(products.tenantId, tenantId),
+        or(eq(products.isActive, true), isNull(products.isActive)),
+      ));
     return prod;
   },
   async createProduct(data: InsertProduct) {
@@ -324,10 +341,10 @@ export const storage = {
     const conditions: any[] = [or(eq(customers.isActive, true), isNull(customers.isActive))];
     if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
     if (search) {
-      const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
+      const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(asciiDigits(search).trim());
       if (looksLikePhone) {
         const { getPhoneSearchVariants } = await import("./phoneUtils");
-        const variants = getPhoneSearchVariants(search.trim());
+        const variants = getPhoneSearchVariants(asciiDigits(search).trim());
         conditions.push(or(...getPhoneSearchConditions(customers.phone, variants)));
       } else {
         conditions.push(
@@ -351,10 +368,10 @@ export const storage = {
     const conditions: any[] = [or(eq(customers.isActive, true), isNull(customers.isActive))];
     if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
     if (search) {
-      const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
+      const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(asciiDigits(search).trim());
       if (looksLikePhone) {
         const { getPhoneSearchVariants } = await import("./phoneUtils");
-        const variants = getPhoneSearchVariants(search.trim());
+        const variants = getPhoneSearchVariants(asciiDigits(search).trim());
         conditions.push(or(...getPhoneSearchConditions(customers.phone, variants)));
       } else {
         conditions.push(
@@ -428,14 +445,19 @@ export const storage = {
     const [cust] = await db.select().from(customers).where(eq(customers.id, id));
     return cust;
   },
+  /**
+   * Soft delete. sales.customer_id is ON DELETE CASCADE: a real DELETE wiped
+   * the customer's sales (and their sale items) from the books.
+   */
   async deleteCustomer(id: number) {
-    const [cust] = await db.delete(customers).where(eq(customers.id, id));
-    return cust;
+    await db.update(customers).set({ isActive: false, updatedAt: new Date() }).where(eq(customers.id, id));
   },
   async addLoyaltyPoints(id: number, points: number) {
+    const delta = Math.trunc(Number(points));
+    if (!Number.isFinite(delta)) throw new Error("points must be a number");
     const cust = await this.getCustomer(id);
     if (!cust) return null;
-    return this.updateCustomer(id, { loyaltyPoints: (cust.loyaltyPoints || 0) + points });
+    return this.updateCustomer(id, { loyaltyPoints: Math.max(0, (cust.loyaltyPoints || 0) + delta) });
   },
 
   // Sales
@@ -474,6 +496,69 @@ export const storage = {
     const [sale] = await db.select().from(sales).where(eq(sales.id, _ins_sale[0]?.id ?? 0));
     return sale;
   },
+  /**
+   * A till sale in ONE transaction: the sale row, its lines, the stock
+   * movements and the idempotency key either all land or none do (a crash
+   * half-way used to leave a sale without items, or stock taken for a sale
+   * that does not exist).
+   */
+  async createSaleWithItems(
+    data: InsertSale,
+    items: any[],
+    opts: { clientRef?: string | null; employeeId?: number | null } = {},
+  ) {
+    const saleId = await db.transaction(async (tx) => {
+      const ins = await tx.insert(sales).values(data).$returningId();
+      const id = ins[0]?.id ?? 0;
+      if (opts.clientRef) {
+        await tx.execute(sql`UPDATE sales SET client_ref = ${opts.clientRef} WHERE id = ${id}`);
+      }
+      for (const item of items || []) {
+        await tx.insert(saleItems).values({ ...item, saleId: id } as any);
+        const productId = Number(item.productId);
+        const qty = Number(item.quantity) || 0;
+        if (!data.branchId || !Number.isFinite(productId) || productId <= 0 || !qty) continue;
+        const [inv] = await tx.select({ id: inventory.id }).from(inventory)
+          .where(and(eq(inventory.productId, productId), eq(inventory.branchId, data.branchId)))
+          .limit(1).for("update");
+        if (inv) {
+          await tx.update(inventory)
+            .set({ quantity: sql`${inventory.quantity} - ${qty}`, updatedAt: new Date() })
+            .where(eq(inventory.id, inv.id));
+        } else {
+          await tx.insert(inventory).values({ productId, branchId: data.branchId, quantity: -qty });
+        }
+        await tx.insert(inventoryMovements).values({
+          productId,
+          branchId: data.branchId,
+          type: "sale",
+          quantity: -qty,
+          referenceType: "sale",
+          referenceId: id,
+          employeeId: opts.employeeId ?? data.employeeId ?? null,
+        } as any);
+      }
+      return id;
+    });
+    const [sale] = await db.select().from(sales).where(eq(sales.id, saleId));
+    return sale;
+  },
+  /** The sale this store already recorded under a till idempotency key. */
+  async findSaleByClientRef(clientRef: string, tenantId?: number | null) {
+    const [rows]: any = tenantId
+      ? await pool.query(
+          `SELECT s.id FROM sales s JOIN branches b ON b.id = s.branch_id
+            WHERE s.client_ref = ? AND b.tenant_id = ? AND s.created_at >= NOW() - INTERVAL 7 DAY
+            ORDER BY s.id LIMIT 1`, [clientRef, tenantId])
+      : await pool.query(
+          `SELECT s.id FROM sales s
+            WHERE s.client_ref = ? AND s.created_at >= NOW() - INTERVAL 7 DAY
+            ORDER BY s.id LIMIT 1`, [clientRef]);
+    const id = Array.isArray(rows) && rows[0]?.id;
+    if (!id) return undefined;
+    const [sale] = await db.select().from(sales).where(eq(sales.id, Number(id)));
+    return sale;
+  },
   async getSaleItems(saleId: number) {
     return db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
   },
@@ -487,6 +572,32 @@ export const storage = {
   },
   async updateSale(id: number, data: Partial<InsertSale>) {
     const [sale] = await db.update(sales).set(data).where(eq(sales.id, id));
+    return sale;
+  },
+  /**
+   * Edit a sale and (optionally) replace its items in one transaction, so a
+   * failure never leaves the sale with its items deleted.
+   */
+  async updateSaleWithItems(id: number, data: Partial<InsertSale>, items?: any[]) {
+    await db.transaction(async (tx) => {
+      if (data && Object.keys(data).length) await tx.update(sales).set(data).where(eq(sales.id, id));
+      if (items !== undefined) {
+        await tx.delete(saleItems).where(eq(saleItems.saleId, id));
+        for (const item of items) {
+          await tx.insert(saleItems).values({
+            saleId: id,
+            productId: item.productId,
+            productName: item.productName || item.name,
+            quantity: item.quantity,
+            unitPrice: String(item.unitPrice),
+            total: String(item.total),
+            modifiers: item.modifiers || [],
+            notes: item.notes || null,
+          } as any);
+        }
+      }
+    });
+    const [sale] = await db.select().from(sales).where(eq(sales.id, id));
     return sale;
   },
   async deleteSale(id: number) {
@@ -537,6 +648,10 @@ export const storage = {
   async updatePurchaseOrder(id: number, data: Partial<InsertPurchaseOrder>) {
     const [po] = await db.update(purchaseOrders).set(data).where(eq(purchaseOrders.id, id));
     return po;
+  },
+  async purchaseOrderNumberExists(orderNumber: string) {
+    const [row] = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.orderNumber, orderNumber)).limit(1);
+    return !!row;
   },
   async getPurchaseOrder(id: number) {
     const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
@@ -630,10 +745,11 @@ export const storage = {
     const [exp] = await db.select().from(expenses).where(eq(expenses.id, _ins_exp[0]?.id ?? 0));
     return exp;
   },
-  async getExpensesByDateRange(startDate?: Date, endDate?: Date) {
+  async getExpensesByDateRange(startDate?: Date, endDate?: Date, tenantId?: number) {
     const conditions = [];
     if (startDate) conditions.push(gte(expenses.date, startDate));
     if (endDate) conditions.push(lte(expenses.date, endDate));
+    if (tenantId) conditions.push(eq(expenses.tenantId, tenantId));
     if (conditions.length > 0) {
       return db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.createdAt));
     }
@@ -644,11 +760,25 @@ export const storage = {
   },
 
   // Tables
-  async getTables(branchId?: number) {
+  async getTables(branchId?: number, tenantId?: number) {
     if (branchId) {
       return db.select().from(tables).where(eq(tables.branchId, branchId));
     }
+    if (tenantId) {
+      const ids = await tenantBranchIds(tenantId);
+      return ids.length ? db.select().from(tables).where(inArray(tables.branchId, ids)) : [];
+    }
     return db.select().from(tables);
+  },
+  async getTable(id: number) {
+    const [table] = await db.select().from(tables).where(eq(tables.id, id));
+    return table;
+  },
+  async deleteTable(id: number) {
+    // Its QR code goes too — a printed code must not keep opening a table
+    // that no longer exists.
+    await db.delete(tableQrCodes).where(eq(tableQrCodes.tableId, id));
+    await db.delete(tables).where(eq(tables.id, id));
   },
   async createTable(data: InsertTable) {
     const _ins_table = await db.insert(tables).values(data).$returningId();
@@ -688,10 +818,17 @@ export const storage = {
   },
 
   // Kitchen Orders
-  async getKitchenOrders(branchId?: number) {
+  async getKitchenOrders(branchId?: number, tenantId?: number) {
     if (branchId) {
       return db.select().from(kitchenOrders).where(
         and(eq(kitchenOrders.branchId, branchId), eq(kitchenOrders.status, "pending"))
+      ).orderBy(kitchenOrders.createdAt);
+    }
+    if (tenantId) {
+      const ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+      return db.select().from(kitchenOrders).where(
+        and(inArray(kitchenOrders.branchId, ids), eq(kitchenOrders.status, "pending"))
       ).orderBy(kitchenOrders.createdAt);
     }
     return db.select().from(kitchenOrders).where(eq(kitchenOrders.status, "pending")).orderBy(kitchenOrders.createdAt);
@@ -716,7 +853,12 @@ export const storage = {
     const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, _ins_plan[0]?.id ?? 0));
     return plan;
   },
-  async getSubscriptions() {
+  async getSubscriptions(tenantId?: number) {
+    if (tenantId) {
+      return db.select().from(subscriptions)
+        .where(sql`${subscriptions.customerId} IN (SELECT id FROM customers WHERE tenant_id = ${tenantId})`)
+        .orderBy(desc(subscriptions.createdAt));
+    }
     return db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
   },
   async createSubscription(data: InsertSubscription) {
@@ -813,10 +955,23 @@ export const storage = {
   },
 
   // Sales Analytics
-  async getSalesByDateRange(startDate: Date, endDate: Date) {
-    return db.select().from(sales).where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate))).orderBy(desc(sales.createdAt));
+  async getSalesByDateRange(startDate: Date, endDate: Date, tenantId?: number, branchId?: number) {
+    const conditions: any[] = [gte(sales.createdAt, startDate), lte(sales.createdAt, endDate)];
+    if (branchId) conditions.push(eq(sales.branchId, branchId));
+    if (tenantId) {
+      const ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+      conditions.push(inArray(sales.branchId, ids));
+    }
+    return db.select().from(sales).where(and(...conditions)).orderBy(desc(sales.createdAt));
   },
-  async getSalesWithCustomerByDateRange(startDate: Date, endDate: Date) {
+  async getSalesWithCustomerByDateRange(startDate: Date, endDate: Date, tenantId?: number) {
+    const conditions: any[] = [gte(sales.createdAt, startDate), lte(sales.createdAt, endDate)];
+    if (tenantId) {
+      const ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+      conditions.push(inArray(sales.branchId, ids));
+    }
     return db.select({
       id: sales.id,
       receiptNumber: sales.receiptNumber,
@@ -833,25 +988,41 @@ export const storage = {
       customerPostalCode: customers.postalCode,
     }).from(sales)
       .leftJoin(customers, eq(sales.customerId, customers.id))
-      .where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate)))
+      .where(and(...conditions))
       .orderBy(sales.createdAt);
   },
-  async getTopProducts(limit?: number) {
+  async getTopProducts(limit?: number, tenantId?: number) {
     const topLimit = limit || 10;
-    const result = await db.select({
+    let ids: number[] | null = null;
+    if (tenantId) {
+      ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+    }
+    const base = db.select({
       productId: saleItems.productId,
       name: saleItems.productName,
       totalSold: sql<number>`sum(${saleItems.quantity})`,
       revenue: sql<string>`sum(${saleItems.total})`,
-    }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
-    return result.map(r => ({ ...r, totalSold: Number(r.totalSold), revenue: Number(r.revenue) }));
+    }).from(saleItems);
+    const scoped = ids
+      ? base.innerJoin(sales, eq(saleItems.saleId, sales.id)).where(inArray(sales.branchId, ids))
+      : base;
+    const result = await (scoped as any).groupBy(saleItems.productId, saleItems.productName).orderBy(sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
+    return (result as any[]).map(r => ({ ...r, totalSold: Number(r.totalSold), revenue: Number(r.revenue) }));
   },
-  async getSalesByPaymentMethod() {
-    const result = await db.select({
+  async getSalesByPaymentMethod(tenantId?: number) {
+    let where: any = undefined;
+    if (tenantId) {
+      const ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+      where = inArray(sales.branchId, ids);
+    }
+    const q = db.select({
       method: sales.paymentMethod,
       count: sql<number>`count(*)`,
       total: sql<string>`coalesce(sum(${sales.totalAmount}), 0)`,
-    }).from(sales).groupBy(sales.paymentMethod);
+    }).from(sales);
+    const result = await (where ? q.where(where) : q).groupBy(sales.paymentMethod);
     return result.map(r => ({ method: r.method, count: Number(r.count), total: Number(r.total) }));
   },
 
@@ -873,16 +1044,13 @@ export const storage = {
     let recentSalesQuery: any;
     let profitRowQuery: any;
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - 7);
-    weekStart.setHours(0, 0, 0, 0);
-
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    // The store's own calendar: Damascus for SYP stores, Zurich for CHF.
+    // "Week" is the last 7 store days including today (it used to reach back
+    // 8 days: today minus 7, from midnight).
+    const tz = await storeTimeZone(tenantId);
+    const todayStart = dayStart(tz);
+    const weekStart = daysAgoStart(tz, 6);
+    const monthStart = storeMonthStart(tz);
 
     if (tenantId) {
       const tenantBranches = await this.getBranchesByTenant(tenantId);
@@ -1161,7 +1329,12 @@ export const storage = {
   },
 
   // Warehouse Transfers
-  async getWarehouseTransfers() {
+  async getWarehouseTransfers(tenantId?: number) {
+    if (tenantId) {
+      return db.select().from(warehouseTransfers)
+        .where(sql`${warehouseTransfers.fromWarehouseId} IN (SELECT w.id FROM warehouses w JOIN branches b ON b.id = w.branch_id WHERE b.tenant_id = ${tenantId})`)
+        .orderBy(desc(warehouseTransfers.createdAt));
+    }
     return db.select().from(warehouseTransfers).orderBy(desc(warehouseTransfers.createdAt));
   },
   async createWarehouseTransfer(data: InsertWarehouseTransfer) {
@@ -1196,10 +1369,15 @@ export const storage = {
   },
 
   // Inventory Movements
-  async getInventoryMovements(productId?: number, limit?: number) {
+  async getInventoryMovements(productId?: number, limit?: number, tenantId?: number) {
     const l = limit || 100;
-    if (productId) return db.select().from(inventoryMovements).where(eq(inventoryMovements.productId, productId)).orderBy(desc(inventoryMovements.createdAt)).limit(l);
-    return db.select().from(inventoryMovements).orderBy(desc(inventoryMovements.createdAt)).limit(l);
+    const conditions: any[] = [];
+    if (productId) conditions.push(eq(inventoryMovements.productId, productId));
+    if (tenantId) {
+      conditions.push(sql`${inventoryMovements.productId} IN (SELECT id FROM products WHERE tenant_id = ${tenantId})`);
+    }
+    const q = db.select().from(inventoryMovements);
+    return (conditions.length ? q.where(and(...conditions)) : q).orderBy(desc(inventoryMovements.createdAt)).limit(l);
   },
   async createInventoryMovement(data: InsertInventoryMovement) {
     const _ins_mov = await db.insert(inventoryMovements).values(data).$returningId();
@@ -1208,7 +1386,12 @@ export const storage = {
   },
 
   // Stock Counts
-  async getStockCounts() {
+  async getStockCounts(tenantId?: number) {
+    if (tenantId) {
+      const ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+      return db.select().from(stockCounts).where(inArray(stockCounts.branchId, ids)).orderBy(desc(stockCounts.createdAt));
+    }
     return db.select().from(stockCounts).orderBy(desc(stockCounts.createdAt));
   },
   async getStockCount(id: number) {
@@ -1238,8 +1421,14 @@ export const storage = {
   },
 
   // Supplier Contracts
-  async getSupplierContracts(supplierId?: number) {
+  async getSupplierContracts(supplierId?: number, tenantId?: number) {
     if (supplierId) return db.select().from(supplierContracts).where(and(eq(supplierContracts.supplierId, supplierId), eq(supplierContracts.isActive, true)));
+    if (tenantId) {
+      return db.select().from(supplierContracts).where(and(
+        eq(supplierContracts.isActive, true),
+        sql`${supplierContracts.supplierId} IN (SELECT id FROM suppliers WHERE tenant_id = ${tenantId})`,
+      ));
+    }
     return db.select().from(supplierContracts).where(eq(supplierContracts.isActive, true));
   },
   async createSupplierContract(data: InsertSupplierContract) {
@@ -1253,8 +1442,13 @@ export const storage = {
   },
 
   // Employee Commissions
-  async getEmployeeCommissions(employeeId?: number) {
+  async getEmployeeCommissions(employeeId?: number, tenantId?: number) {
     if (employeeId) return db.select().from(employeeCommissions).where(eq(employeeCommissions.employeeId, employeeId)).orderBy(desc(employeeCommissions.createdAt));
+    if (tenantId) {
+      const emps = await this.getEmployeesByTenant(tenantId);
+      if (!emps.length) return [];
+      return db.select().from(employeeCommissions).where(inArray(employeeCommissions.employeeId, emps.map((e) => e.id))).orderBy(desc(employeeCommissions.createdAt));
+    }
     return db.select().from(employeeCommissions).orderBy(desc(employeeCommissions.createdAt));
   },
   async createEmployeeCommission(data: InsertEmployeeCommission) {
@@ -1271,16 +1465,22 @@ export const storage = {
     }).from(sales).where(eq(sales.employeeId, employeeId));
     return { salesCount: Number(result[0]?.count || 0), totalRevenue: Number(result[0]?.total || 0) };
   },
-  async getSlowMovingProducts(days: number = 30) {
+  async getSlowMovingProducts(days: number = 30, tenantId?: number) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
-    const allProds = await db.select().from(products).where(eq(products.isActive, true));
-    const recentSaleItems = await db.select({
+    let ids: number[] | null = null;
+    if (tenantId) {
+      ids = await tenantBranchIds(tenantId);
+    }
+    const allProds = await db.select().from(products).where(
+      tenantId ? and(eq(products.isActive, true), eq(products.tenantId, tenantId)) : eq(products.isActive, true),
+    );
+    const recentSaleItems = ids && !ids.length ? [] : await db.select({
       productId: saleItems.productId,
       totalSold: sql<number>`sum(${saleItems.quantity})`,
     }).from(saleItems)
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
-      .where(gte(sales.createdAt, cutoffDate))
+      .where(ids ? and(gte(sales.createdAt, cutoffDate), inArray(sales.branchId, ids)) : gte(sales.createdAt, cutoffDate))
       .groupBy(saleItems.productId);
     const soldMap = new Map(recentSaleItems.map(r => [r.productId, Number(r.totalSold)]));
     return allProds.filter(p => !soldMap.has(p.id) || (soldMap.get(p.id) || 0) < 3).map(p => ({
@@ -1288,14 +1488,24 @@ export const storage = {
       recentSold: soldMap.get(p.id) || 0,
     }));
   },
-  async getProfitByProduct() {
-    const result = await db.select({
+  async getProfitByProduct(tenantId?: number) {
+    let ids: number[] | null = null;
+    if (tenantId) {
+      ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+    }
+    const base = db.select({
       productId: saleItems.productId,
       productName: saleItems.productName,
       totalRevenue: sql<string>`sum(${saleItems.total})`,
       totalSold: sql<number>`sum(${saleItems.quantity})`,
-    }).from(saleItems).groupBy(saleItems.productId, saleItems.productName);
-    const prodList = await db.select().from(products);
+    }).from(saleItems);
+    const result: any[] = await (ids
+      ? base.innerJoin(sales, eq(saleItems.saleId, sales.id)).where(inArray(sales.branchId, ids))
+      : base as any).groupBy(saleItems.productId, saleItems.productName);
+    const prodList = tenantId
+      ? await db.select().from(products).where(eq(products.tenantId, tenantId))
+      : await db.select().from(products);
     const prodMap = new Map(prodList.map(p => [p.id, p]));
     return result.map(r => {
       const prod = prodMap.get(r.productId);
@@ -1313,14 +1523,20 @@ export const storage = {
       };
     }).sort((a, b) => b.profit - a.profit);
   },
-  async getCashierPerformance() {
-    const result = await db.select({
+  async getCashierPerformance(tenantId?: number) {
+    let ids: number[] | null = null;
+    if (tenantId) {
+      ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return [];
+    }
+    const base = db.select({
       employeeId: sales.employeeId,
       count: sql<number>`count(*)`,
       total: sql<string>`coalesce(sum(${sales.totalAmount}), 0)`,
       avgSale: sql<string>`coalesce(avg(${sales.totalAmount}), 0)`,
-    }).from(sales).groupBy(sales.employeeId);
-    const empList = await db.select().from(employees);
+    }).from(sales);
+    const result = await (ids ? base.where(inArray(sales.branchId, ids)) : base).groupBy(sales.employeeId);
+    const empList: any[] = tenantId ? await this.getEmployeesByTenant(tenantId) : await db.select().from(employees);
     const empMap = new Map(empList.map(e => [e.id, e]));
     return result.map(r => ({
       employeeId: r.employeeId,
@@ -1331,12 +1547,20 @@ export const storage = {
       avgSaleValue: Number(r.avgSale || 0),
     })).sort((a, b) => b.totalRevenue - a.totalRevenue);
   },
-  async getReturnsReport() {
-    const result = await db.select({
+  async getReturnsReport(tenantId?: number) {
+    let where: any = undefined;
+    if (tenantId) {
+      const ids = await tenantBranchIds(tenantId);
+      if (!ids.length) return { totalReturns: 0, totalRefundAmount: 0, recentReturns: [] };
+      where = inArray(returns.branchId, ids);
+    }
+    const agg = db.select({
       count: sql<number>`count(*)`,
       total: sql<string>`coalesce(sum(${returns.totalAmount}), 0)`,
     }).from(returns);
-    const returnsList = await db.select().from(returns).orderBy(desc(returns.createdAt)).limit(20);
+    const result = await (where ? agg.where(where) : agg);
+    const list = db.select().from(returns);
+    const returnsList = await (where ? list.where(where) : list).orderBy(desc(returns.createdAt)).limit(20);
     return {
       totalReturns: Number(result[0]?.count || 0),
       totalRefundAmount: Number(result[0]?.total || 0),
@@ -1366,9 +1590,17 @@ export const storage = {
     await db.update(notifications).set({ isRead: true }).where(eq(notifications.recipientId, recipientId));
   },
   async notifyAdmins(senderId: number, type: string, title: string, message: string, entityType?: string, entityId?: number, priority?: string) {
-    const admins = await db.select().from(employees).where(
-      or(eq(employees.role, "admin"), eq(employees.role, "owner"))
-    );
+    // Only the sender's own store: this used to notify the admins of EVERY
+    // store on the platform about each sale, return and cash withdrawal.
+    const sender = senderId ? await this.getEmployee(senderId) : undefined;
+    let senderTenant: number | null = sender?.tenantId ?? null;
+    if (!senderTenant && sender?.branchId) {
+      const br = await this.getBranch(sender.branchId);
+      senderTenant = br?.tenantId ?? null;
+    }
+    if (!senderTenant) return [];
+    const admins = (await this.getEmployeesByTenant(senderTenant))
+      .filter((e) => e.role === "admin" || e.role === "owner");
     const notifs = [];
     for (const admin of admins) {
       if (admin.id === senderId) continue;
@@ -1434,8 +1666,7 @@ export const storage = {
     const empMap = new Map(empList.map(e => [e.id, e]));
     const activeShifts = allShifts.filter(s => s.status === "open");
     const closedShifts = allShifts.filter(s => s.status === "closed");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = dayStart(await storeTimeZone(tenantId));
     const todayShifts = allShifts.filter(s => s.startTime && new Date(s.startTime) >= today);
     return {
       activeCount: activeShifts.length,
@@ -2113,10 +2344,12 @@ export const storage = {
   },
 
   // ── Daily Sequential Numbering (resets at midnight Europe/Zurich) ──────────
-  async getNextSequenceNumber(scopeKey: string): Promise<number> {
-    // Get current date in Swiss timezone (Europe/Zurich = UTC+1/+2)
+  async getNextSequenceNumber(scopeKey: string, timeZone: string = "Europe/Zurich"): Promise<number> {
+    // The counter restarts at midnight of the store's own zone — the same
+    // calendar day that is printed in the receipt / order number, or two
+    // numbers of the same day could collide around midnight.
     const swissDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Europe/Zurich",
+      timeZone,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -2221,6 +2454,16 @@ export const storage = {
         .where(eq(customerAddresses.customerId, data.customerId));
     }
     await db.update(customerAddresses).set(data).where(eq(customerAddresses.id, id));
+    const [addr] = await db.select().from(customerAddresses).where(eq(customerAddresses.id, id)).limit(1);
+    return addr;
+  },
+
+  async findCustomerByPhoneExact(phone: string, tenantId: number) {
+    const [c] = await db.select().from(customers)
+      .where(and(eq(customers.phone, phone), eq(customers.tenantId, tenantId))).limit(1);
+    return c;
+  },
+  async getCustomerAddress(id: number) {
     const [addr] = await db.select().from(customerAddresses).where(eq(customerAddresses.id, id)).limit(1);
     return addr;
   },
@@ -2340,24 +2583,48 @@ export const storage = {
 
   // ── Delivery Management ─────────────────────────────────────────────────────
   async getDeliveryOrders(tenantId: number, filters?: { status?: string; orderType?: string }) {
-    let q = db.select().from(onlineOrders).where(eq(onlineOrders.tenantId, tenantId));
-    if (filters?.status) {
-      q = q.where(eq(onlineOrders.status, filters.status)) as any;
-    }
-    if (filters?.orderType) {
-      q = q.where(eq(onlineOrders.orderType, filters.orderType)) as any;
-    }
-    return q.orderBy(desc(onlineOrders.createdAt));
+    // One WHERE with every condition: a second .where() replaced the tenant
+    // filter, so a status filter returned every store's orders.
+    const conditions: any[] = [eq(onlineOrders.tenantId, tenantId)];
+    if (filters?.status) conditions.push(eq(onlineOrders.status, filters.status));
+    if (filters?.orderType) conditions.push(eq(onlineOrders.orderType, filters.orderType));
+    return db.select().from(onlineOrders).where(and(...conditions)).orderBy(desc(onlineOrders.createdAt));
   },
 
   async assignDriverToOrder(orderId: number, vehicleId: number) {
+    const [order] = await db.select({ driverId: onlineOrders.driverId }).from(onlineOrders).where(eq(onlineOrders.id, orderId)).limit(1);
+    const previous = order?.driverId ?? null;
     await db.update(onlineOrders).set({ driverId: vehicleId }).where(eq(onlineOrders.id, orderId));
     await db.update(vehicles).set({ driverStatus: "on_delivery", activeOrderId: orderId }).where(eq(vehicles.id, vehicleId));
+    // Reassigned: the previous driver is free again (unless busy elsewhere).
+    if (previous && previous !== vehicleId) await this.releaseDriverFromOrder(previous, orderId);
+  },
+
+  /**
+   * Frees `vehicleId` after `orderId` is delivered, cancelled or taken off
+   * them. A driver still carrying another open order stays on_delivery
+   * (pointing at that order).
+   */
+  async releaseDriverFromOrder(vehicleId: number, orderId: number) {
+    const open = await db.select({ id: onlineOrders.id }).from(onlineOrders).where(and(
+      eq(onlineOrders.driverId, vehicleId),
+      ne(onlineOrders.id, orderId),
+      sql`${onlineOrders.status} NOT IN ('delivered', 'cancelled', 'rejected', 'completed')`,
+    )).limit(1);
+    if (open.length) {
+      await db.update(vehicles).set({ activeOrderId: open[0].id }).where(eq(vehicles.id, vehicleId));
+      return;
+    }
+    await db.update(vehicles)
+      .set({ driverStatus: "available", activeOrderId: null } as any)
+      .where(and(eq(vehicles.id, vehicleId), eq(vehicles.driverStatus, "on_delivery")));
+    await db.update(vehicles)
+      .set({ activeOrderId: null } as any)
+      .where(and(eq(vehicles.id, vehicleId), eq(vehicles.activeOrderId, orderId)));
   },
 
   async getDeliveryStats(tenantId: number) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = dayStart(await storeTimeZone(tenantId));
 
     const [totalRow] = await db.select({ count: sql<number>`count(*)` })
       .from(onlineOrders)
@@ -2384,12 +2651,30 @@ export const storage = {
   },
 
   // ── Customer order history (delivery) ──────────────────────────────────────
+  /**
+   * A customer's online orders, matched by phone in every stored format
+   * (+963…, 09…, 0041…). Orders at the customer's own store always count;
+   * orders at OTHER stores only once the phone was proven by an OTP login
+   * (customers.phone_verified_at), so an unverified phone typed at
+   * registration never reveals someone else's orders.
+   */
   async getCustomerOrderHistory(customerId: number, tenantId: number, limit = 20) {
+    let row: any;
+    try {
+      const [rows]: any = await pool.query("SELECT phone, phone_verified_at FROM customers WHERE id = ? LIMIT 1", [customerId]);
+      row = rows?.[0];
+    } catch {
+      const [rows]: any = await pool.query("SELECT phone FROM customers WHERE id = ? LIMIT 1", [customerId]);
+      row = rows?.[0];
+    }
+    const phone = String(row?.phone || "");
+    if (!phone || phone.startsWith("guest-")) return [];
+    const { getPhoneSearchVariants } = await import("./phoneUtils");
+    const variants = Array.from(new Set([phone, ...getPhoneSearchVariants(phone)])).filter((v) => v && v.length >= 6);
+    if (!variants.length) return [];
+    const scope = row?.phone_verified_at ? undefined : eq(onlineOrders.tenantId, tenantId);
     return db.select().from(onlineOrders)
-      .where(and(
-        sql`${onlineOrders.customerPhone} = (SELECT phone FROM customers WHERE id = ${customerId})`,
-        eq(onlineOrders.tenantId, tenantId)
-      ))
+      .where(scope ? and(inArray(onlineOrders.customerPhone, variants), scope) : inArray(onlineOrders.customerPhone, variants))
       .orderBy(desc(onlineOrders.createdAt))
       .limit(limit);
   },

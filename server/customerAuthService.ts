@@ -7,7 +7,9 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import { db } from "./db";
 import { customers, customerSessions, otpVerifications } from "../shared/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, ne } from "drizzle-orm";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "./jwtSecret";
 import type { Customer } from "../shared/schema";
 
 const SESSION_TTL_DAYS = 30;
@@ -76,7 +78,7 @@ export async function verifyOtp(
     .limit(1);
 
   if (!record) {
-    return { success: false, error: "OTP expired or not found" };
+    return { success: false, error: "انتهت صلاحية الرمز أو لم يُطلب — اطلب رمزاً جديداً / OTP expired or not found" };
   }
 
   const attempts = (record.attempts ?? 0) + 1;
@@ -86,7 +88,7 @@ export async function verifyOtp(
       .update(otpVerifications)
       .set({ verified: true })
       .where(eq(otpVerifications.id, record.id));
-    return { success: false, error: "Too many attempts. Please request a new OTP." };
+    return { success: false, error: "محاولات كثيرة، اطلب رمزاً جديداً / Too many attempts. Please request a new OTP." };
   }
 
   await db
@@ -95,7 +97,7 @@ export async function verifyOtp(
     .where(eq(otpVerifications.id, record.id));
 
   if (record.otp !== inputOtp) {
-    return { success: false, error: "Invalid OTP" };
+    return { success: false, error: "الرمز غير صحيح / Invalid OTP" };
   }
 
   await db
@@ -118,7 +120,15 @@ export async function findOrCreateCustomerByPhone(
     .where(and(eq(customers.phone, phone), eq(customers.tenantId, tenantId)))
     .limit(1);
 
-  if (existing) return existing;
+  if (existing) {
+    // A customer the store deleted (soft delete) comes back when they log in
+    // again, instead of a second row with the same phone.
+    if (existing.isActive === false) {
+      await db.update(customers).set({ isActive: true }).where(eq(customers.id, existing.id));
+      return { ...existing, isActive: true };
+    }
+    return existing;
+  }
 
   const referralCode = generateToken(4).toUpperCase(); // 8-char hex ref code
   const [inserted] = await db
@@ -141,6 +151,51 @@ export async function findOrCreateCustomerByPhone(
     .limit(1);
 
   return newCustomer;
+}
+
+// ── Phone proof ───────────────────────────────────────────────────────────────
+// verify-otp hands the client a 15-minute token proving it controls a phone,
+// so /auth/register can attach a password to an EXISTING customer only with
+// that proof (it used to set one on any phone number — an account takeover).
+const PHONE_PROOF_SECRET = `${JWT_SECRET}:phone-proof`;
+
+export function signPhoneProof(phone: string, tenantId: number): string {
+  return jwt.sign({ typ: "phone", ph: phone, t: tenantId }, PHONE_PROOF_SECRET, { expiresIn: "15m" });
+}
+
+export function verifyPhoneProof(token: unknown, phone: string, tenantId: number): boolean {
+  if (typeof token !== "string" || !token) return false;
+  try {
+    const c = jwt.verify(token, PHONE_PROOF_SECRET) as any;
+    return c?.typ === "phone" && c.ph === phone && Number(c.t) === Number(tenantId);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The phone's owner just proved it (OTP). If the row was never a real account
+ * — a guest row or one the till created — sessions someone else may have
+ * opened on it are revoked before the owner takes it over.
+ */
+export async function claimCustomerAfterPhoneProof(customer: Customer): Promise<void> {
+  // Remember the proof: order history across stores is matched by phone
+  // only for proven phones (storage.getCustomerOrderHistory).
+  try {
+    const { pool } = await import("./db");
+    await pool.query("UPDATE customers SET phone_verified_at = NOW() WHERE id = ?", [customer.id]);
+  } catch { /* column added by serverMigrations; never block a login */ }
+  if (customer.hasAccount) return;
+  await db.delete(customerSessions).where(eq(customerSessions.customerId, customer.id));
+  await db.update(customers).set({ hasAccount: true, isActive: true }).where(eq(customers.id, customer.id));
+}
+
+/** Another customer of this store already uses this e-mail? */
+export async function emailTakenByOther(email: string, tenantId: number, customerId?: number): Promise<boolean> {
+  const conds = [eq(customers.email, email), eq(customers.tenantId, tenantId)];
+  if (customerId) conds.push(ne(customers.id, customerId));
+  const [row] = await db.select({ id: customers.id }).from(customers).where(and(...conds)).limit(1);
+  return !!row;
 }
 
 // ── Email / password login ────────────────────────────────────────────────────

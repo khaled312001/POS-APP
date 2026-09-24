@@ -1340,6 +1340,173 @@ var init_db = __esm({
   }
 });
 
+// server/storeTime.ts
+function isZeroDecimal(currency) {
+  return ZERO_DECIMAL.has(String(currency || "").toUpperCase());
+}
+function roundMoney(amount, currency) {
+  const n = Number(amount) || 0;
+  return isZeroDecimal(currency) ? Math.round(n) : Math.round(n * 100) / 100;
+}
+function formatMoney(amount, currency) {
+  const cur = String(currency || "CHF").toUpperCase();
+  const n = Number(amount) || 0;
+  if (isZeroDecimal(cur)) {
+    const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return cur === "SYP" ? `${s} \u0644.\u0633` : `${s} ${cur}`;
+  }
+  return `${n.toFixed(2)} ${cur}`;
+}
+function timeZoneForCurrency(currency) {
+  return ZONE_BY_CURRENCY[String(currency || "").toUpperCase()] || DEFAULT_TIME_ZONE;
+}
+async function storeCurrency(tenantId) {
+  const id = Number(tenantId) || 0;
+  if (!id) return "CHF";
+  const hit = currencyCache.get(id);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.currency;
+  let currency = "CHF";
+  try {
+    const [rows] = await pool.query(
+      "SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id LIMIT 1",
+      [id]
+    );
+    if (rows?.[0]?.currency) currency = String(rows[0].currency).toUpperCase();
+  } catch {
+  }
+  currencyCache.set(id, { at: Date.now(), currency });
+  return currency;
+}
+async function branchCurrency(branchId) {
+  const id = Number(branchId) || 0;
+  if (!id) return "CHF";
+  try {
+    const [rows] = await pool.query("SELECT tenant_id, currency FROM branches WHERE id = ? LIMIT 1", [id]);
+    const row = rows?.[0];
+    if (row?.currency) return String(row.currency).toUpperCase();
+    if (row?.tenant_id) return storeCurrency(Number(row.tenant_id));
+  } catch {
+  }
+  return "CHF";
+}
+async function storeTimeZone(tenantId) {
+  return timeZoneForCurrency(await storeCurrency(tenantId));
+}
+function partsIn(tz, d) {
+  const f = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+  const p = {};
+  for (const x of f.formatToParts(d)) if (x.type !== "literal") p[x.type] = Number(x.value);
+  return p;
+}
+function offsetMs(tz, d) {
+  const p = partsIn(tz, d);
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asUtc - (d.getTime() - d.getMilliseconds());
+}
+function zonedToUtc(tz, y, m, d, hh = 0, mm = 0, ss = 0, ms = 0) {
+  const guess = Date.UTC(y, m - 1, d, hh, mm, ss, ms);
+  let t2 = guess - offsetMs(tz, new Date(guess));
+  t2 = guess - offsetMs(tz, new Date(t2));
+  return new Date(t2);
+}
+function localDateString(tz, d = /* @__PURE__ */ new Date()) {
+  const p = partsIn(tz, d);
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+function compactDate(tz, d = /* @__PURE__ */ new Date()) {
+  return localDateString(tz, d).replace(/-/g, "");
+}
+function ymd(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || "").trim());
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+function dayStart(tz, d = /* @__PURE__ */ new Date()) {
+  const parts = typeof d === "string" ? ymd(d) : null;
+  if (typeof d === "string" && !parts) return /* @__PURE__ */ new Date(NaN);
+  const [y, m, day] = parts ?? (() => {
+    const p = partsIn(tz, d);
+    return [p.year, p.month, p.day];
+  })();
+  return zonedToUtc(tz, y, m, day);
+}
+function dayEnd(tz, d = /* @__PURE__ */ new Date()) {
+  const start = dayStart(tz, d);
+  if (isNaN(start.getTime())) return start;
+  const p = partsIn(tz, new Date(start.getTime() + 12 * 3600 * 1e3));
+  const next = zonedToUtc(tz, p.year, p.month, p.day + 1);
+  return new Date(next.getTime() - 1);
+}
+function daysAgoStart(tz, days, now = /* @__PURE__ */ new Date()) {
+  const p = partsIn(tz, now);
+  return zonedToUtc(tz, p.year, p.month, p.day - days);
+}
+function monthStart(tz, now = /* @__PURE__ */ new Date()) {
+  const p = partsIn(tz, now);
+  return zonedToUtc(tz, p.year, p.month, 1);
+}
+function monthRange(tz, month) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(month || "").trim());
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]);
+  const start = zonedToUtc(tz, y, mo, 1);
+  const next = zonedToUtc(tz, y, mo + 1, 1);
+  return [start, new Date(next.getTime() - 1)];
+}
+function localMonthString(tz, d = /* @__PURE__ */ new Date()) {
+  return localDateString(tz, d).slice(0, 7);
+}
+var ZONE_BY_CURRENCY, DEFAULT_TIME_ZONE, ZERO_DECIMAL, CACHE_MS, currencyCache;
+var init_storeTime = __esm({
+  "server/storeTime.ts"() {
+    "use strict";
+    init_db();
+    ZONE_BY_CURRENCY = {
+      SYP: "Asia/Damascus",
+      EGP: "Africa/Cairo",
+      SAR: "Asia/Riyadh",
+      AED: "Asia/Dubai",
+      CHF: "Europe/Zurich",
+      EUR: "Europe/Zurich"
+    };
+    DEFAULT_TIME_ZONE = "Europe/Zurich";
+    ZERO_DECIMAL = /* @__PURE__ */ new Set(["SYP", "IQD", "LBP", "JPY", "KRW"]);
+    CACHE_MS = 5 * 60 * 1e3;
+    currencyCache = /* @__PURE__ */ new Map();
+  }
+});
+
+// server/phone.ts
+function asciiDigits(raw) {
+  return String(raw ?? "").replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632)).replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776));
+}
+function canonicalPhone(raw) {
+  const typed = asciiDigits(raw).trim();
+  let d = typed.replace(/\D/g, "");
+  if (!d) return typed;
+  if (d.startsWith("00")) d = d.slice(2);
+  if (/^09[3-9]\d{7}$/.test(d)) return "+963" + d.slice(1);
+  if (/^9[3-9]\d{7}$/.test(d)) return "+963" + d;
+  if (/^9639\d{8}$/.test(d)) return "+" + d;
+  if (/^96309\d{8}$/.test(d)) return "+963" + d.slice(4);
+  if (/^01[0125]\d{8}$/.test(d)) return "+20" + d.slice(1);
+  if (/^201[0125]\d{8}$/.test(d)) return "+" + d;
+  return typed;
+}
+var init_phone = __esm({
+  "server/phone.ts"() {
+    "use strict";
+  }
+});
+
 // server/phoneUtils.ts
 var phoneUtils_exports = {};
 __export(phoneUtils_exports, {
@@ -1380,9 +1547,18 @@ function isSwissLandlineWithAreaCode(digits2) {
   return /^0[^7]\d{8}$/.test(digits2);
 }
 function getPhoneSearchVariants(search) {
-  const cleaned = search.replace(/[\s\-\(\)\.\/]/g, "");
+  const cleaned = asciiDigits(search).replace(/[\s\-\(\)\.\/]/g, "");
   const variants = /* @__PURE__ */ new Set();
   variants.add(cleaned);
+  const canonical = canonicalPhone(cleaned);
+  if (/^\+9639\d{8}$/.test(canonical)) {
+    const local9 = canonical.slice(4);
+    variants.add(canonical);
+    variants.add("963" + local9);
+    variants.add("00963" + local9);
+    variants.add("0" + local9);
+    variants.add(local9);
+  }
   const normalized = normalizePhone(cleaned);
   variants.add(normalized);
   let baseNumber = normalized;
@@ -1417,6 +1593,7 @@ var SWISS_AREA_CODES;
 var init_phoneUtils = __esm({
   "server/phoneUtils.ts"() {
     "use strict";
+    init_phone();
     SWISS_AREA_CODES = [
       "044",
       "043",
@@ -1494,15 +1671,22 @@ function normalizeOnlineOrderRecord(order) {
     items: normalizeArrayLikeJson(order.items)
   };
 }
+async function tenantBranchIds(tenantId) {
+  const rows = await db.select({ id: branches.id }).from(branches).where((0, import_drizzle_orm.eq)(branches.tenantId, tenantId));
+  return rows.map((r) => r.id);
+}
 var import_drizzle_orm, fs, storage;
 var init_storage = __esm({
   "server/storage.ts"() {
     "use strict";
     init_db();
     import_drizzle_orm = require("drizzle-orm");
+    init_storeTime();
+    init_phone();
     fs = __toESM(require("fs"));
     init_schema();
     storage = {
+      tenantBranchIds,
       seedLog(msg) {
         const timestamp2 = (/* @__PURE__ */ new Date()).toISOString();
         try {
@@ -1543,9 +1727,9 @@ var init_storage = __esm({
       async getEmployeesByTenant(tenantId) {
         const tenantBranches = await this.getBranchesByTenant(tenantId);
         const branchIds = tenantBranches.map((b) => b.id);
-        const { inArray: inArray3 } = await import("drizzle-orm");
+        const { inArray: inArray4 } = await import("drizzle-orm");
         if (branchIds.length > 0) {
-          return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.tenantId, tenantId), inArray3(employees.branchId, branchIds)))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
+          return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.tenantId, tenantId), inArray4(employees.branchId, branchIds)))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
         }
         return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.eq)(employees.tenantId, tenantId))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
       },
@@ -1593,19 +1777,22 @@ var init_storage = __esm({
       async deleteCategory(id) {
         await db.update(categories).set({ isActive: false }).where((0, import_drizzle_orm.eq)(categories.id, id));
       },
+      async detachProductsFromCategory(categoryId) {
+        await db.update(products).set({ categoryId: null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(products.categoryId, categoryId));
+      },
       // Products
       async getProducts(search) {
         if (search) {
-          const q7 = `%${search.toLowerCase()}%`;
+          const q8 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q7}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q8}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1614,17 +1801,17 @@ var init_storage = __esm({
       },
       async getProductsByTenant(tenantId, search) {
         if (search) {
-          const q7 = `%${search.toLowerCase()}%`;
+          const q8 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q7}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q7}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q8}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q8}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1636,7 +1823,11 @@ var init_storage = __esm({
         return prod;
       },
       async getProductByBarcode(barcode, tenantId) {
-        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.barcode, barcode), (0, import_drizzle_orm.eq)(products.tenantId, tenantId)));
+        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.and)(
+          (0, import_drizzle_orm.eq)(products.barcode, barcode),
+          (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
+          (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(products.isActive, true), (0, import_drizzle_orm.isNull)(products.isActive))
+        ));
         return prod;
       },
       async createProduct(data) {
@@ -1661,8 +1852,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            return db.select().from(inventory).where(inArray3(inventory.branchId, branchIds));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            return db.select().from(inventory).where(inArray4(inventory.branchId, branchIds));
           }
           return [];
         }
@@ -1695,12 +1886,12 @@ var init_storage = __esm({
         return inv;
       },
       async getLowStockItems(branchId) {
-        const { inArray: inArray3, notInArray, lte: ltEq } = await import("drizzle-orm");
+        const { inArray: inArray4, notInArray, lte: ltEq } = await import("drizzle-orm");
         const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where((0, import_drizzle_orm.eq)(tenants.storeType, "restaurant"));
         const restaurantTenantIds = restaurantTenants.map((t2) => t2.id);
         let excludedBranchIds = [];
         if (restaurantTenantIds.length > 0) {
-          const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray3(branches.tenantId, restaurantTenantIds));
+          const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray4(branches.tenantId, restaurantTenantIds));
           excludedBranchIds = restaurantBranches.map((b) => b.id);
         }
         const conditions = [
@@ -1719,10 +1910,10 @@ var init_storage = __esm({
         const conditions = [(0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(customers.isActive, true), (0, import_drizzle_orm.isNull)(customers.isActive))];
         if (tenantId) conditions.push((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
         if (search) {
-          const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
+          const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(asciiDigits(search).trim());
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
-            const variants = getPhoneSearchVariants2(search.trim());
+            const variants = getPhoneSearchVariants2(asciiDigits(search).trim());
             conditions.push((0, import_drizzle_orm.or)(...getPhoneSearchConditions(customers.phone, variants)));
           } else {
             conditions.push(
@@ -1746,10 +1937,10 @@ var init_storage = __esm({
         const conditions = [(0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(customers.isActive, true), (0, import_drizzle_orm.isNull)(customers.isActive))];
         if (tenantId) conditions.push((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
         if (search) {
-          const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
+          const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(asciiDigits(search).trim());
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
-            const variants = getPhoneSearchVariants2(search.trim());
+            const variants = getPhoneSearchVariants2(asciiDigits(search).trim());
             conditions.push((0, import_drizzle_orm.or)(...getPhoneSearchConditions(customers.phone, variants)));
           } else {
             conditions.push(
@@ -1819,14 +2010,19 @@ var init_storage = __esm({
         const [cust] = await db.select().from(customers).where((0, import_drizzle_orm.eq)(customers.id, id));
         return cust;
       },
+      /**
+       * Soft delete. sales.customer_id is ON DELETE CASCADE: a real DELETE wiped
+       * the customer's sales (and their sale items) from the books.
+       */
       async deleteCustomer(id) {
-        const [cust] = await db.delete(customers).where((0, import_drizzle_orm.eq)(customers.id, id));
-        return cust;
+        await db.update(customers).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(customers.id, id));
       },
       async addLoyaltyPoints(id, points) {
+        const delta = Math.trunc(Number(points));
+        if (!Number.isFinite(delta)) throw new Error("points must be a number");
         const cust = await this.getCustomer(id);
         if (!cust) return null;
-        return this.updateCustomer(id, { loyaltyPoints: (cust.loyaltyPoints || 0) + points });
+        return this.updateCustomer(id, { loyaltyPoints: Math.max(0, (cust.loyaltyPoints || 0) + delta) });
       },
       // Sales
       async getCustomerSales(customerId) {
@@ -1839,8 +2035,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(filters.tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            conditions.push(inArray3(sales.branchId, branchIds));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            conditions.push(inArray4(sales.branchId, branchIds));
           } else {
             return [];
           }
@@ -1860,6 +2056,63 @@ var init_storage = __esm({
         const [sale] = await db.select().from(sales).where((0, import_drizzle_orm.eq)(sales.id, _ins_sale[0]?.id ?? 0));
         return sale;
       },
+      /**
+       * A till sale in ONE transaction: the sale row, its lines, the stock
+       * movements and the idempotency key either all land or none do (a crash
+       * half-way used to leave a sale without items, or stock taken for a sale
+       * that does not exist).
+       */
+      async createSaleWithItems(data, items, opts = {}) {
+        const saleId = await db.transaction(async (tx) => {
+          const ins = await tx.insert(sales).values(data).$returningId();
+          const id = ins[0]?.id ?? 0;
+          if (opts.clientRef) {
+            await tx.execute(import_drizzle_orm.sql`UPDATE sales SET client_ref = ${opts.clientRef} WHERE id = ${id}`);
+          }
+          for (const item of items || []) {
+            await tx.insert(saleItems).values({ ...item, saleId: id });
+            const productId = Number(item.productId);
+            const qty = Number(item.quantity) || 0;
+            if (!data.branchId || !Number.isFinite(productId) || productId <= 0 || !qty) continue;
+            const [inv] = await tx.select({ id: inventory.id }).from(inventory).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(inventory.productId, productId), (0, import_drizzle_orm.eq)(inventory.branchId, data.branchId))).limit(1).for("update");
+            if (inv) {
+              await tx.update(inventory).set({ quantity: import_drizzle_orm.sql`${inventory.quantity} - ${qty}`, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(inventory.id, inv.id));
+            } else {
+              await tx.insert(inventory).values({ productId, branchId: data.branchId, quantity: -qty });
+            }
+            await tx.insert(inventoryMovements).values({
+              productId,
+              branchId: data.branchId,
+              type: "sale",
+              quantity: -qty,
+              referenceType: "sale",
+              referenceId: id,
+              employeeId: opts.employeeId ?? data.employeeId ?? null
+            });
+          }
+          return id;
+        });
+        const [sale] = await db.select().from(sales).where((0, import_drizzle_orm.eq)(sales.id, saleId));
+        return sale;
+      },
+      /** The sale this store already recorded under a till idempotency key. */
+      async findSaleByClientRef(clientRef, tenantId) {
+        const [rows] = tenantId ? await pool.query(
+          `SELECT s.id FROM sales s JOIN branches b ON b.id = s.branch_id
+            WHERE s.client_ref = ? AND b.tenant_id = ? AND s.created_at >= NOW() - INTERVAL 7 DAY
+            ORDER BY s.id LIMIT 1`,
+          [clientRef, tenantId]
+        ) : await pool.query(
+          `SELECT s.id FROM sales s
+            WHERE s.client_ref = ? AND s.created_at >= NOW() - INTERVAL 7 DAY
+            ORDER BY s.id LIMIT 1`,
+          [clientRef]
+        );
+        const id = Array.isArray(rows) && rows[0]?.id;
+        if (!id) return void 0;
+        const [sale] = await db.select().from(sales).where((0, import_drizzle_orm.eq)(sales.id, Number(id)));
+        return sale;
+      },
       async getSaleItems(saleId) {
         return db.select().from(saleItems).where((0, import_drizzle_orm.eq)(saleItems.saleId, saleId));
       },
@@ -1873,6 +2126,32 @@ var init_storage = __esm({
       },
       async updateSale(id, data) {
         const [sale] = await db.update(sales).set(data).where((0, import_drizzle_orm.eq)(sales.id, id));
+        return sale;
+      },
+      /**
+       * Edit a sale and (optionally) replace its items in one transaction, so a
+       * failure never leaves the sale with its items deleted.
+       */
+      async updateSaleWithItems(id, data, items) {
+        await db.transaction(async (tx) => {
+          if (data && Object.keys(data).length) await tx.update(sales).set(data).where((0, import_drizzle_orm.eq)(sales.id, id));
+          if (items !== void 0) {
+            await tx.delete(saleItems).where((0, import_drizzle_orm.eq)(saleItems.saleId, id));
+            for (const item of items) {
+              await tx.insert(saleItems).values({
+                saleId: id,
+                productId: item.productId,
+                productName: item.productName || item.name,
+                quantity: item.quantity,
+                unitPrice: String(item.unitPrice),
+                total: String(item.total),
+                modifiers: item.modifiers || [],
+                notes: item.notes || null
+              });
+            }
+          }
+        });
+        const [sale] = await db.select().from(sales).where((0, import_drizzle_orm.eq)(sales.id, id));
         return sale;
       },
       async deleteSale(id) {
@@ -1906,8 +2185,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            return db.select().from(purchaseOrders).where(inArray3(purchaseOrders.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            return db.select().from(purchaseOrders).where(inArray4(purchaseOrders.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
           }
           return [];
         }
@@ -1921,6 +2200,10 @@ var init_storage = __esm({
       async updatePurchaseOrder(id, data) {
         const [po] = await db.update(purchaseOrders).set(data).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id));
         return po;
+      },
+      async purchaseOrderNumberExists(orderNumber) {
+        const [row] = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where((0, import_drizzle_orm.eq)(purchaseOrders.orderNumber, orderNumber)).limit(1);
+        return !!row;
       },
       async getPurchaseOrder(id) {
         const [po] = await db.select().from(purchaseOrders).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id));
@@ -1953,8 +2236,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            return db.select().from(shifts).where(inArray3(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            return db.select().from(shifts).where(inArray4(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
@@ -1965,8 +2248,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            return db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray3(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            return db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray4(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
@@ -2007,10 +2290,11 @@ var init_storage = __esm({
         const [exp] = await db.select().from(expenses).where((0, import_drizzle_orm.eq)(expenses.id, _ins_exp[0]?.id ?? 0));
         return exp;
       },
-      async getExpensesByDateRange(startDate, endDate) {
+      async getExpensesByDateRange(startDate, endDate, tenantId) {
         const conditions = [];
         if (startDate) conditions.push((0, import_drizzle_orm.gte)(expenses.date, startDate));
         if (endDate) conditions.push((0, import_drizzle_orm.lte)(expenses.date, endDate));
+        if (tenantId) conditions.push((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId));
         if (conditions.length > 0) {
           return db.select().from(expenses).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(expenses.createdAt));
         }
@@ -2020,11 +2304,23 @@ var init_storage = __esm({
         await db.delete(expenses).where((0, import_drizzle_orm.eq)(expenses.id, id));
       },
       // Tables
-      async getTables(branchId) {
+      async getTables(branchId, tenantId) {
         if (branchId) {
           return db.select().from(tables).where((0, import_drizzle_orm.eq)(tables.branchId, branchId));
         }
+        if (tenantId) {
+          const ids = await tenantBranchIds(tenantId);
+          return ids.length ? db.select().from(tables).where((0, import_drizzle_orm.inArray)(tables.branchId, ids)) : [];
+        }
         return db.select().from(tables);
+      },
+      async getTable(id) {
+        const [table] = await db.select().from(tables).where((0, import_drizzle_orm.eq)(tables.id, id));
+        return table;
+      },
+      async deleteTable(id) {
+        await db.delete(tableQrCodes).where((0, import_drizzle_orm.eq)(tableQrCodes.tableId, id));
+        await db.delete(tables).where((0, import_drizzle_orm.eq)(tables.id, id));
       },
       async createTable(data) {
         const _ins_table = await db.insert(tables).values(data).$returningId();
@@ -2060,10 +2356,17 @@ var init_storage = __esm({
         await db.update(tableQrCodes).set({ scannedCount: import_drizzle_orm.sql`scanned_count + 1`, lastScannedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tableQrCodes.qrToken, token));
       },
       // Kitchen Orders
-      async getKitchenOrders(branchId) {
+      async getKitchenOrders(branchId, tenantId) {
         if (branchId) {
           return db.select().from(kitchenOrders).where(
             (0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(kitchenOrders.branchId, branchId), (0, import_drizzle_orm.eq)(kitchenOrders.status, "pending"))
+          ).orderBy(kitchenOrders.createdAt);
+        }
+        if (tenantId) {
+          const ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+          return db.select().from(kitchenOrders).where(
+            (0, import_drizzle_orm.and)((0, import_drizzle_orm.inArray)(kitchenOrders.branchId, ids), (0, import_drizzle_orm.eq)(kitchenOrders.status, "pending"))
           ).orderBy(kitchenOrders.createdAt);
         }
         return db.select().from(kitchenOrders).where((0, import_drizzle_orm.eq)(kitchenOrders.status, "pending")).orderBy(kitchenOrders.createdAt);
@@ -2087,7 +2390,10 @@ var init_storage = __esm({
         const [plan2] = await db.select().from(subscriptionPlans).where((0, import_drizzle_orm.eq)(subscriptionPlans.id, _ins_plan[0]?.id ?? 0));
         return plan2;
       },
-      async getSubscriptions() {
+      async getSubscriptions(tenantId) {
+        if (tenantId) {
+          return db.select().from(subscriptions).where(import_drizzle_orm.sql`${subscriptions.customerId} IN (SELECT id FROM customers WHERE tenant_id = ${tenantId})`).orderBy((0, import_drizzle_orm.desc)(subscriptions.createdAt));
+        }
         return db.select().from(subscriptions).orderBy((0, import_drizzle_orm.desc)(subscriptions.createdAt));
       },
       async createSubscription(data) {
@@ -2101,8 +2407,8 @@ var init_storage = __esm({
           const emps = await this.getEmployeesByTenant(tenantId);
           const empIds = emps.map((e) => e.id);
           if (empIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            return db.select().from(activityLog).where(inArray3(activityLog.employeeId, empIds)).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            return db.select().from(activityLog).where(inArray4(activityLog.employeeId, empIds)).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
           }
           return [];
         }
@@ -2147,8 +2453,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            return db.select().from(returns).where(inArray3(returns.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            return db.select().from(returns).where(inArray4(returns.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
           }
           return [];
         }
@@ -2172,10 +2478,23 @@ var init_storage = __esm({
         return item;
       },
       // Sales Analytics
-      async getSalesByDateRange(startDate, endDate) {
-        return db.select().from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, startDate), (0, import_drizzle_orm.lte)(sales.createdAt, endDate))).orderBy((0, import_drizzle_orm.desc)(sales.createdAt));
+      async getSalesByDateRange(startDate, endDate, tenantId, branchId) {
+        const conditions = [(0, import_drizzle_orm.gte)(sales.createdAt, startDate), (0, import_drizzle_orm.lte)(sales.createdAt, endDate)];
+        if (branchId) conditions.push((0, import_drizzle_orm.eq)(sales.branchId, branchId));
+        if (tenantId) {
+          const ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+          conditions.push((0, import_drizzle_orm.inArray)(sales.branchId, ids));
+        }
+        return db.select().from(sales).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt));
       },
-      async getSalesWithCustomerByDateRange(startDate, endDate) {
+      async getSalesWithCustomerByDateRange(startDate, endDate, tenantId) {
+        const conditions = [(0, import_drizzle_orm.gte)(sales.createdAt, startDate), (0, import_drizzle_orm.lte)(sales.createdAt, endDate)];
+        if (tenantId) {
+          const ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+          conditions.push((0, import_drizzle_orm.inArray)(sales.branchId, ids));
+        }
         return db.select({
           id: sales.id,
           receiptNumber: sales.receiptNumber,
@@ -2190,24 +2509,38 @@ var init_storage = __esm({
           customerHouseNr: customers.houseNr,
           customerCity: customers.city,
           customerPostalCode: customers.postalCode
-        }).from(sales).leftJoin(customers, (0, import_drizzle_orm.eq)(sales.customerId, customers.id)).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, startDate), (0, import_drizzle_orm.lte)(sales.createdAt, endDate))).orderBy(sales.createdAt);
+        }).from(sales).leftJoin(customers, (0, import_drizzle_orm.eq)(sales.customerId, customers.id)).where((0, import_drizzle_orm.and)(...conditions)).orderBy(sales.createdAt);
       },
-      async getTopProducts(limit) {
+      async getTopProducts(limit, tenantId) {
         const topLimit = limit || 10;
-        const result = await db.select({
+        let ids = null;
+        if (tenantId) {
+          ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+        }
+        const base = db.select({
           productId: saleItems.productId,
           name: saleItems.productName,
           totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
           revenue: import_drizzle_orm.sql`sum(${saleItems.total})`
-        }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
+        }).from(saleItems);
+        const scoped = ids ? base.innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where((0, import_drizzle_orm.inArray)(sales.branchId, ids)) : base;
+        const result = await scoped.groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
         return result.map((r) => ({ ...r, totalSold: Number(r.totalSold), revenue: Number(r.revenue) }));
       },
-      async getSalesByPaymentMethod() {
-        const result = await db.select({
+      async getSalesByPaymentMethod(tenantId) {
+        let where = void 0;
+        if (tenantId) {
+          const ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+          where = (0, import_drizzle_orm.inArray)(sales.branchId, ids);
+        }
+        const q8 = db.select({
           method: sales.paymentMethod,
           count: import_drizzle_orm.sql`count(*)`,
           total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
-        }).from(sales).groupBy(sales.paymentMethod);
+        }).from(sales);
+        const result = await (where ? q8.where(where) : q8).groupBy(sales.paymentMethod);
         return result.map((r) => ({ method: r.method, count: Number(r.count), total: Number(r.total) }));
       },
       // Dashboard Stats
@@ -2226,36 +2559,32 @@ var init_storage = __esm({
         let salesByPaymentMethodQuery;
         let recentSalesQuery;
         let profitRowQuery;
-        const todayStart = /* @__PURE__ */ new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const weekStart = /* @__PURE__ */ new Date();
-        weekStart.setDate(weekStart.getDate() - 7);
-        weekStart.setHours(0, 0, 0, 0);
-        const monthStart = /* @__PURE__ */ new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
+        const tz = await storeTimeZone(tenantId);
+        const todayStart = dayStart(tz);
+        const weekStart = daysAgoStart(tz, 6);
+        const monthStart2 = monthStart(tz);
         if (tenantId) {
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray3(sales.branchId, branchIds));
-            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray3(sales.branchId, branchIds));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray4(sales.branchId, branchIds));
+            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray4(sales.branchId, branchIds));
             customerCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers).where((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
             productCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.tenantId, tenantId), (0, import_drizzle_orm.eq)(products.isActive, true)));
             const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, tenantId));
             const isRestaurant = tenant?.storeType === "restaurant";
-            lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray3(inventory.branchId, branchIds)));
+            lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray4(inventory.branchId, branchIds)));
             todaySalesQuery = db.select({
               count: import_drizzle_orm.sql`count(*)`,
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray3(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray4(sales.branchId, branchIds)));
             weekSalesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray3(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray4(sales.branchId, branchIds)));
             monthSalesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart), inArray3(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart2), inArray4(sales.branchId, branchIds)));
             totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)` }).from(expenses).where((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId));
             todayExpensesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)`
@@ -2266,16 +2595,16 @@ var init_storage = __esm({
               name: saleItems.productName,
               totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
               revenue: import_drizzle_orm.sql`sum(${saleItems.total})`
-            }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray3(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
+            }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray4(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
             salesByPaymentMethodQuery = db.select({
               method: sales.paymentMethod,
               count: import_drizzle_orm.sql`count(*)`,
               total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
-            }).from(sales).where(inArray3(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
-            recentSalesQuery = db.select().from(sales).where(inArray3(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
+            }).from(sales).where(inArray4(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
+            recentSalesQuery = db.select().from(sales).where(inArray4(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
             profitRowQuery = db.select({
               totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice} * ${saleItems.quantity}), 0)`
-            }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray3(sales.branchId, branchIds));
+            }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray4(sales.branchId, branchIds));
           } else {
             return {
               totalSales: 0,
@@ -2307,7 +2636,7 @@ var init_storage = __esm({
           }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, weekStart));
           monthSalesQuery = db.select({
             total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-          }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, monthStart));
+          }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, monthStart2));
           todayExpensesQuery = db.select({
             total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)`
           }).from(expenses).where((0, import_drizzle_orm.gte)(expenses.date, todayStart));
@@ -2449,8 +2778,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            return db.select().from(warehouses).where((0, import_drizzle_orm.and)(inArray3(warehouses.branchId, branchIds), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            return db.select().from(warehouses).where((0, import_drizzle_orm.and)(inArray4(warehouses.branchId, branchIds), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
           }
           return [];
         }
@@ -2466,7 +2795,10 @@ var init_storage = __esm({
         return wh;
       },
       // Warehouse Transfers
-      async getWarehouseTransfers() {
+      async getWarehouseTransfers(tenantId) {
+        if (tenantId) {
+          return db.select().from(warehouseTransfers).where(import_drizzle_orm.sql`${warehouseTransfers.fromWarehouseId} IN (SELECT w.id FROM warehouses w JOIN branches b ON b.id = w.branch_id WHERE b.tenant_id = ${tenantId})`).orderBy((0, import_drizzle_orm.desc)(warehouseTransfers.createdAt));
+        }
         return db.select().from(warehouseTransfers).orderBy((0, import_drizzle_orm.desc)(warehouseTransfers.createdAt));
       },
       async createWarehouseTransfer(data) {
@@ -2482,8 +2814,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            conditions.push(inArray3(productBatches.branchId, branchIds));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            conditions.push(inArray4(productBatches.branchId, branchIds));
           } else {
             return [];
           }
@@ -2501,10 +2833,15 @@ var init_storage = __esm({
         return batch;
       },
       // Inventory Movements
-      async getInventoryMovements(productId, limit) {
+      async getInventoryMovements(productId, limit, tenantId) {
         const l = limit || 100;
-        if (productId) return db.select().from(inventoryMovements).where((0, import_drizzle_orm.eq)(inventoryMovements.productId, productId)).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
-        return db.select().from(inventoryMovements).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
+        const conditions = [];
+        if (productId) conditions.push((0, import_drizzle_orm.eq)(inventoryMovements.productId, productId));
+        if (tenantId) {
+          conditions.push(import_drizzle_orm.sql`${inventoryMovements.productId} IN (SELECT id FROM products WHERE tenant_id = ${tenantId})`);
+        }
+        const q8 = db.select().from(inventoryMovements);
+        return (conditions.length ? q8.where((0, import_drizzle_orm.and)(...conditions)) : q8).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
       },
       async createInventoryMovement(data) {
         const _ins_mov = await db.insert(inventoryMovements).values(data).$returningId();
@@ -2512,7 +2849,12 @@ var init_storage = __esm({
         return mov;
       },
       // Stock Counts
-      async getStockCounts() {
+      async getStockCounts(tenantId) {
+        if (tenantId) {
+          const ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+          return db.select().from(stockCounts).where((0, import_drizzle_orm.inArray)(stockCounts.branchId, ids)).orderBy((0, import_drizzle_orm.desc)(stockCounts.createdAt));
+        }
         return db.select().from(stockCounts).orderBy((0, import_drizzle_orm.desc)(stockCounts.createdAt));
       },
       async getStockCount(id) {
@@ -2541,8 +2883,14 @@ var init_storage = __esm({
         return item;
       },
       // Supplier Contracts
-      async getSupplierContracts(supplierId) {
+      async getSupplierContracts(supplierId, tenantId) {
         if (supplierId) return db.select().from(supplierContracts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(supplierContracts.supplierId, supplierId), (0, import_drizzle_orm.eq)(supplierContracts.isActive, true)));
+        if (tenantId) {
+          return db.select().from(supplierContracts).where((0, import_drizzle_orm.and)(
+            (0, import_drizzle_orm.eq)(supplierContracts.isActive, true),
+            import_drizzle_orm.sql`${supplierContracts.supplierId} IN (SELECT id FROM suppliers WHERE tenant_id = ${tenantId})`
+          ));
+        }
         return db.select().from(supplierContracts).where((0, import_drizzle_orm.eq)(supplierContracts.isActive, true));
       },
       async createSupplierContract(data) {
@@ -2555,8 +2903,13 @@ var init_storage = __esm({
         return contract;
       },
       // Employee Commissions
-      async getEmployeeCommissions(employeeId) {
+      async getEmployeeCommissions(employeeId, tenantId) {
         if (employeeId) return db.select().from(employeeCommissions).where((0, import_drizzle_orm.eq)(employeeCommissions.employeeId, employeeId)).orderBy((0, import_drizzle_orm.desc)(employeeCommissions.createdAt));
+        if (tenantId) {
+          const emps = await this.getEmployeesByTenant(tenantId);
+          if (!emps.length) return [];
+          return db.select().from(employeeCommissions).where((0, import_drizzle_orm.inArray)(employeeCommissions.employeeId, emps.map((e) => e.id))).orderBy((0, import_drizzle_orm.desc)(employeeCommissions.createdAt));
+        }
         return db.select().from(employeeCommissions).orderBy((0, import_drizzle_orm.desc)(employeeCommissions.createdAt));
       },
       async createEmployeeCommission(data) {
@@ -2572,28 +2925,40 @@ var init_storage = __esm({
         }).from(sales).where((0, import_drizzle_orm.eq)(sales.employeeId, employeeId));
         return { salesCount: Number(result[0]?.count || 0), totalRevenue: Number(result[0]?.total || 0) };
       },
-      async getSlowMovingProducts(days = 30) {
+      async getSlowMovingProducts(days = 30, tenantId) {
         const cutoffDate = /* @__PURE__ */ new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
-        const allProds = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.isActive, true));
-        const recentSaleItems = await db.select({
+        let ids = null;
+        if (tenantId) {
+          ids = await tenantBranchIds(tenantId);
+        }
+        const allProds = await db.select().from(products).where(
+          tenantId ? (0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.isActive, true), (0, import_drizzle_orm.eq)(products.tenantId, tenantId)) : (0, import_drizzle_orm.eq)(products.isActive, true)
+        );
+        const recentSaleItems = ids && !ids.length ? [] : await db.select({
           productId: saleItems.productId,
           totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`
-        }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where((0, import_drizzle_orm.gte)(sales.createdAt, cutoffDate)).groupBy(saleItems.productId);
+        }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(ids ? (0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, cutoffDate), (0, import_drizzle_orm.inArray)(sales.branchId, ids)) : (0, import_drizzle_orm.gte)(sales.createdAt, cutoffDate)).groupBy(saleItems.productId);
         const soldMap = new Map(recentSaleItems.map((r) => [r.productId, Number(r.totalSold)]));
         return allProds.filter((p) => !soldMap.has(p.id) || (soldMap.get(p.id) || 0) < 3).map((p) => ({
           ...p,
           recentSold: soldMap.get(p.id) || 0
         }));
       },
-      async getProfitByProduct() {
-        const result = await db.select({
+      async getProfitByProduct(tenantId) {
+        let ids = null;
+        if (tenantId) {
+          ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+        }
+        const base = db.select({
           productId: saleItems.productId,
           productName: saleItems.productName,
           totalRevenue: import_drizzle_orm.sql`sum(${saleItems.total})`,
           totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`
-        }).from(saleItems).groupBy(saleItems.productId, saleItems.productName);
-        const prodList = await db.select().from(products);
+        }).from(saleItems);
+        const result = await (ids ? base.innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where((0, import_drizzle_orm.inArray)(sales.branchId, ids)) : base).groupBy(saleItems.productId, saleItems.productName);
+        const prodList = tenantId ? await db.select().from(products).where((0, import_drizzle_orm.eq)(products.tenantId, tenantId)) : await db.select().from(products);
         const prodMap = new Map(prodList.map((p) => [p.id, p]));
         return result.map((r) => {
           const prod = prodMap.get(r.productId);
@@ -2611,14 +2976,20 @@ var init_storage = __esm({
           };
         }).sort((a, b) => b.profit - a.profit);
       },
-      async getCashierPerformance() {
-        const result = await db.select({
+      async getCashierPerformance(tenantId) {
+        let ids = null;
+        if (tenantId) {
+          ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return [];
+        }
+        const base = db.select({
           employeeId: sales.employeeId,
           count: import_drizzle_orm.sql`count(*)`,
           total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`,
           avgSale: import_drizzle_orm.sql`coalesce(avg(${sales.totalAmount}), 0)`
-        }).from(sales).groupBy(sales.employeeId);
-        const empList = await db.select().from(employees);
+        }).from(sales);
+        const result = await (ids ? base.where((0, import_drizzle_orm.inArray)(sales.branchId, ids)) : base).groupBy(sales.employeeId);
+        const empList = tenantId ? await this.getEmployeesByTenant(tenantId) : await db.select().from(employees);
         const empMap = new Map(empList.map((e) => [e.id, e]));
         return result.map((r) => ({
           employeeId: r.employeeId,
@@ -2629,12 +3000,20 @@ var init_storage = __esm({
           avgSaleValue: Number(r.avgSale || 0)
         })).sort((a, b) => b.totalRevenue - a.totalRevenue);
       },
-      async getReturnsReport() {
-        const result = await db.select({
+      async getReturnsReport(tenantId) {
+        let where = void 0;
+        if (tenantId) {
+          const ids = await tenantBranchIds(tenantId);
+          if (!ids.length) return { totalReturns: 0, totalRefundAmount: 0, recentReturns: [] };
+          where = (0, import_drizzle_orm.inArray)(returns.branchId, ids);
+        }
+        const agg = db.select({
           count: import_drizzle_orm.sql`count(*)`,
           total: import_drizzle_orm.sql`coalesce(sum(${returns.totalAmount}), 0)`
         }).from(returns);
-        const returnsList = await db.select().from(returns).orderBy((0, import_drizzle_orm.desc)(returns.createdAt)).limit(20);
+        const result = await (where ? agg.where(where) : agg);
+        const list = db.select().from(returns);
+        const returnsList = await (where ? list.where(where) : list).orderBy((0, import_drizzle_orm.desc)(returns.createdAt)).limit(20);
         return {
           totalReturns: Number(result[0]?.count || 0),
           totalRefundAmount: Number(result[0]?.total || 0),
@@ -2663,9 +3042,14 @@ var init_storage = __esm({
         await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm.eq)(notifications.recipientId, recipientId));
       },
       async notifyAdmins(senderId, type, title, message, entityType, entityId, priority) {
-        const admins = await db.select().from(employees).where(
-          (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.role, "admin"), (0, import_drizzle_orm.eq)(employees.role, "owner"))
-        );
+        const sender = senderId ? await this.getEmployee(senderId) : void 0;
+        let senderTenant = sender?.tenantId ?? null;
+        if (!senderTenant && sender?.branchId) {
+          const br = await this.getBranch(sender.branchId);
+          senderTenant = br?.tenantId ?? null;
+        }
+        if (!senderTenant) return [];
+        const admins = (await this.getEmployeesByTenant(senderTenant)).filter((e) => e.role === "admin" || e.role === "owner");
         const notifs = [];
         for (const admin of admins) {
           if (admin.id === senderId) continue;
@@ -2696,8 +3080,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray3(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray4(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           } else {
             activeShifts = [];
           }
@@ -2718,8 +3102,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
-            allShifts = await db.select().from(shifts).where(inArray3(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
+            const { inArray: inArray4 } = await import("drizzle-orm");
+            allShifts = await db.select().from(shifts).where(inArray4(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
           } else {
             allShifts = [];
           }
@@ -2730,8 +3114,7 @@ var init_storage = __esm({
         const empMap = new Map(empList.map((e) => [e.id, e]));
         const activeShifts = allShifts.filter((s) => s.status === "open");
         const closedShifts = allShifts.filter((s) => s.status === "closed");
-        const today = /* @__PURE__ */ new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = dayStart(await storeTimeZone(tenantId));
         const todayShifts = allShifts.filter((s) => s.startTime && new Date(s.startTime) >= today);
         return {
           activeCount: activeShifts.length,
@@ -2859,12 +3242,12 @@ var init_storage = __esm({
           const tenantEmployees = await this.getEmployeesByTenant(tenant.id);
           let salesToday = "0.00";
           if (branchIds.length > 0) {
-            const { inArray: inArray3 } = await import("drizzle-orm");
+            const { inArray: inArray4 } = await import("drizzle-orm");
             const todayStart = /* @__PURE__ */ new Date();
             todayStart.setHours(0, 0, 0, 0);
             const [todaySales] = await db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray3(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray4(sales.branchId, branchIds)));
             salesToday = Number(todaySales?.total || 0).toFixed(2);
           }
           results.push({
@@ -2970,7 +3353,7 @@ var init_storage = __esm({
       // Bulk Operations
       async bulkCreateCustomers(data) {
         if (data.length === 0) return [];
-        const { inArray: inArray3 } = await import("drizzle-orm");
+        const { inArray: inArray4 } = await import("drizzle-orm");
         const sanitizedRows = data.map((row) => {
           const { id, createdAt, updatedAt, ...payload } = row;
           return payload;
@@ -2993,7 +3376,7 @@ var init_storage = __esm({
           const existingCustomers = await db.select().from(customers).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(customers.tenantId, Number(tenantId)),
-              inArray3(customers.phone, phones)
+              inArray4(customers.phone, phones)
             )
           );
           for (const existing of existingCustomers) {
@@ -3318,9 +3701,9 @@ var init_storage = __esm({
         return { tenants: result, grandTotal };
       },
       // ── Daily Sequential Numbering (resets at midnight Europe/Zurich) ──────────
-      async getNextSequenceNumber(scopeKey) {
+      async getNextSequenceNumber(scopeKey, timeZone = "Europe/Zurich") {
         const swissDate = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Europe/Zurich",
+          timeZone,
           year: "numeric",
           month: "2-digit",
           day: "2-digit"
@@ -3397,6 +3780,14 @@ var init_storage = __esm({
           await db.update(customerAddresses).set({ isDefault: false }).where((0, import_drizzle_orm.eq)(customerAddresses.customerId, data.customerId));
         }
         await db.update(customerAddresses).set(data).where((0, import_drizzle_orm.eq)(customerAddresses.id, id));
+        const [addr] = await db.select().from(customerAddresses).where((0, import_drizzle_orm.eq)(customerAddresses.id, id)).limit(1);
+        return addr;
+      },
+      async findCustomerByPhoneExact(phone, tenantId) {
+        const [c] = await db.select().from(customers).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(customers.phone, phone), (0, import_drizzle_orm.eq)(customers.tenantId, tenantId))).limit(1);
+        return c;
+      },
+      async getCustomerAddress(id) {
         const [addr] = await db.select().from(customerAddresses).where((0, import_drizzle_orm.eq)(customerAddresses.id, id)).limit(1);
         return addr;
       },
@@ -3485,22 +3876,38 @@ var init_storage = __esm({
       },
       // ── Delivery Management ─────────────────────────────────────────────────────
       async getDeliveryOrders(tenantId, filters) {
-        let q7 = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
-        if (filters?.status) {
-          q7 = q7.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
-        }
-        if (filters?.orderType) {
-          q7 = q7.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
-        }
-        return q7.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+        const conditions = [(0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId)];
+        if (filters?.status) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
+        if (filters?.orderType) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
+        return db.select().from(onlineOrders).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
       },
       async assignDriverToOrder(orderId, vehicleId) {
+        const [order] = await db.select({ driverId: onlineOrders.driverId }).from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, orderId)).limit(1);
+        const previous = order?.driverId ?? null;
         await db.update(onlineOrders).set({ driverId: vehicleId }).where((0, import_drizzle_orm.eq)(onlineOrders.id, orderId));
         await db.update(vehicles).set({ driverStatus: "on_delivery", activeOrderId: orderId }).where((0, import_drizzle_orm.eq)(vehicles.id, vehicleId));
+        if (previous && previous !== vehicleId) await this.releaseDriverFromOrder(previous, orderId);
+      },
+      /**
+       * Frees `vehicleId` after `orderId` is delivered, cancelled or taken off
+       * them. A driver still carrying another open order stays on_delivery
+       * (pointing at that order).
+       */
+      async releaseDriverFromOrder(vehicleId, orderId) {
+        const open = await db.select({ id: onlineOrders.id }).from(onlineOrders).where((0, import_drizzle_orm.and)(
+          (0, import_drizzle_orm.eq)(onlineOrders.driverId, vehicleId),
+          (0, import_drizzle_orm.ne)(onlineOrders.id, orderId),
+          import_drizzle_orm.sql`${onlineOrders.status} NOT IN ('delivered', 'cancelled', 'rejected', 'completed')`
+        )).limit(1);
+        if (open.length) {
+          await db.update(vehicles).set({ activeOrderId: open[0].id }).where((0, import_drizzle_orm.eq)(vehicles.id, vehicleId));
+          return;
+        }
+        await db.update(vehicles).set({ driverStatus: "available", activeOrderId: null }).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(vehicles.id, vehicleId), (0, import_drizzle_orm.eq)(vehicles.driverStatus, "on_delivery")));
+        await db.update(vehicles).set({ activeOrderId: null }).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(vehicles.id, vehicleId), (0, import_drizzle_orm.eq)(vehicles.activeOrderId, orderId)));
       },
       async getDeliveryStats(tenantId) {
-        const today = /* @__PURE__ */ new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = dayStart(await storeTimeZone(tenantId));
         const [totalRow] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(onlineOrders).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId), (0, import_drizzle_orm.gte)(onlineOrders.createdAt, today)));
         const [pendingRow] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(onlineOrders).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId), (0, import_drizzle_orm.eq)(onlineOrders.status, "pending"), (0, import_drizzle_orm.gte)(onlineOrders.createdAt, today)));
         const [deliveredRow] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(onlineOrders).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId), (0, import_drizzle_orm.eq)(onlineOrders.status, "delivered"), (0, import_drizzle_orm.gte)(onlineOrders.createdAt, today)));
@@ -3513,11 +3920,29 @@ var init_storage = __esm({
         };
       },
       // ── Customer order history (delivery) ──────────────────────────────────────
+      /**
+       * A customer's online orders, matched by phone in every stored format
+       * (+963…, 09…, 0041…). Orders at the customer's own store always count;
+       * orders at OTHER stores only once the phone was proven by an OTP login
+       * (customers.phone_verified_at), so an unverified phone typed at
+       * registration never reveals someone else's orders.
+       */
       async getCustomerOrderHistory(customerId, tenantId, limit = 20) {
-        return db.select().from(onlineOrders).where((0, import_drizzle_orm.and)(
-          import_drizzle_orm.sql`${onlineOrders.customerPhone} = (SELECT phone FROM customers WHERE id = ${customerId})`,
-          (0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId)
-        )).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt)).limit(limit);
+        let row;
+        try {
+          const [rows] = await pool.query("SELECT phone, phone_verified_at FROM customers WHERE id = ? LIMIT 1", [customerId]);
+          row = rows?.[0];
+        } catch {
+          const [rows] = await pool.query("SELECT phone FROM customers WHERE id = ? LIMIT 1", [customerId]);
+          row = rows?.[0];
+        }
+        const phone = String(row?.phone || "");
+        if (!phone || phone.startsWith("guest-")) return [];
+        const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
+        const variants = Array.from(/* @__PURE__ */ new Set([phone, ...getPhoneSearchVariants2(phone)])).filter((v) => v && v.length >= 6);
+        if (!variants.length) return [];
+        const scope = row?.phone_verified_at ? void 0 : (0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId);
+        return db.select().from(onlineOrders).where(scope ? (0, import_drizzle_orm.and)((0, import_drizzle_orm.inArray)(onlineOrders.customerPhone, variants), scope) : (0, import_drizzle_orm.inArray)(onlineOrders.customerPhone, variants)).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt)).limit(limit);
       },
       // ── Driver earnings ─────────────────────────────────────────────────────────
       async getDriverEarnings(vehicleId, days = 7) {
@@ -3826,6 +4251,35 @@ var init_callerIdService = __esm({
       broadcast(payload, tenantId) {
         const msg = JSON.stringify(payload);
         this.broadcastToTenant(msg, tenantId);
+      }
+      /**
+       * Deliver to every client that registered a store (tenantId), never to the
+       * anonymous ones (the public /api/events feed, customer pages). For events
+       * all stores must see, e.g. a marketplace Quick Order open for claiming.
+       */
+      broadcastToStores(payload) {
+        const msg = JSON.stringify(payload);
+        let n = 0;
+        if (this.wss) {
+          this.wss.clients.forEach((client) => {
+            if (client.readyState === import_ws.WebSocket.OPEN && client.tenantId) {
+              n++;
+              client.send(msg);
+            }
+          });
+        }
+        this.sseClients.forEach((sc) => {
+          if (!sc.alive || !sc.tenantId) return;
+          n++;
+          try {
+            sc.res.write(`data: ${msg}
+
+`);
+          } catch {
+            sc.alive = false;
+          }
+        });
+        console.log(`[CallerID] Store broadcast: ${n} client(s)`);
       }
       /**
        * Returns all currently active calls for a given tenant (for HTTP polling fallback).
@@ -6631,6 +7085,7 @@ init_callerIdService();
 
 // server/pushService.ts
 var import_web_push = __toESM(require("web-push"));
+init_storeTime();
 var VAPID_PUBLIC = "BN_VRMNof7tvLBE3u4-dJdq7ZBSOHUqrexcuD2Tf81rQe4t1GSkbUNzRGU9DyoXObqFwUa2ef1w4AWhteWalk08";
 var VAPID_PRIVATE = "SYAn5KRDjhIDKcIb7WJr3kgr_LDsLKQYWEIHmcgfnjY";
 var VAPID_EMAIL = "mailto:admin@barmagly.tech";
@@ -6686,14 +7141,33 @@ var pushService = {
       data: { type: "incoming_call", phoneNumber }
     }, tenantId);
   },
-  /** Push: new online order notification */
+  /** Push: new online order notification (amount in the store's own currency) */
   async notifyNewOrder(orderNumber, total, tenantId) {
+    const currency = tenantId ? await storeCurrency(tenantId).catch(() => "CHF") : "CHF";
     await this.broadcast({
       type: "new_online_order",
       title: "\u{1F6D2} New Online Order",
-      body: `Order #${orderNumber} \u2014 CHF ${Number(total).toFixed(2)}`,
+      body: `Order #${orderNumber} \u2014 ${formatMoney(total, currency)}`,
       data: { type: "new_online_order", orderNumber }
     }, tenantId);
+  },
+  /**
+   * Push: a marketplace Quick Order is open for stores to claim. Sent per
+   * store, amount in that store's currency, and without the customer's
+   * name/phone/address (details are in the authenticated POS list).
+   */
+  async notifyBroadcastOrder(broadcastId, estimatedTotal, itemCount) {
+    const tenants2 = new Set(Array.from(subscriptions2.values()).map((r) => r.tenantId).filter(Boolean));
+    await Promise.allSettled(Array.from(tenants2).map(async (tenantId) => {
+      const currency = await storeCurrency(tenantId).catch(() => "CHF");
+      const amount = Number(estimatedTotal) > 0 ? formatMoney(estimatedTotal, currency) : "?";
+      await this.broadcast({
+        type: "broadcast_new",
+        title: "\u{1F6F5} New Broadcast Order",
+        body: `${itemCount} item(s) \u2014 ${amount}`,
+        data: { id: broadcastId }
+      }, tenantId);
+    }));
   }
 };
 
@@ -6851,9 +7325,24 @@ var ROUTE_RULES = [
   // Operational settings.
   {
     methods: ["PUT", "PATCH", "POST"],
-    path: /^\/api\/(store-settings|promo-codes|delivery-zones|drivers|payment-gateway)(\/|$)/,
+    path: /^\/api\/(store-settings|payment-gateway|vehicles|table-qr-codes)(\/|$)/,
     roles: ["manager"],
     label: "operations"
+  },
+  // Promo codes and delivery zones — the real paths (/api/promo-codes and
+  // /api/delivery-zones never existed, so these were open to cashiers).
+  {
+    methods: ["POST", "PUT", "PATCH", "DELETE"],
+    path: /^\/api\/delivery\/(promos|manage\/zones)(\/|$)/,
+    roles: ["manager"],
+    label: "delivery-settings"
+  },
+  // Deleting a QR code, vehicle, online order or expense is a manager decision.
+  {
+    methods: ["DELETE"],
+    path: /^\/api\/(vehicles|table-qr-codes|online-orders|expenses)(\/|$)/,
+    roles: ["manager"],
+    label: "operations-delete"
   },
   // Backups contain the whole tenant database.
   {
@@ -7128,17 +7617,28 @@ async function repriceOrder(opts) {
   if ((opts.orderType ?? "delivery") === "delivery") {
     const requested = num(opts.clientDeliveryFee, NaN);
     const [zoneRows] = await pool.query(
-      `SELECT delivery_fee FROM delivery_zones WHERE tenant_id = ? AND is_active = 1`,
+      `SELECT delivery_fee, min_order_amount FROM delivery_zones WHERE tenant_id = ? AND is_active = 1`,
       [tenantId]
     );
     const allowed = zoneRows.map((z) => money(num(z.delivery_fee, 0)));
     const [branchRows] = await pool.query(
-      `SELECT delivery_fee FROM branches WHERE tenant_id = ? LIMIT 1`,
+      `SELECT delivery_fee, currency FROM branches WHERE tenant_id = ? LIMIT 1`,
       [tenantId]
     );
     const branchFee = money(num(branchRows?.[0]?.delivery_fee, 0));
+    const zoneFees = allowed.slice();
     if (!allowed.includes(branchFee)) allowed.push(branchFee);
     deliveryFee = Number.isFinite(requested) && allowed.includes(money(requested)) ? money(requested) : branchFee;
+    if (deliveryFee !== branchFee && zoneFees.includes(deliveryFee)) {
+      const matching = zoneRows.filter((z) => money(num(z.delivery_fee, 0)) === deliveryFee);
+      const minimums = matching.map((z) => money(num(z.min_order_amount, 0)));
+      if (minimums.length && minimums.every((m) => m > 0 && subtotal < m)) {
+        const need = Math.min(...minimums);
+        const currency = String(branchRows?.[0]?.currency || "CHF").toUpperCase();
+        const en = `The minimum order for this delivery area is ${need} ${currency}`;
+        throw new PricingError(currency === "SYP" ? `\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0644\u0644\u0637\u0644\u0628 \u0644\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0647\u0630\u0647 \u0647\u0648 ${need} \u0644.\u0633 / ${en}` : en);
+      }
+    }
   }
   const discountAmount = Math.min(money(Math.max(0, num(opts.discountAmount, 0))), subtotal);
   const walletUsed = Math.max(0, money(num(opts.walletUsed, 0)));
@@ -7412,10 +7912,10 @@ async function storeContext(tenantId) {
   const lang = meta2.whatsappTemplates?.lang || (currency === "SYP" ? "ar" : "en");
   return { name: tenant?.businessName || "Store", meta: meta2, currency, lang };
 }
-var ZERO_DECIMAL = /* @__PURE__ */ new Set(["SYP", "IQD", "LBP", "JPY", "KRW"]);
+var ZERO_DECIMAL2 = /* @__PURE__ */ new Set(["SYP", "IQD", "LBP", "JPY", "KRW"]);
 function money2(v, currency) {
   const n = Number(v) || 0;
-  if (ZERO_DECIMAL.has(currency)) {
+  if (ZERO_DECIMAL2.has(currency)) {
     const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     return currency === "SYP" ? `${s} \u0644.\u0633` : `${s} ${currency}`;
   }
@@ -7478,7 +7978,8 @@ function orderVars(order, ctx) {
     paymentMethod: (payment[order.paymentMethod] || order.paymentMethod) + paid,
     notes: order.notes || "",
     eta: order.estimatedTime ? ar ? `${order.estimatedTime} \u062F\u0642\u064A\u0642\u0629` : `${order.estimatedTime} min` : "",
-    trackingLink: order.trackingToken ? `${BASE_URL()}/track/${order.trackingToken}` : ""
+    // The tracking page opens in the message's language.
+    trackingLink: order.trackingToken ? `${BASE_URL()}/track/${order.trackingToken}${ctx.lang === "ar" ? "?lang=ar" : ""}` : ""
   };
 }
 function templateText(ctx, event, vars) {
@@ -7564,6 +8065,15 @@ var whatsappService = {
   },
   async storeLogout(tenantId) {
     const v = await bridge("POST", "/logout", { key: storeKey(tenantId) });
+    storeCache.delete(tenantId);
+    return v;
+  },
+  /**
+   * Stop the store's session WITHOUT unlinking it: the phone stays paired
+   * (credentials kept) and "connect" resumes it without a new QR scan.
+   */
+  async storeDisconnect(tenantId) {
+    const v = await bridge("POST", "/disconnect", { key: storeKey(tenantId) }, 15e3);
     storeCache.delete(tenantId);
     return v;
   },
@@ -7888,12 +8398,567 @@ Kassenta WhatsApp verification code: *${code}*
   });
 }
 
+// server/routes.ts
+init_phone();
+init_storeTime();
+
+// server/tenantScope.ts
+init_db();
+async function one(sql8, id) {
+  const [rows] = await pool.query(sql8, [id]);
+  return rows?.[0];
+}
+var branchCache = /* @__PURE__ */ new Map();
+async function branchTenant(id) {
+  const hit = branchCache.get(id);
+  if (hit && Date.now() - hit.at < 6e4) return hit.tenantId;
+  const row = await one("SELECT tenant_id FROM branches WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  const tenantId = row.tenant_id == null ? null : Number(row.tenant_id);
+  branchCache.set(id, { at: Date.now(), tenantId });
+  return tenantId;
+}
+var direct = (table) => async (id) => {
+  const row = await one(`SELECT tenant_id FROM \`${table}\` WHERE id = ? LIMIT 1`, id);
+  if (!row) return void 0;
+  return row.tenant_id == null ? null : Number(row.tenant_id);
+};
+var viaBranch = (table) => async (id) => {
+  const row = await one(`SELECT branch_id FROM \`${table}\` WHERE id = ? LIMIT 1`, id);
+  if (!row) return void 0;
+  return row.branch_id == null ? null : branchTenant(Number(row.branch_id));
+};
+var employeeTenant = async (id) => {
+  const row = await one("SELECT tenant_id, branch_id FROM employees WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  if (row.tenant_id != null) return Number(row.tenant_id);
+  return row.branch_id == null ? null : branchTenant(Number(row.branch_id));
+};
+var saleTenant = async (id) => {
+  const row = await one("SELECT branch_id, employee_id FROM sales WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  if (row.branch_id != null) return branchTenant(Number(row.branch_id));
+  return row.employee_id == null ? null : employeeTenant(Number(row.employee_id));
+};
+var shiftTenant = async (id) => {
+  const row = await one("SELECT branch_id, employee_id FROM shifts WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  if (row.branch_id != null) return branchTenant(Number(row.branch_id));
+  return employeeTenant(Number(row.employee_id));
+};
+var returnTenant = async (id) => {
+  const row = await one("SELECT branch_id, original_sale_id FROM `returns` WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  if (row.branch_id != null) return branchTenant(Number(row.branch_id));
+  return saleTenant(Number(row.original_sale_id));
+};
+var productBatchTenant = async (id) => {
+  const row = await one("SELECT branch_id, product_id FROM product_batches WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  if (row.branch_id != null) return branchTenant(Number(row.branch_id));
+  return direct("products")(Number(row.product_id));
+};
+var supplierContractTenant = async (id) => {
+  const row = await one("SELECT supplier_id FROM supplier_contracts WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  return direct("suppliers")(Number(row.supplier_id));
+};
+var notificationTenant = async (id) => {
+  const row = await one("SELECT recipient_id FROM notifications WHERE id = ? LIMIT 1", id);
+  if (!row) return void 0;
+  return employeeTenant(Number(row.recipient_id));
+};
+var resolvers = {
+  product: direct("products"),
+  category: direct("categories"),
+  customer: direct("customers"),
+  supplier: direct("suppliers"),
+  expense: direct("expenses"),
+  vehicle: direct("vehicles"),
+  onlineOrder: direct("online_orders"),
+  tableQr: direct("table_qr_codes"),
+  zone: direct("delivery_zones"),
+  promo: direct("promo_codes"),
+  branch: (id) => branchTenant(id),
+  employee: employeeTenant,
+  sale: saleTenant,
+  shift: shiftTenant,
+  return: returnTenant,
+  purchaseOrder: viaBranch("purchase_orders"),
+  table: viaBranch("tables"),
+  kitchenOrder: viaBranch("kitchen_orders"),
+  warehouse: viaBranch("warehouses"),
+  stockCount: viaBranch("stock_counts"),
+  productBatch: productBatchTenant,
+  supplierContract: supplierContractTenant,
+  notification: notificationTenant
+};
+var PATH_RULES = [
+  [/^\/api\/products\/(\d+)(\/|$)/, resolvers.product],
+  [/^\/api\/categories\/(\d+)(\/|$)/, resolvers.category],
+  [/^\/api\/customers\/(\d+)(\/|$)/, resolvers.customer],
+  [/^\/api\/branches\/(\d+)(\/|$)/, resolvers.branch],
+  [/^\/api\/employees\/(\d+)(\/|$)/, resolvers.employee],
+  [/^\/api\/sales\/(\d+)(\/|$)/, resolvers.sale],
+  [/^\/api\/suppliers\/(\d+)(\/|$)/, resolvers.supplier],
+  [/^\/api\/purchase-orders\/(\d+)(\/|$)/, resolvers.purchaseOrder],
+  [/^\/api\/shifts\/active\/(\d+)$/, resolvers.employee],
+  [/^\/api\/shifts\/(\d+)(\/|$)/, resolvers.shift],
+  [/^\/api\/notifications\/(\d+)\/read$/, resolvers.notification],
+  [/^\/api\/notifications\/(\d+)(\/unread-count|\/read-all)?$/, resolvers.employee],
+  [/^\/api\/expenses\/(\d+)(\/|$)/, resolvers.expense],
+  [/^\/api\/tables\/(\d+)(\/|$)/, resolvers.table],
+  [/^\/api\/table-qr-codes\/(\d+)(\/|$)/, resolvers.tableQr],
+  [/^\/api\/kitchen-orders\/(\d+)(\/|$)/, resolvers.kitchenOrder],
+  [/^\/api\/returns\/(\d+)(\/|$)/, resolvers.return],
+  [/^\/api\/cash-drawer\/(\d+)$/, resolvers.shift],
+  [/^\/api\/warehouses\/(\d+)(\/|$)/, resolvers.warehouse],
+  [/^\/api\/product-batches\/(\d+)(\/|$)/, resolvers.productBatch],
+  [/^\/api\/stock-counts\/(\d+)(\/|$)/, resolvers.stockCount],
+  [/^\/api\/supplier-contracts\/(\d+)(\/|$)/, resolvers.supplierContract],
+  [/^\/api\/analytics\/employee-sales\/(\d+)$/, resolvers.employee],
+  [/^\/api\/online-orders\/(\d+)(\/|$)/, resolvers.onlineOrder],
+  [/^\/api\/vehicles\/(\d+)(\/|$)/, resolvers.vehicle],
+  [/^\/api\/delivery\/manage\/orders\/(\d+)(\/|$)/, resolvers.onlineOrder],
+  [/^\/api\/delivery\/manage\/zones\/(\d+)(\/|$)/, resolvers.zone],
+  [/^\/api\/delivery\/promos\/(\d+)(\/|$)/, resolvers.promo],
+  [/^\/api\/delivery\/loyalty\/(\d+)$/, resolvers.customer],
+  [/^\/api\/delivery\/wallet\/(\d+)$/, resolvers.customer]
+];
+var FIELD_RULES = [
+  ["branchId", resolvers.branch],
+  ["customerId", resolvers.customer],
+  ["productId", resolvers.product],
+  ["employeeId", resolvers.employee],
+  ["vehicleId", resolvers.vehicle],
+  ["supplierId", resolvers.supplier]
+];
+function idOf(v) {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+function notFound(res) {
+  return res.status(404).json({ error: "Not found" });
+}
+function enforceTenantOwnership() {
+  return async (req, res, next) => {
+    const r = req;
+    if (!req.path.startsWith("/api/")) return next();
+    if (req.path.startsWith("/api/super-admin")) return next();
+    if (r.isSuperAdmin) return next();
+    const tenantId = r.tenantId;
+    if (typeof tenantId !== "number" || !tenantId) return next();
+    try {
+      for (const [re, resolve3] of PATH_RULES) {
+        const m = re.exec(req.path);
+        if (!m) continue;
+        const owner = await resolve3(Number(m[1]));
+        if (owner !== void 0 && owner !== tenantId) return notFound(res);
+        break;
+      }
+      const sources = [req.query];
+      if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) sources.push(req.body);
+      for (const src of sources) {
+        for (const [field, resolve3] of FIELD_RULES) {
+          const id = idOf(src?.[field]);
+          if (!id) continue;
+          const owner = await resolve3(id);
+          if (owner !== void 0 && owner !== tenantId) return notFound(res);
+        }
+      }
+    } catch (e) {
+      console.error("[tenantScope] ownership check failed:", e?.message || e);
+      return res.status(500).json({ error: "Ownership check failed" });
+    }
+    next();
+  };
+}
+async function ownedBy(req, resolve3, id) {
+  const r = req;
+  if (r.isSuperAdmin) return true;
+  const tenantId = r.tenantId;
+  if (typeof tenantId !== "number" || !tenantId) return false;
+  const owner = await resolve3(id);
+  return owner === tenantId;
+}
+
+// server/serverMigrations.ts
+init_db();
+async function q(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return rows;
+}
+async function columnExists(table, column) {
+  const rows = await q(
+    `SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [table, column]
+  );
+  return rows.length > 0;
+}
+async function indexExists(table, index) {
+  const rows = await q(
+    `SELECT 1 FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
+    [table, index]
+  );
+  return rows.length > 0;
+}
+var salesClientRefReady = false;
+async function migrateSkuPerTenant() {
+  try {
+    if (!await indexExists("products", "ux_products_tenant_sku")) {
+      await q(`ALTER TABLE products ADD UNIQUE INDEX ux_products_tenant_sku (tenant_id, sku(191))`);
+      console.log("[migrations] products: added UNIQUE (tenant_id, sku)");
+    }
+  } catch (e) {
+    console.error("[migrations] products per-store sku index:", e?.message || e);
+    return;
+  }
+  try {
+    const rows = await q(
+      `SELECT INDEX_NAME AS name
+         FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND NON_UNIQUE = 0
+        GROUP BY INDEX_NAME
+       HAVING COUNT(*) = 1 AND MAX(COLUMN_NAME) = 'sku'`
+    );
+    for (const r of rows) {
+      await q(`ALTER TABLE products DROP INDEX \`${String(r.name).replace(/`/g, "")}\``);
+      console.log(`[migrations] products: dropped global sku index ${r.name}`);
+    }
+  } catch (e) {
+    console.error("[migrations] products global sku index:", e?.message || e);
+  }
+}
+async function migrateSalesClientRef() {
+  try {
+    if (!await columnExists("sales", "client_ref")) {
+      await q(`ALTER TABLE sales ADD COLUMN client_ref VARCHAR(100) NULL`);
+      console.log("[migrations] sales: added client_ref");
+    }
+    if (!await indexExists("sales", "ux_sales_branch_client_ref")) {
+      await q(`ALTER TABLE sales ADD UNIQUE INDEX ux_sales_branch_client_ref (branch_id, client_ref)`);
+    }
+    salesClientRefReady = true;
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (/duplicate (column|key)/i.test(msg)) salesClientRefReady = true;
+    else console.error("[migrations] sales.client_ref:", msg);
+  }
+}
+var orderClientRefReady = false;
+var broadcastClientRefReady = false;
+async function migrateOrderClientRef() {
+  const targets = [
+    ["online_orders", "ix_online_orders_client_ref", "tenant_id, client_ref", () => {
+      orderClientRefReady = true;
+    }],
+    // broadcast_orders has no tenant_id (it is not a store's order yet).
+    ["broadcast_orders", "ix_broadcast_orders_client_ref", "client_ref", () => {
+      broadcastClientRefReady = true;
+    }]
+  ];
+  for (const [table, index, cols, setReady] of targets) {
+    try {
+      const exists = await q(
+        `SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1`,
+        [table]
+      );
+      if (!exists.length) continue;
+      if (!await columnExists(table, "client_ref")) {
+        await q(`ALTER TABLE \`${table}\` ADD COLUMN client_ref VARCHAR(100) NULL`);
+        console.log(`[migrations] ${table}: added client_ref`);
+      }
+      if (!await indexExists(table, index)) {
+        await q(`ALTER TABLE \`${table}\` ADD INDEX ${index} (${cols})`);
+      }
+      setReady();
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (/duplicate (column|key)/i.test(msg)) setReady();
+      else console.error(`[migrations] ${table}.client_ref:`, msg);
+    }
+  }
+}
+async function ensureBroadcastClientRef() {
+  if (!broadcastClientRefReady) await migrateOrderClientRef();
+}
+async function migrateCustomerPhoneVerified() {
+  try {
+    if (!await columnExists("customers", "phone_verified_at")) {
+      await q(`ALTER TABLE customers ADD COLUMN phone_verified_at DATETIME NULL`);
+      console.log("[migrations] customers: added phone_verified_at");
+    }
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (!/duplicate column/i.test(msg)) console.error("[migrations] customers.phone_verified_at:", msg);
+  }
+}
+async function runServerMigrations() {
+  await migrateSkuPerTenant();
+  await migrateSalesClientRef();
+  await migrateOrderClientRef();
+  await migrateCustomerPhoneVerified();
+}
+
+// server/tenantAuth.ts
+var import_jsonwebtoken3 = __toESM(require("jsonwebtoken"));
+init_storage();
+var DOWNLOAD_SECRET = `${JWT_SECRET}:download-link`;
+var DOWNLOAD_TTL_SECONDS = 300;
+var DOWNLOADABLE_PATHS = [
+  /^\/api\/customers\/export$/,
+  /^\/api\/reports\/(sales|inventory|profit|employee-performance)-export$/
+];
+function signDownloadToken(tenantId, path5, employee) {
+  return import_jsonwebtoken3.default.sign({ typ: "dl", t: tenantId, p: path5, emp: employee || void 0 }, DOWNLOAD_SECRET, {
+    expiresIn: DOWNLOAD_TTL_SECONDS
+  });
+}
+function verifyDownloadToken(token, path5) {
+  try {
+    const c = import_jsonwebtoken3.default.verify(token, DOWNLOAD_SECRET);
+    if (c?.typ !== "dl" || c.p !== path5 || !Number.isInteger(c.t) || c.t <= 0) return null;
+    return c;
+  } catch {
+    return null;
+  }
+}
+var PUBLIC_ROUTES = [
+  "/api/health",
+  "/api/license/validate",
+  "/api/auth/google",
+  "/api/landing/subscribe",
+  "/api/landing/plans",
+  // Public plan catalogue for the pricing page
+  "/api/landing/checkout-session",
+  // Read-only Checkout status for /pay/success
+  "/api/landing-page-config",
+  "/api/store/",
+  "/api/store-public/",
+  "/api/online-orders/public",
+  "/api/stripe/webhook",
+  "/api/stripe/publishable-key",
+  "/api/payment-gateway/config",
+  // ── Payments ──
+  // Only the routes a guest checkout genuinely needs. Everything else under
+  // /api/payments/ (sale intents, refunds, health) deliberately stays behind
+  // the licence/employee check, so this must NOT become a bare "/api/payments/".
+  "/api/payments/webhook",
+  // signature-verified, see stripeWebhook.ts
+  "/api/payments/config",
+  // publishable key + offered methods
+  "/api/payments/order/",
+  // guarded by the order's tracking token
+  "/api/payments/status/",
+  // PaymentIntent id is already a bearer secret
+  "/api/payments/checkout-session",
+  // plan price comes from the DB, never the caller
+  "/api/products/template",
+  "/api/customers/template",
+  // static sample sheet, no store data
+  "/api/caller-id/incoming",
+  // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
+  "/api/caller-id/active-calls",
+  // HTTP polling fallback — tenantId required in query string
+  "/api/push/vapid-public-key",
+  // Public — needed for SW push subscription before auth
+  "/api/push/subscribe",
+  // Public — SW registers subscription before full auth
+  "/api/maintenance/fix-tenant-ids",
+  // One-time migration fix (secured by secret header)
+  // ── Delivery Platform Public Routes ──
+  "/api/dine-in/validate/",
+  // Public QR token validation for dine-in
+  "/api/delivery/auth/",
+  // Customer OTP login/register
+  "/api/delivery/store/",
+  // Menu & store config browsing
+  "/api/delivery/restaurants",
+  // Multi-restaurant discovery listing
+  "/api/delivery/orders/track/",
+  // Public order tracking by token
+  "/api/delivery/orders/public",
+  // Public order placement
+  "/api/delivery/orders",
+  // Order creation (customer-facing)
+  "/api/delivery/promo/validate",
+  // Promo code validation
+  "/api/delivery/zones",
+  // Delivery zones for checkout map
+  "/api/delivery/referral/",
+  // Referral code lookup
+  "/api/delivery/driver/",
+  // All driver endpoints (auth via Bearer driver token)
+  "/api/delivery/search",
+  // Public product search
+  "/api/delivery/help/faq",
+  // Public FAQ listing
+  "/api/delivery/sitemap.xml",
+  // Dynamic sitemap XML
+  "/api/delivery/recommendations",
+  // Public recommendations
+  "/api/delivery/broadcast",
+  // Public broadcast order creation (drop-shipping)
+  "/api/delivery/broadcast/menu",
+  // Public aggregated menu for /broadcast page
+  "/api/customer/chats",
+  // Customer chat list (auth via Bearer customer token)
+  "/api/customer/chats/",
+  // Customer chat single room + messages
+  "/api/robots.txt",
+  // SEO robots.txt
+  "/api/sitemap.xml",
+  // SEO sitemap (CDN-prefixed variant)
+  "/api/contact",
+  // Website demo request (rate limited, no auth)
+  "/api/favicon.ico",
+  // Favicon via the CDN-prefixed path
+  // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
+  "/api/order",
+  // Delivery listing (no-slug) + /api/order/
+  "/api/track/",
+  // Public tracking page HTML
+  "/api/driver",
+  // Driver PWA HTML (exact)
+  "/api/driver/",
+  // Driver PWA HTML (with slash/slug)
+  "/api/restaurants",
+  // Restaurant listing HTML
+  "/api/delivery-app/",
+  // Static assets (CSS, JS, images)
+  // ── Static files under /api/ prefix (CDN compatibility) ──
+  "/api/uploads/",
+  // Product images & media
+  "/api/assets/",
+  // App assets
+  "/api/objects/",
+  // Alias for uploads
+  "/api/sounds/",
+  // Notification sounds
+  "/api/ws/",
+  // WebSocket upgrade — auth handled by ws server itself
+  "/api/events"
+  // SSE fallback for the WS broadcast channel
+];
+var PUBLIC_ROUTE_PATTERNS = [
+  /^\/api\/store\/\d+\/menu$/
+];
+function matchesPrefix(path5, route) {
+  if (route.endsWith("/")) return path5.startsWith(route);
+  if (path5 === route) return true;
+  return path5.startsWith(route + "/");
+}
+function isPublicRoute(path5) {
+  if (PUBLIC_ROUTES.some((route) => matchesPrefix(path5, route))) return true;
+  if (PUBLIC_ROUTE_PATTERNS.some((pattern) => pattern.test(path5))) return true;
+  return false;
+}
+var SEED_ROUTES = [
+  "/api/admin/seed-pizza-lemon",
+  "/api/admin/seed-zurich-restaurants",
+  "/api/admin/check-pizza-lemon",
+  "/api/seed",
+  "/api/fix-schema-and-seed",
+  "/api/force-full-seed"
+];
+function isSeedRoute(path5) {
+  return SEED_ROUTES.some((route) => matchesPrefix(path5, route));
+}
+function tenantAuthMiddleware() {
+  const isDev = process.env.NODE_ENV === "development";
+  return async (req, res, next) => {
+    if (!req.path.startsWith("/api")) {
+      return next();
+    }
+    if (req.path.startsWith("/api/super-admin")) {
+      return next();
+    }
+    if (isPublicRoute(req.path)) {
+      return next();
+    }
+    if (isSeedRoute(req.path)) {
+      if (isDev) return next();
+      console.warn(`[tenantAuth] Blocked seed route in production: ${req.path}`);
+      return res.status(404).json({ error: "Not found" });
+    }
+    const dl = typeof req.query.dl === "string" ? req.query.dl : "";
+    if (dl && req.method === "GET" && DOWNLOADABLE_PATHS.some((re) => re.test(req.path))) {
+      const claims = verifyDownloadToken(dl, req.path);
+      if (!claims) return res.status(401).json({ error: "Download link expired or invalid", code: "DOWNLOAD_LINK_INVALID" });
+      req.tenantId = claims.t;
+      if (claims.emp && !req.employee) req.employee = claims.emp;
+      const { dl: _dl, ...rest } = req.query;
+      Object.defineProperty(req, "query", { value: { ...rest, tenantId: String(claims.t) }, writable: true, configurable: true, enumerable: true });
+      return next();
+    }
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = import_jsonwebtoken3.default.verify(token, JWT_SECRET);
+        const admin = await storage.getSuperAdmin(decoded.id);
+        if (admin && admin.isActive) {
+          const tenantId2 = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
+          if (tenantId2) req.tenantId = tenantId2;
+          req.isSuperAdmin = true;
+          return next();
+        }
+      } catch (_) {
+      }
+    }
+    const tenantId = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
+    const licenseKey = req.headers["x-license-key"];
+    if (!tenantId && !licenseKey) {
+      return res.status(401).json({ error: "Authentication required. Provide x-license-key header." });
+    }
+    if (!licenseKey) {
+      return res.status(401).json({ error: "Authentication required. Provide x-license-key header." });
+    }
+    try {
+      const license = await storage.getLicenseByKey(licenseKey);
+      if (!license) {
+        return res.status(401).json({ error: "Invalid license key" });
+      }
+      if (license.status !== "active") {
+        return res.status(401).json({ error: `License is ${license.status}` });
+      }
+      const queryTenant = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const bodyTenant = req.body && typeof req.body === "object" && req.body.tenantId != null && req.body.tenantId !== "" ? Number(req.body.tenantId) : void 0;
+      if (queryTenant && license.tenantId !== queryTenant || bodyTenant && license.tenantId !== bodyTenant) {
+        return res.status(403).json({ error: "License key does not match the requested tenant" });
+      }
+      if (license.expiresAt && new Date(license.expiresAt) < /* @__PURE__ */ new Date()) {
+        const isTrial = license.licenseKey.startsWith("TRIAL-");
+        return res.status(401).json({
+          error: isTrial ? "Your 14-day trial period has expired. Please subscribe to continue." : "License has expired",
+          code: "LICENSE_EXPIRED",
+          isTrial
+        });
+      }
+      req.tenantId = license.tenantId;
+      req.licenseKey = licenseKey;
+      if (!queryTenant) {
+        const q8 = { ...req.query, tenantId: String(license.tenantId) };
+        Object.defineProperty(req, "query", { value: q8, writable: true, configurable: true, enumerable: true });
+      }
+      next();
+    } catch (error) {
+      console.error("[tenantAuth] Error validating license:", error);
+      return res.status(500).json({ error: "Authentication error" });
+    }
+  };
+}
+
 // server/customerAuthService.ts
 var import_crypto4 = __toESM(require("crypto"));
 var import_bcrypt2 = __toESM(require("bcrypt"));
 init_db();
 init_schema();
 var import_drizzle_orm2 = require("drizzle-orm");
+var import_jsonwebtoken4 = __toESM(require("jsonwebtoken"));
 var SESSION_TTL_DAYS = 30;
 var OTP_TTL_MINUTES = 10;
 var OTP_MAX_ATTEMPTS = 5;
@@ -7934,23 +8999,29 @@ async function verifyOtp(phone, tenantId, inputOtp) {
     )
   ).orderBy(otpVerifications.id).limit(1);
   if (!record) {
-    return { success: false, error: "OTP expired or not found" };
+    return { success: false, error: "\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0627\u0644\u0631\u0645\u0632 \u0623\u0648 \u0644\u0645 \u064A\u064F\u0637\u0644\u0628 \u2014 \u0627\u0637\u0644\u0628 \u0631\u0645\u0632\u0627\u064B \u062C\u062F\u064A\u062F\u0627\u064B / OTP expired or not found" };
   }
   const attempts = (record.attempts ?? 0) + 1;
   if (attempts > OTP_MAX_ATTEMPTS) {
     await db.update(otpVerifications).set({ verified: true }).where((0, import_drizzle_orm2.eq)(otpVerifications.id, record.id));
-    return { success: false, error: "Too many attempts. Please request a new OTP." };
+    return { success: false, error: "\u0645\u062D\u0627\u0648\u0644\u0627\u062A \u0643\u062B\u064A\u0631\u0629\u060C \u0627\u0637\u0644\u0628 \u0631\u0645\u0632\u0627\u064B \u062C\u062F\u064A\u062F\u0627\u064B / Too many attempts. Please request a new OTP." };
   }
   await db.update(otpVerifications).set({ attempts }).where((0, import_drizzle_orm2.eq)(otpVerifications.id, record.id));
   if (record.otp !== inputOtp) {
-    return { success: false, error: "Invalid OTP" };
+    return { success: false, error: "\u0627\u0644\u0631\u0645\u0632 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D / Invalid OTP" };
   }
   await db.update(otpVerifications).set({ verified: true }).where((0, import_drizzle_orm2.eq)(otpVerifications.id, record.id));
   return { success: true };
 }
 async function findOrCreateCustomerByPhone(phone, tenantId) {
   const [existing] = await db.select().from(customers).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(customers.phone, phone), (0, import_drizzle_orm2.eq)(customers.tenantId, tenantId))).limit(1);
-  if (existing) return existing;
+  if (existing) {
+    if (existing.isActive === false) {
+      await db.update(customers).set({ isActive: true }).where((0, import_drizzle_orm2.eq)(customers.id, existing.id));
+      return { ...existing, isActive: true };
+    }
+    return existing;
+  }
   const referralCode = generateToken2(4).toUpperCase();
   const [inserted] = await db.insert(customers).values({
     tenantId,
@@ -7963,6 +9034,35 @@ async function findOrCreateCustomerByPhone(phone, tenantId) {
   }).$returningId();
   const [newCustomer] = await db.select().from(customers).where((0, import_drizzle_orm2.eq)(customers.id, inserted.id)).limit(1);
   return newCustomer;
+}
+var PHONE_PROOF_SECRET = `${JWT_SECRET}:phone-proof`;
+function signPhoneProof(phone, tenantId) {
+  return import_jsonwebtoken4.default.sign({ typ: "phone", ph: phone, t: tenantId }, PHONE_PROOF_SECRET, { expiresIn: "15m" });
+}
+function verifyPhoneProof(token, phone, tenantId) {
+  if (typeof token !== "string" || !token) return false;
+  try {
+    const c = import_jsonwebtoken4.default.verify(token, PHONE_PROOF_SECRET);
+    return c?.typ === "phone" && c.ph === phone && Number(c.t) === Number(tenantId);
+  } catch {
+    return false;
+  }
+}
+async function claimCustomerAfterPhoneProof(customer) {
+  try {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await pool2.query("UPDATE customers SET phone_verified_at = NOW() WHERE id = ?", [customer.id]);
+  } catch {
+  }
+  if (customer.hasAccount) return;
+  await db.delete(customerSessions).where((0, import_drizzle_orm2.eq)(customerSessions.customerId, customer.id));
+  await db.update(customers).set({ hasAccount: true, isActive: true }).where((0, import_drizzle_orm2.eq)(customers.id, customer.id));
+}
+async function emailTakenByOther(email, tenantId, customerId) {
+  const conds = [(0, import_drizzle_orm2.eq)(customers.email, email), (0, import_drizzle_orm2.eq)(customers.tenantId, tenantId)];
+  if (customerId) conds.push((0, import_drizzle_orm2.ne)(customers.id, customerId));
+  const [row] = await db.select({ id: customers.id }).from(customers).where((0, import_drizzle_orm2.and)(...conds)).limit(1);
+  return !!row;
 }
 async function findCustomerByEmail(email, tenantId) {
   const [customer] = await db.select().from(customers).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(customers.email, email), (0, import_drizzle_orm2.eq)(customers.tenantId, tenantId))).limit(1);
@@ -8007,6 +9107,8 @@ async function getAuthenticatedCustomer(authHeader) {
 // server/deliveryService.ts
 var import_crypto5 = __toESM(require("crypto"));
 init_db();
+init_storeTime();
+init_phone();
 init_schema();
 var import_drizzle_orm3 = require("drizzle-orm");
 function generateTrackingToken() {
@@ -8014,29 +9116,32 @@ function generateTrackingToken() {
 }
 async function validatePromoCode(tenantId, code, orderTotal, orderType, customerId) {
   const now = /* @__PURE__ */ new Date();
+  const currency = await storeCurrency(tenantId).catch(() => "CHF");
+  const arabic = currency === "SYP";
+  const msg = (en, ar) => arabic ? `${ar} / ${en}` : en;
   const [promo] = await db.select().from(promoCodes).where(
     (0, import_drizzle_orm3.and)(
       (0, import_drizzle_orm3.eq)(promoCodes.tenantId, tenantId),
-      (0, import_drizzle_orm3.eq)(promoCodes.code, code.toUpperCase()),
+      (0, import_drizzle_orm3.eq)(promoCodes.code, asciiDigits(code).trim().toUpperCase()),
       (0, import_drizzle_orm3.eq)(promoCodes.isActive, true)
     )
   ).limit(1);
-  if (!promo) return { valid: false, error: "Invalid promo code" };
+  if (!promo) return { valid: false, error: msg("Invalid promo code", "\u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D") };
   if (promo.validFrom && new Date(promo.validFrom) > now)
-    return { valid: false, error: "Promo code is not active yet" };
+    return { valid: false, error: msg("Promo code is not active yet", "\u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644 \u0628\u0639\u062F") };
   if (promo.validUntil && new Date(promo.validUntil) < now)
-    return { valid: false, error: "Promo code has expired" };
+    return { valid: false, error: msg("Promo code has expired", "\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645") };
   if (promo.usageLimit !== null && promo.usageLimit !== void 0 && (promo.usageCount ?? 0) >= promo.usageLimit)
-    return { valid: false, error: "Promo code usage limit reached" };
+    return { valid: false, error: msg("Promo code usage limit reached", "\u062A\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 \u0644\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645") };
   const minAmount = parseFloat(promo.minOrderAmount ?? "0");
   if (orderTotal < minAmount)
     return {
       valid: false,
-      error: `Minimum order amount is ${minAmount} to use this code`
+      error: arabic ? msg(`Minimum order amount is ${formatMoney(minAmount, currency)} to use this code`, `\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0644\u0644\u0637\u0644\u0628 \u0644\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0647\u0630\u0627 \u0627\u0644\u0631\u0645\u0632 \u0647\u0648 ${formatMoney(minAmount, currency)}`) : `Minimum order amount is ${minAmount} to use this code`
     };
   const types = promo.applicableOrderTypes ?? ["delivery", "pickup"];
   if (!types.includes(orderType))
-    return { valid: false, error: "Promo code not applicable for this order type" };
+    return { valid: false, error: msg("Promo code not applicable for this order type", "\u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645 \u0644\u0627 \u064A\u0646\u0637\u0628\u0642 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0646\u0648\u0639 \u0645\u0646 \u0627\u0644\u0637\u0644\u0628\u0627\u062A") };
   if (customerId && promo.perCustomerLimit) {
     const [usageCount] = await db.select({ count: import_drizzle_orm3.sql`count(*)` }).from(promoCodeUsages).where(
       (0, import_drizzle_orm3.and)(
@@ -8045,7 +9150,7 @@ async function validatePromoCode(tenantId, code, orderTotal, orderType, customer
       )
     );
     if ((usageCount?.count ?? 0) >= promo.perCustomerLimit)
-      return { valid: false, error: "You have already used this promo code" };
+      return { valid: false, error: msg("You have already used this promo code", "\u0644\u0642\u062F \u0627\u0633\u062A\u062E\u062F\u0645\u062A \u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645 \u0647\u0630\u0627 \u0645\u0646 \u0642\u0628\u0644") };
   }
   let discountAmount = 0;
   const value = parseFloat(promo.discountValue);
@@ -8061,7 +9166,8 @@ async function validatePromoCode(tenantId, code, orderTotal, orderType, customer
   }
   return {
     valid: true,
-    discountAmount: Math.round(discountAmount * 100) / 100,
+    // Whole units for SYP (and other zero-decimal currencies), cents otherwise.
+    discountAmount: roundMoney(discountAmount, currency),
     discountType: promo.discountType,
     promoCode: promo
   };
@@ -8177,19 +9283,16 @@ async function checkLoyaltyRedemption(customerId, tenantId, pointsToRedeem, conf
   if (pointsToRedeem > (customer.loyaltyPoints ?? 0)) return "Insufficient loyalty points";
   return null;
 }
-async function redeemLoyaltyPoints(customerId, tenantId, pointsToRedeem) {
-  const config = await getLoyaltyConfig(tenantId);
-  const refusal = await checkLoyaltyRedemption(customerId, tenantId, pointsToRedeem, config);
-  if (refusal) return { success: false, discountAmount: 0, error: refusal };
-  const discountAmount = Math.round(pointsToRedeem * config.redemptionRate * 100) / 100;
+async function redeemPointsForOrder(customerId, tenantId, points, orderId, value) {
+  if (!(points > 0)) return;
   await moveLoyaltyPoints(
     customerId,
     tenantId,
-    -pointsToRedeem,
+    -points,
     "redeem",
-    `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`
+    `Redeemed ${points} points for ${value} discount on order #${orderId}`,
+    orderId
   );
-  return { success: true, discountAmount };
 }
 async function settlePosSaleLoyalty(opts) {
   const config = await getLoyaltyConfig(opts.tenantId);
@@ -8244,5562 +9347,22 @@ async function deductWallet(customerId, tenantId, amount, orderId) {
   });
   return { success: true };
 }
-
-// server/wholesale.ts
-init_db();
-async function q(sqlText, params = []) {
-  const [rows] = await pool.query(sqlText, params);
-  return Array.isArray(rows) ? rows : [];
-}
-var WholesaleError = class extends Error {
-  statusCode;
-  code;
-  details;
-  constructor(message, statusCode = 400, code, details) {
-    super(message);
-    this.statusCode = statusCode;
-    this.code = code;
-    this.details = details;
-  }
-};
-var COLUMNS = [
-  ["products", "wholesale_price", "decimal(12,2) NULL DEFAULT NULL"],
-  ["products", "wholesale_min_qty", "int NULL DEFAULT NULL"],
-  ["customers", "customer_type", "varchar(20) NOT NULL DEFAULT 'retail'"],
-  ["customers", "shop_name", "varchar(160) NULL DEFAULT NULL"],
-  ["customers", "tax_number", "varchar(64) NULL DEFAULT NULL"],
-  ["customers", "credit_limit", "decimal(14,2) NULL DEFAULT NULL"],
-  ["customers", "wholesale_balance", "decimal(14,2) NOT NULL DEFAULT 0"]
-];
-var PAYMENTS_TABLE = `
-  CREATE TABLE IF NOT EXISTS wholesale_payments (
-    id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    tenant_id int NOT NULL,
-    customer_id int NOT NULL,
-    kind varchar(20) NOT NULL DEFAULT 'payment',
-    amount decimal(14,2) NOT NULL,
-    method varchar(30) NULL DEFAULT NULL,
-    note varchar(500) NULL DEFAULT NULL,
-    sale_id int NULL DEFAULT NULL,
-    return_id int NULL DEFAULT NULL,
-    employee_id int NULL DEFAULT NULL,
-    balance_after decimal(14,2) NULL DEFAULT NULL,
-    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    KEY ix_wp_tenant (tenant_id, created_at),
-    KEY ix_wp_customer (customer_id, created_at),
-    KEY ix_wp_sale (sale_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
-async function columnExists(table, column) {
-  const rows = await q(
-    `SELECT 1 FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
-    [table, column]
-  );
-  return rows.length > 0;
-}
-async function indexExists(table, index) {
-  const rows = await q(
-    `SELECT 1 FROM information_schema.STATISTICS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
-    [table, index]
-  );
-  return rows.length > 0;
-}
-async function runWholesaleMigrations() {
-  let added = 0;
-  for (const [table, column, def] of COLUMNS) {
-    try {
-      if (await columnExists(table, column)) continue;
-      await q(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${def}`);
-      added++;
-    } catch (e) {
-      const msg = String(e?.message || e);
-      if (!/duplicate column/i.test(msg)) console.error(`[wholesale] ${table}.${column}: ${msg}`);
-    }
-  }
-  try {
-    await q(PAYMENTS_TABLE);
-  } catch (e) {
-    console.error("[wholesale] wholesale_payments:", e?.message || e);
-  }
-  try {
-    if (!await indexExists("customers", "ix_customers_tenant_type")) {
-      await q(`ALTER TABLE customers ADD INDEX ix_customers_tenant_type (tenant_id, customer_type)`);
-    }
-  } catch (e) {
-    const msg = String(e?.message || e);
-    if (!/duplicate key name/i.test(msg)) console.error("[wholesale] customers index:", msg);
-  }
-  console.log(added > 0 ? `[wholesale] added ${added} column(s)` : "[wholesale] schema up to date");
-}
-var MAX_AMOUNT_CENTS = 1e13;
-function toCents(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.round(n * 100) : 0;
-}
-var fromCents = (c) => (c / 100).toFixed(2);
-var num2 = (v) => v == null ? 0 : Number(v) || 0;
-var numOrNull = (v) => v == null || v === "" ? null : Number(v);
-function parsePositiveAmount(v, field = "amount") {
-  const raw = typeof v === "string" ? v.trim().replace(",", ".") : v;
-  const n = Number(raw);
-  if (raw === "" || raw == null || !Number.isFinite(n)) {
-    throw new WholesaleError(`${field} must be a number`, 400, "INVALID_AMOUNT");
-  }
-  const cents = Math.round(n * 100);
-  if (cents <= 0) throw new WholesaleError(`${field} must be greater than zero`, 400, "INVALID_AMOUNT");
-  if (cents > MAX_AMOUNT_CENTS) throw new WholesaleError(`${field} is too large`, 400, "INVALID_AMOUNT");
-  return cents;
-}
-function parseOptionalMoney(v, field) {
-  if (v === void 0 || v === null) return null;
-  const raw = typeof v === "string" ? v.trim().replace(",", ".") : v;
-  if (raw === "") return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) throw new WholesaleError(`${field} must be zero or more`, 400, "INVALID_AMOUNT");
-  const cents = Math.round(n * 100);
-  if (cents > MAX_AMOUNT_CENTS) throw new WholesaleError(`${field} is too large`, 400, "INVALID_AMOUNT");
-  return cents;
-}
-var clip = (v, n) => {
-  const t2 = String(v ?? "").trim();
-  return t2 ? t2.slice(0, n) : null;
-};
-function normalizeWholesaleProductFields(body) {
-  if (!body || typeof body !== "object") return body;
-  const b = body;
-  if ("wholesalePrice" in b) {
-    const cents = parseOptionalMoney(b.wholesalePrice, "wholesalePrice");
-    b.wholesalePrice = cents == null ? null : fromCents(cents);
-  }
-  if ("wholesaleMinQty" in b) {
-    const raw = b.wholesaleMinQty;
-    if (raw === "" || raw == null) {
-      b.wholesaleMinQty = null;
-    } else {
-      const n = Number(raw);
-      if (!Number.isInteger(n) || n < 1 || n > 1e6) {
-        throw new WholesaleError("wholesaleMinQty must be a whole number of at least 1", 400, "INVALID_QTY");
-      }
-      b.wholesaleMinQty = n;
-    }
-  }
-  return body;
-}
-function stripProtectedCustomerFields(body) {
-  if (!body || typeof body !== "object") return body;
-  const b = { ...body };
-  delete b.wholesaleBalance;
-  delete b.wholesale_balance;
-  delete b.creditLimit;
-  delete b.credit_limit;
-  delete b.customerType;
-  delete b.customer_type;
-  return b;
-}
-function mapTrader(r) {
-  const balance = num2(r.wholesale_balance);
-  const creditLimit = numOrNull(r.credit_limit);
-  return {
-    id: Number(r.id),
-    name: r.name,
-    shopName: r.shop_name ?? null,
-    phone: r.phone ?? null,
-    email: r.email ?? null,
-    address: r.address ?? null,
-    taxNumber: r.tax_number ?? null,
-    notes: r.notes ?? null,
-    creditLimit,
-    balance,
-    availableCredit: creditLimit == null ? null : Math.max(0, (toCents(creditLimit) - toCents(balance)) / 100),
-    overLimit: creditLimit != null && toCents(balance) > toCents(creditLimit),
-    isActive: r.is_active == null ? true : !!Number(r.is_active),
-    createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
-    lastPaymentAt: r.last_payment_at ? new Date(r.last_payment_at).toISOString() : null,
-    lastCreditSaleAt: r.last_credit_sale_at ? new Date(r.last_credit_sale_at).toISOString() : null
-  };
-}
-var TRADER_COLUMNS = `c.id, c.name, c.shop_name, c.phone, c.email, c.address, c.tax_number, c.notes,
-  c.credit_limit, c.wholesale_balance, c.is_active, c.created_at`;
-async function listTraders(tenantId, opts = {}) {
-  const where = ["c.tenant_id = ?", "c.customer_type = 'wholesale'"];
-  const params = [tenantId];
-  if (!opts.includeInactive) where.push("(c.is_active = 1 OR c.is_active IS NULL)");
-  const s = String(opts.search ?? "").trim();
-  if (s) {
-    const like2 = `%${s.slice(0, 80)}%`;
-    where.push("(c.name LIKE ? OR c.shop_name LIKE ? OR c.phone LIKE ? OR c.tax_number LIKE ?)");
-    params.push(like2, like2, like2, like2);
-  }
-  const rows = await q(
-    `SELECT ${TRADER_COLUMNS},
-       (SELECT MAX(p.created_at) FROM wholesale_payments p
-         WHERE p.customer_id = c.id AND p.kind = 'payment') AS last_payment_at,
-       (SELECT MAX(s.created_at) FROM sales s
-         WHERE s.customer_id = c.id AND s.payment_method = 'credit') AS last_credit_sale_at
-     FROM customers c
-     WHERE ${where.join(" AND ")}
-     ORDER BY c.wholesale_balance DESC, c.name ASC
-     LIMIT 1000`,
-    params
-  );
-  return rows.map(mapTrader);
-}
-async function getTrader(tenantId, id) {
-  const rows = await q(
-    `SELECT ${TRADER_COLUMNS} FROM customers c
-      WHERE c.id = ? AND c.tenant_id = ? AND c.customer_type = 'wholesale' LIMIT 1`,
-    [id, tenantId]
-  );
-  if (!rows[0]) throw new WholesaleError("Trader not found", 404, "NOT_FOUND");
-  return mapTrader(rows[0]);
-}
-async function withTx(fn) {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const out = await fn(conn);
-    await conn.commit();
-    return out;
-  } catch (e) {
-    try {
-      await conn.rollback();
-    } catch {
-    }
-    throw e;
-  } finally {
-    conn.release();
-  }
-}
-async function cq(conn, sqlText, params = []) {
-  const [rows] = await conn.query(sqlText, params);
-  return rows;
-}
-async function lockTrader(conn, tenantId, customerId, requireWholesale = true) {
-  const rows = await cq(
-    conn,
-    `SELECT id, name, customer_type, is_active, credit_limit, wholesale_balance
-       FROM customers WHERE id = ? AND tenant_id = ? FOR UPDATE`,
-    [customerId, tenantId]
-  );
-  const row = rows?.[0];
-  if (!row) throw new WholesaleError("Trader not found", 404, "NOT_FOUND");
-  if (requireWholesale && row.customer_type !== "wholesale") {
-    throw new WholesaleError("This customer is not a wholesale trader", 409, "NOT_WHOLESALE");
-  }
-  return row;
-}
-async function createTrader(tenantId, input, employeeId) {
-  const name = clip(input.name, 160);
-  const limitCents = parseOptionalMoney(input.creditLimit, "creditLimit");
-  const openingCents = parseOptionalMoney(input.openingBalance, "openingBalance") ?? 0;
-  const existingId = input.customerId != null && input.customerId !== "" ? Number(input.customerId) : null;
-  if (existingId != null && !Number.isInteger(existingId)) throw new WholesaleError("Invalid customerId", 400);
-  if (!name && existingId == null) throw new WholesaleError("Name is required", 400, "NAME_REQUIRED");
-  const id = await withTx(async (conn) => {
-    let customerId;
-    if (existingId != null) {
-      const row = await lockTrader(conn, tenantId, existingId, false);
-      if (row.customer_type === "wholesale") {
-        throw new WholesaleError("This customer is already a wholesale trader", 409, "ALREADY_WHOLESALE");
-      }
-      await cq(
-        conn,
-        `UPDATE customers SET customer_type = 'wholesale',
-            name = COALESCE(?, name), shop_name = ?, tax_number = ?, credit_limit = ?,
-            phone = COALESCE(?, phone), email = COALESCE(?, email), address = COALESCE(?, address),
-            notes = COALESCE(?, notes), is_active = 1, wholesale_balance = 0
-          WHERE id = ? AND tenant_id = ?`,
-        [
-          name,
-          clip(input.shopName, 160),
-          clip(input.taxNumber, 64),
-          limitCents == null ? null : fromCents(limitCents),
-          clip(input.phone, 40),
-          clip(input.email, 160),
-          clip(input.address, 500),
-          clip(input.notes, 1e3),
-          existingId,
-          tenantId
-        ]
-      );
-      customerId = existingId;
-    } else {
-      const res = await cq(
-        conn,
-        `INSERT INTO customers
-           (tenant_id, name, phone, email, address, notes, customer_type, shop_name, tax_number,
-            credit_limit, wholesale_balance, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, 'wholesale', ?, ?, ?, 0, 1)`,
-        [
-          tenantId,
-          name,
-          clip(input.phone, 40),
-          clip(input.email, 160),
-          clip(input.address, 500),
-          clip(input.notes, 1e3),
-          clip(input.shopName, 160),
-          clip(input.taxNumber, 64),
-          limitCents == null ? null : fromCents(limitCents)
-        ]
-      );
-      customerId = Number(res.insertId);
-    }
-    if (openingCents > 0) {
-      await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(openingCents), customerId]);
-      await cq(
-        conn,
-        `INSERT INTO wholesale_payments
-           (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
-         VALUES (?, ?, 'charge', ?, 'opening', ?, ?, ?)`,
-        [tenantId, customerId, fromCents(openingCents), "Opening balance", employeeId, fromCents(openingCents)]
-      );
-    }
-    return customerId;
-  });
-  return getTrader(tenantId, id);
-}
-async function updateTrader(tenantId, id, input) {
-  await getTrader(tenantId, id);
-  const sets = [];
-  const params = [];
-  const text2 = (key, col2, max) => {
-    if (input[key] !== void 0) {
-      sets.push(`${col2} = ?`);
-      params.push(clip(input[key], max));
-    }
-  };
-  if (input.name !== void 0) {
-    const name = clip(input.name, 160);
-    if (!name) throw new WholesaleError("Name is required", 400, "NAME_REQUIRED");
-    sets.push("name = ?");
-    params.push(name);
-  }
-  text2("shopName", "shop_name", 160);
-  text2("phone", "phone", 40);
-  text2("email", "email", 160);
-  text2("address", "address", 500);
-  text2("taxNumber", "tax_number", 64);
-  text2("notes", "notes", 1e3);
-  if (input.creditLimit !== void 0) {
-    const cents = parseOptionalMoney(input.creditLimit, "creditLimit");
-    sets.push("credit_limit = ?");
-    params.push(cents == null ? null : fromCents(cents));
-  }
-  if (input.isActive !== void 0) {
-    sets.push("is_active = ?");
-    params.push(input.isActive ? 1 : 0);
-  }
-  if (sets.length > 0) {
-    params.push(id, tenantId);
-    await q(`UPDATE customers SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ? AND customer_type = 'wholesale'`, params);
-  }
-  return getTrader(tenantId, id);
-}
-async function deactivateTrader(tenantId, id) {
-  return updateTrader(tenantId, id, { isActive: false });
-}
-var PAYMENT_METHODS = ["cash", "card", "transfer", "shamcash", "cheque", "other"];
-async function recordPayment(tenantId, customerId, body, employeeId) {
-  const cents = parsePositiveAmount(body.amount);
-  const method = String(body.method || "cash").toLowerCase();
-  if (!PAYMENT_METHODS.includes(method)) {
-    throw new WholesaleError("Unknown payment method", 400, "INVALID_METHOD");
-  }
-  return withTx(async (conn) => {
-    const row = await lockTrader(conn, tenantId, customerId);
-    const balance = toCents(row.wholesale_balance);
-    if (cents > balance) {
-      throw new WholesaleError("Amount exceeds the outstanding balance", 409, "OVERPAYMENT", {
-        balance: balance / 100
-      });
-    }
-    const next = balance - cents;
-    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), customerId]);
-    const res = await cq(
-      conn,
-      `INSERT INTO wholesale_payments
-         (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
-       VALUES (?, ?, 'payment', ?, ?, ?, ?, ?)`,
-      [tenantId, customerId, fromCents(cents), method, clip(body.note, 500), employeeId, fromCents(next)]
-    );
-    return { id: Number(res.insertId), amount: cents / 100, method, balance: next / 100 };
+async function creditWallet(customerId, tenantId, amount, type, stripePaymentIntentId) {
+  const [customer] = await db.select({ walletBalance: customers.walletBalance }).from(customers).where((0, import_drizzle_orm3.eq)(customers.id, customerId)).limit(1);
+  const balance = parseFloat(customer?.walletBalance ?? "0");
+  const after = Math.round((balance + amount) * 100) / 100;
+  await db.update(customers).set({ walletBalance: after.toFixed(2) }).where((0, import_drizzle_orm3.eq)(customers.id, customerId));
+  await db.insert(walletTransactions).values({
+    customerId,
+    tenantId,
+    type,
+    amount: amount.toFixed(2),
+    balanceBefore: balance.toFixed(2),
+    balanceAfter: after.toFixed(2),
+    stripePaymentIntentId: stripePaymentIntentId ?? null,
+    description: `Wallet ${type}`
   });
 }
-async function recordCharge(tenantId, customerId, body, employeeId) {
-  const cents = parsePositiveAmount(body.amount);
-  return withTx(async (conn) => {
-    const row = await lockTrader(conn, tenantId, customerId);
-    const next = toCents(row.wholesale_balance) + cents;
-    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), customerId]);
-    const res = await cq(
-      conn,
-      `INSERT INTO wholesale_payments
-         (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
-       VALUES (?, ?, 'charge', ?, 'manual', ?, ?, ?)`,
-      [tenantId, customerId, fromCents(cents), clip(body.note, 500), employeeId, fromCents(next)]
-    );
-    return { id: Number(res.insertId), amount: cents / 100, balance: next / 100 };
-  });
-}
-async function voidLedgerEntry(tenantId, entryId) {
-  const rows = await q(
-    `SELECT id, customer_id, kind, amount FROM wholesale_payments WHERE id = ? AND tenant_id = ? LIMIT 1`,
-    [entryId, tenantId]
-  );
-  const entry = rows[0];
-  if (!entry) throw new WholesaleError("Entry not found", 404, "NOT_FOUND");
-  if (entry.kind === "return") {
-    throw new WholesaleError("Returns are reversed from the returns screen", 409, "NOT_VOIDABLE");
-  }
-  return withTx(async (conn) => {
-    const row = await lockTrader(conn, tenantId, Number(entry.customer_id));
-    const amount = toCents(entry.amount);
-    const next = toCents(row.wholesale_balance) + (entry.kind === "charge" ? -amount : amount);
-    const del = await cq(conn, `DELETE FROM wholesale_payments WHERE id = ? AND tenant_id = ?`, [entryId, tenantId]);
-    if (!del?.affectedRows) throw new WholesaleError("Entry not found", 404, "NOT_FOUND");
-    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), row.id]);
-    return { balance: next / 100 };
-  });
-}
-async function holdCreditForSale(tenantId, customerId, totalAmount) {
-  if (!tenantId) throw new WholesaleError("Store not identified", 401, "NO_TENANT");
-  const cid = Number(customerId);
-  if (!customerId || !Number.isInteger(cid) || cid <= 0) {
-    throw new WholesaleError("A credit sale needs a wholesale trader as the customer", 400, "CUSTOMER_REQUIRED");
-  }
-  const cents = parsePositiveAmount(totalAmount, "totalAmount");
-  await withTx(async (conn) => {
-    const row = await lockTrader(conn, tenantId, cid);
-    if (row.is_active != null && !Number(row.is_active)) {
-      throw new WholesaleError("This trader account is deactivated", 409, "TRADER_INACTIVE");
-    }
-    const balance = toCents(row.wholesale_balance);
-    const next = balance + cents;
-    if (row.credit_limit != null) {
-      const limit = toCents(row.credit_limit);
-      if (next > limit) {
-        throw new WholesaleError("Credit limit exceeded", 409, "CREDIT_LIMIT", {
-          balance: balance / 100,
-          creditLimit: limit / 100,
-          available: Math.max(0, limit - balance) / 100
-        });
-      }
-    }
-    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), cid]);
-  });
-  return { tenantId, customerId: cid, cents };
-}
-async function releaseCreditHold(hold) {
-  try {
-    await q(
-      `UPDATE customers SET wholesale_balance = wholesale_balance - ? WHERE id = ? AND tenant_id = ?`,
-      [fromCents(hold.cents), hold.customerId, hold.tenantId]
-    );
-  } catch (e) {
-    console.error("[wholesale] could not release credit hold", hold, e?.message || e);
-  }
-}
-async function creditSaleOfTenant(tenantId, saleId) {
-  const rows = await q(
-    `SELECT s.id, s.customer_id, s.total_amount, s.receipt_number
-       FROM sales s JOIN customers c ON c.id = s.customer_id
-      WHERE s.id = ? AND s.payment_method = 'credit' AND c.tenant_id = ? LIMIT 1`,
-    [saleId, tenantId]
-  );
-  return rows[0] ?? null;
-}
-async function reverseCreditSale(tenantId, saleId) {
-  if (!tenantId || !Number.isInteger(saleId)) return;
-  const sale = await creditSaleOfTenant(tenantId, saleId);
-  if (!sale) return;
-  await withTx(async (conn) => {
-    const row = await lockTrader(conn, tenantId, Number(sale.customer_id), false);
-    const ret = await cq(
-      conn,
-      `SELECT COALESCE(SUM(amount), 0) AS returned FROM wholesale_payments
-        WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`,
-      [saleId, tenantId]
-    );
-    const outstanding = Math.max(0, toCents(sale.total_amount) - toCents(ret?.[0]?.returned));
-    await cq(conn, `DELETE FROM wholesale_payments WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`, [saleId, tenantId]);
-    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [
-      fromCents(toCents(row.wholesale_balance) - outstanding),
-      row.id
-    ]);
-  });
-}
-async function creditReturnForSale(tenantId, saleId, returnId, returnTotal, employeeId) {
-  const sid = Number(saleId);
-  if (!tenantId || !Number.isInteger(sid) || sid <= 0) return;
-  const requested = Math.abs(toCents(returnTotal));
-  if (requested <= 0) return;
-  const sale = await creditSaleOfTenant(tenantId, sid);
-  if (!sale) return;
-  await withTx(async (conn) => {
-    const row = await lockTrader(conn, tenantId, Number(sale.customer_id), false);
-    const ret = await cq(
-      conn,
-      `SELECT COALESCE(SUM(amount), 0) AS returned FROM wholesale_payments
-        WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`,
-      [sid, tenantId]
-    );
-    const left = Math.max(0, toCents(sale.total_amount) - toCents(ret?.[0]?.returned));
-    const cents = Math.min(requested, left);
-    if (cents <= 0) return;
-    const next = toCents(row.wholesale_balance) - cents;
-    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), row.id]);
-    await cq(
-      conn,
-      `INSERT INTO wholesale_payments
-         (tenant_id, customer_id, kind, amount, method, note, sale_id, return_id, employee_id, balance_after)
-       VALUES (?, ?, 'return', ?, 'return', ?, ?, ?, ?, ?)`,
-      [
-        tenantId,
-        row.id,
-        fromCents(cents),
-        `Return on ${sale.receipt_number || `#${sid}`}`,
-        sid,
-        returnId,
-        employeeId,
-        fromCents(next)
-      ]
-    );
-  });
-}
-function parseDate(v, endOfDay = false) {
-  const s = String(v ?? "").trim();
-  if (!s) return null;
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? /* @__PURE__ */ new Date(`${s}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`) : new Date(s);
-  if (Number.isNaN(d.getTime())) throw new WholesaleError("Invalid date", 400, "INVALID_DATE");
-  return d;
-}
-async function getStatement(tenantId, customerId, fromRaw, toRaw) {
-  const trader = await getTrader(tenantId, customerId);
-  const from = parseDate(fromRaw);
-  const to = parseDate(toRaw, true);
-  const saleRows = await q(
-    `SELECT id, receipt_number, total_amount, created_at FROM sales
-      WHERE customer_id = ? AND payment_method = 'credit' ${from ? "AND created_at >= ?" : ""}
-      ORDER BY created_at ASC, id ASC`,
-    from ? [customerId, from] : [customerId]
-  );
-  const ledgerRows = await q(
-    `SELECT id, kind, amount, method, note, sale_id, created_at FROM wholesale_payments
-      WHERE customer_id = ? AND tenant_id = ? ${from ? "AND created_at >= ?" : ""}
-      ORDER BY created_at ASC, id ASC`,
-    from ? [customerId, tenantId, from] : [customerId, tenantId]
-  );
-  const all = [
-    ...saleRows.map((s) => {
-      const cents = toCents(s.total_amount);
-      return {
-        id: `s${s.id}`,
-        at: new Date(s.created_at).getTime(),
-        date: new Date(s.created_at).toISOString(),
-        type: "sale",
-        reference: s.receipt_number ?? null,
-        method: "credit",
-        note: null,
-        debit: cents / 100,
-        credit: 0,
-        cents,
-        saleId: Number(s.id),
-        entryId: null
-      };
-    }),
-    ...ledgerRows.map((p) => {
-      const cents = toCents(p.amount);
-      const isDebit = p.kind === "charge";
-      return {
-        id: `p${p.id}`,
-        at: new Date(p.created_at).getTime(),
-        date: new Date(p.created_at).toISOString(),
-        type: ["payment", "charge", "return"].includes(p.kind) ? p.kind : "payment",
-        reference: null,
-        method: p.method ?? null,
-        note: p.note ?? null,
-        debit: isDebit ? cents / 100 : 0,
-        credit: isDebit ? 0 : cents / 100,
-        cents: isDebit ? cents : -cents,
-        saleId: p.sale_id != null ? Number(p.sale_id) : null,
-        entryId: Number(p.id)
-      };
-    })
-  ].sort((a, b) => a.at - b.at);
-  const sinceFromNet = all.reduce((s, e) => s + e.cents, 0);
-  const openingCents = toCents(trader.balance) - sinceFromNet;
-  let running = openingCents;
-  let debitCents = 0;
-  let creditCents = 0;
-  const entries = [];
-  for (const e of all) {
-    if (to && e.at > to.getTime()) break;
-    running += e.cents;
-    if (e.cents > 0) debitCents += e.cents;
-    else creditCents -= e.cents;
-    const { at: _at, cents: _c, ...rest } = e;
-    entries.push({ ...rest, balance: running / 100 });
-  }
-  return {
-    trader,
-    from: from ? from.toISOString() : null,
-    to: to ? to.toISOString() : null,
-    openingBalance: openingCents / 100,
-    totalDebit: debitCents / 100,
-    totalCredit: creditCents / 100,
-    closingBalance: running / 100,
-    entries
-  };
-}
-async function getSummary(tenantId) {
-  const [totals] = await q(
-    `SELECT COUNT(*) AS traders,
-            COALESCE(SUM(CASE WHEN is_active = 1 OR is_active IS NULL THEN 1 ELSE 0 END), 0) AS active,
-            COALESCE(SUM(CASE WHEN wholesale_balance > 0 THEN wholesale_balance ELSE 0 END), 0) AS receivables,
-            COALESCE(SUM(CASE WHEN wholesale_balance > 0 THEN 1 ELSE 0 END), 0) AS debtors,
-            COALESCE(SUM(CASE WHEN credit_limit IS NOT NULL AND wholesale_balance > credit_limit THEN 1 ELSE 0 END), 0) AS over_limit
-       FROM customers WHERE tenant_id = ? AND customer_type = 'wholesale'`,
-    [tenantId]
-  );
-  const monthStart = /* @__PURE__ */ new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const [collected] = await q(
-    `SELECT COALESCE(SUM(amount), 0) AS total FROM wholesale_payments
-      WHERE tenant_id = ? AND kind = 'payment' AND created_at >= ?`,
-    [tenantId, monthStart]
-  );
-  const [creditSales] = await q(
-    `SELECT COALESCE(SUM(s.total_amount), 0) AS total, COUNT(*) AS count
-       FROM sales s JOIN customers c ON c.id = s.customer_id
-      WHERE c.tenant_id = ? AND s.payment_method = 'credit' AND s.created_at >= ?`,
-    [tenantId, monthStart]
-  );
-  const top = await q(
-    `SELECT ${TRADER_COLUMNS} FROM customers c
-      WHERE c.tenant_id = ? AND c.customer_type = 'wholesale' AND c.wholesale_balance > 0
-      ORDER BY c.wholesale_balance DESC LIMIT 5`,
-    [tenantId]
-  );
-  return {
-    traders: num2(totals?.traders),
-    activeTraders: num2(totals?.active),
-    totalReceivables: num2(totals?.receivables),
-    debtors: num2(totals?.debtors),
-    overLimit: num2(totals?.over_limit),
-    collectedThisMonth: num2(collected?.total),
-    creditSalesThisMonth: num2(creditSales?.total),
-    creditSalesCountThisMonth: num2(creditSales?.count),
-    monthStart: monthStart.toISOString(),
-    topDebtors: top.map(mapTrader)
-  };
-}
-
-// server/routes.ts
-var bcrypt6 = __toESM(require("bcrypt"));
-var crypto6 = __toESM(require("crypto"));
-var import_date_fns4 = require("date-fns");
-var import_google_auth_library = require("google-auth-library");
-var TIMESTAMP_FIELDS = [
-  "createdAt",
-  "updatedAt",
-  "expiryDate",
-  "expectedDate",
-  "receivedDate",
-  "startTime",
-  "endTime",
-  "startDate",
-  "endDate",
-  "nextBillingDate",
-  "date",
-  "lastRestocked",
-  "completedAt",
-  "processedAt"
-];
-function sanitizeDates(data) {
-  const result = { ...data };
-  for (const field of TIMESTAMP_FIELDS) {
-    if (field in result) {
-      if (result[field] === "" || result[field] === null || result[field] === void 0) {
-        delete result[field];
-      } else if (typeof result[field] === "string") {
-        result[field] = new Date(result[field]);
-      }
-    }
-  }
-  return result;
-}
-var GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com";
-var googleClient = new import_google_auth_library.OAuth2Client(GOOGLE_WEB_CLIENT_ID);
-async function registerRoutes(app2) {
-  app2.get("/api/store/:slug", async (req, res) => {
-    try {
-      const { slug } = req.params;
-      const config = await storage.getLandingPageConfigBySlug(slug);
-      if (!config) {
-        return res.status(404).send("<h1>Store not found</h1>");
-      }
-      const tenant = await storage.getTenant(config.tenantId);
-      if (!tenant) {
-        return res.status(404).send("<h1>Store not found</h1>");
-      }
-      const storePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
-      let html = import_node_fs.default.readFileSync(storePath, "utf-8");
-      const storeName = String(tenant.businessName || "Kassenta Store").replace(/[<>"]/g, "");
-      const storeLogo = String(config.logoUrl || tenant.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
-      html = html.replace(/\{\{SLUG\}\}/g, slug);
-      html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
-      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
-      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
-      html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
-      html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
-      html = html.replace(/\{\{CURRENCY\}\}/g, tenant.currency || "CHF");
-      html = html.replace(/\{\{LANGUAGE\}\}/g, config.language || "en");
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      return res.status(200).send(html);
-    } catch (err) {
-      console.error("[store/:slug] Error:", err);
-      return res.status(500).send("<h1>Server error</h1>");
-    }
-  });
-  app2.post("/api/admin/seed-pizza-lemon", async (_req, res) => {
-    try {
-      const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));
-      await seedPizzaLemon2();
-      res.json({ success: true, message: "Pizza Lemon store seeded (or already existed)." });
-    } catch (e) {
-      console.error("[SEED API] Error:", e);
-      res.status(500).json({ success: false, error: e.message });
-    }
-  });
-  app2.post("/api/admin/seed-zurich-restaurants", async (_req, res) => {
-    try {
-      const { seedZurichRestaurants: seedZurichRestaurants2 } = await Promise.resolve().then(() => (init_seedZurichRestaurants(), seedZurichRestaurants_exports));
-      await seedZurichRestaurants2();
-      res.json({ success: true, message: "Z\xFCrich restaurants seeded (idempotent)." });
-    } catch (e) {
-      console.error("[SEED ZURICH] Error:", e);
-      res.status(500).json({ success: false, error: e.message });
-    }
-  });
-  app2.get("/api/admin/check-pizza-lemon", async (_req, res) => {
-    try {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { tenants: tenants2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10 } = await import("drizzle-orm");
-      const [tenant] = await db2.select().from(tenants2).where(eq10(tenants2.ownerEmail, "admin@pizzalemon.ch"));
-      if (!tenant) return res.json({ found: false, message: "Pizza Lemon not found in this database." });
-      const licenses = await db2.select().from(licenseKeys2).where(eq10(licenseKeys2.tenantId, tenant.id));
-      res.json({ found: true, tenantId: tenant.id, status: tenant.status, licenses: licenses.map((l) => ({ key: l.licenseKey, status: l.status })) });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/health", async (_req, res) => {
-    try {
-      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      await pool2.query("SELECT 1");
-      res.json({
-        ok: true,
-        status: "healthy",
-        database: "mysql",
-        timestamp: (/* @__PURE__ */ new Date()).toISOString()
-      });
-    } catch (e) {
-      res.status(500).json({
-        ok: false,
-        status: "unhealthy",
-        database: "mysql",
-        error: e.message
-      });
-    }
-  });
-  app2.post("/api/landing/subscribe", async (req, res) => {
-    try {
-      const {
-        businessName,
-        ownerName,
-        ownerEmail,
-        ownerPhone,
-        planType,
-        // monthly | yearly
-        planName,
-        // basic | advanced
-        paymentMethodId,
-        // Stripe PaymentMethod ID (preferred)
-        stripeToken,
-        // fallback: legacy token
-        lang
-      } = req.body;
-      if (!businessName || !ownerName || !ownerEmail) {
-        return res.status(400).json({ error: "Required fields are missing" });
-      }
-      const existing = await storage.getTenantByEmail(ownerEmail);
-      if (existing) {
-        return res.status(400).json({ error: "A store with this email already exists" });
-      }
-      let stripeChargeId = null;
-      const isAdvanced = planName === "advanced";
-      const isYearly = planType === "yearly";
-      const priceChf = isYearly ? isAdvanced ? 4999 : 1999 : isAdvanced ? 499 : 199;
-      const amountCents = priceChf * 100;
-      if (paymentMethodId || stripeToken) {
-        try {
-          const stripeClient = await getUncachableStripeClient();
-          if (paymentMethodId) {
-            const pi = await stripeClient.paymentIntents.create({
-              amount: amountCents,
-              currency: "chf",
-              payment_method: paymentMethodId,
-              confirm: true,
-              automatic_payment_methods: { enabled: true, allow_redirects: "never" },
-              receipt_email: ownerEmail,
-              description: `Kassenta ${planName} ${planType} \u2014 ${businessName}`,
-              metadata: { businessName, ownerEmail, planName, planType }
-            });
-            if (pi.status === "requires_action") {
-              return res.json({ requiresAction: true, clientSecret: pi.client_secret, paymentIntentId: pi.id });
-            }
-            if (pi.status !== "succeeded") {
-              return res.status(402).json({ error: "Payment was not completed. Please try again." });
-            }
-            stripeChargeId = pi.id;
-          } else if (stripeToken) {
-            const charge = await stripeClient.charges.create({
-              amount: amountCents,
-              currency: "chf",
-              source: stripeToken,
-              receipt_email: ownerEmail,
-              description: `Kassenta ${planName} ${planType} \u2014 ${businessName}`,
-              metadata: { businessName, ownerEmail, planName, planType }
-            });
-            if (charge.status !== "succeeded") {
-              return res.status(402).json({ error: "Payment failed. Please try again." });
-            }
-            stripeChargeId = charge.id;
-          }
-        } catch (stripeErr) {
-          console.error("[SUBSCRIBE] Stripe error:", stripeErr.message);
-          return res.status(402).json({ error: stripeErr.message || "Payment processing failed" });
-        }
-      }
-      const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt6.hash(tempPassword, 10);
-      const tenant = await storage.createTenant({
-        businessName,
-        ownerName,
-        ownerEmail,
-        ownerPhone: ownerPhone || null,
-        passwordHash,
-        status: "active",
-        maxBranches: isAdvanced ? 10 : 1,
-        maxEmployees: isAdvanced ? 999 : 5,
-        metadata: {
-          signupDate: (/* @__PURE__ */ new Date()).toISOString(),
-          paymentMethod: paymentMethodId || stripeToken ? "stripe" : "bank",
-          stripeChargeId
-        }
-      });
-      const startDate = /* @__PURE__ */ new Date();
-      let endDate = /* @__PURE__ */ new Date();
-      if (isYearly) {
-        endDate = (0, import_date_fns4.addYears)(startDate, 1);
-      } else {
-        endDate = (0, import_date_fns4.addMonths)(startDate, 1);
-      }
-      const subscription = await storage.createTenantSubscription({
-        tenantId: tenant.id,
-        planType,
-        planName: planName || "basic",
-        price: String(priceChf) + ".00",
-        status: "active",
-        startDate,
-        endDate,
-        autoRenew: true,
-        paymentMethod: stripeChargeId ? "stripe" : "bank"
-      });
-      const randomSegments = Array.from(
-        { length: 4 },
-        () => crypto6.randomBytes(2).toString("hex").toUpperCase()
-      );
-      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
-      await storage.createLicenseKey({
-        licenseKey,
-        tenantId: tenant.id,
-        subscriptionId: subscription.id,
-        status: "active",
-        maxActivations: isAdvanced ? 10 : 3,
-        expiresAt: endDate,
-        notes: `Landing page subscription: ${planName} ${planType}`
-      });
-      await storage.createTenantNotification({
-        tenantId: tenant.id,
-        type: "info",
-        title: "Welcome to Kassenta!",
-        message: `Your account for ${businessName} is ready. Open the app and enter your license key to activate.`,
-        priority: "normal"
-      });
-      sendLicenseKeyEmail({
-        to: ownerEmail,
-        ownerName,
-        businessName,
-        licenseKey,
-        planName,
-        planType,
-        tempPassword,
-        expiresAt: endDate
-      }).then(() => {
-        console.log(`[SUBSCRIBE] Email sent to ${ownerEmail}`);
-      }).catch((emailErr) => {
-        console.error("[SUBSCRIBE] Email send failed (non-fatal):", emailErr.message);
-      });
-      console.log(`[SUBSCRIBE] Tenant created: ${businessName} (ID: ${tenant.id}) | Stripe: ${stripeChargeId || "none"}`);
-      res.json({
-        success: true,
-        tenantId: tenant.id,
-        licenseKey,
-        requiresAction: false
-      });
-    } catch (e) {
-      console.error("[SUBSCRIBE] Error:", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/landing/confirm-subscription", async (req, res) => {
-    try {
-      const { paymentIntentId, businessName, ownerName, ownerEmail, ownerPhone, planType, planName } = req.body;
-      if (!paymentIntentId) return res.status(400).json({ error: "paymentIntentId required" });
-      const stripeClient = await getUncachableStripeClient();
-      const pi = await stripeClient.paymentIntents.retrieve(paymentIntentId);
-      if (pi.status !== "succeeded") {
-        return res.status(402).json({ error: "Payment not completed" });
-      }
-      const existingTenant = await storage.getTenantByEmail(ownerEmail);
-      if (existingTenant) {
-        const licenses = await storage.getLicenseKeys(existingTenant.id);
-        const key = licenses[0]?.licenseKey || "";
-        return res.json({ success: true, tenantId: existingTenant.id, licenseKey: key, requiresAction: false });
-      }
-      const isAdvanced = planName === "advanced";
-      const isYearly = planType === "yearly";
-      const priceChf = isYearly ? isAdvanced ? 4999 : 1999 : isAdvanced ? 499 : 199;
-      const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt6.hash(tempPassword, 10);
-      const tenant = await storage.createTenant({
-        businessName,
-        ownerName,
-        ownerEmail,
-        ownerPhone: ownerPhone || null,
-        passwordHash,
-        status: "active",
-        maxBranches: isAdvanced ? 10 : 1,
-        maxEmployees: isAdvanced ? 999 : 5,
-        metadata: { stripeChargeId: paymentIntentId }
-      });
-      const startDate = /* @__PURE__ */ new Date();
-      const endDate = isYearly ? (0, import_date_fns4.addYears)(startDate, 1) : (0, import_date_fns4.addMonths)(startDate, 1);
-      const subscription = await storage.createTenantSubscription({
-        tenantId: tenant.id,
-        planType,
-        planName: planName || "basic",
-        price: String(priceChf) + ".00",
-        status: "active",
-        startDate,
-        endDate,
-        autoRenew: true,
-        paymentMethod: "stripe"
-      });
-      const randomSegments = Array.from({ length: 4 }, () => crypto6.randomBytes(2).toString("hex").toUpperCase());
-      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
-      await storage.createLicenseKey({
-        licenseKey,
-        tenantId: tenant.id,
-        subscriptionId: subscription.id,
-        status: "active",
-        maxActivations: isAdvanced ? 10 : 3,
-        expiresAt: endDate
-      });
-      sendLicenseKeyEmail({ to: ownerEmail, ownerName, businessName, licenseKey, planName, planType, tempPassword, expiresAt: endDate }).catch(() => {
-      });
-      res.json({ success: true, tenantId: tenant.id, licenseKey, requiresAction: false });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/auth/google", async (req, res) => {
-    try {
-      const { idToken, deviceId } = req.body;
-      if (!idToken) return res.status(400).json({ error: "idToken is required" });
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: GOOGLE_WEB_CLIENT_ID
-      });
-      const payload = ticket.getPayload();
-      if (!payload || !payload.email) {
-        return res.status(400).json({ error: "Invalid Google token" });
-      }
-      const email = payload.email.toLowerCase();
-      const name = payload.name || "Store Owner";
-      let tenant = await storage.getTenantByEmail(email);
-      let isNew = false;
-      if (!tenant) {
-        isNew = true;
-        const tempPassword = "GAuth-" + crypto6.randomBytes(4).toString("hex");
-        const passwordHash = await bcrypt6.hash(tempPassword, 10);
-        tenant = await storage.createTenant({
-          businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
-          ownerName: name,
-          ownerEmail: email,
-          passwordHash,
-          status: "active",
-          maxBranches: 1,
-          maxEmployees: 5,
-          metadata: { signupMethod: "google", signupDate: (/* @__PURE__ */ new Date()).toISOString() }
-        });
-        const startDate = /* @__PURE__ */ new Date();
-        const endDate = (0, import_date_fns4.addDays)(startDate, 14);
-        const sub = await storage.createTenantSubscription({
-          tenantId: tenant.id,
-          planType: "trial",
-          planName: "14-Day Free Trial",
-          price: "0",
-          status: "active",
-          startDate,
-          endDate,
-          autoRenew: false
-        });
-        const randomSegments = Array.from(
-          { length: 4 },
-          () => crypto6.randomBytes(2).toString("hex").toUpperCase()
-        );
-        const licenseKey = `TRIAL-${randomSegments.join("-")}`;
-        await storage.createLicenseKey({
-          licenseKey,
-          tenantId: tenant.id,
-          subscriptionId: sub.id,
-          status: "active",
-          maxActivations: 3,
-          expiresAt: endDate,
-          notes: "Auto-generated Google Trial"
-        });
-        await storage.ensureTenantData(tenant.id);
-      }
-      const licenses = await storage.getLicenseKeys(tenant.id);
-      const activeLicense = licenses.find((l) => l.status === "active" && (!l.expiresAt || new Date(l.expiresAt) > /* @__PURE__ */ new Date()));
-      if (!activeLicense) {
-        return res.status(403).json({ error: "No active license found for this account. Your trial may have expired." });
-      }
-      const employees2 = await storage.getEmployeesByTenant(tenant.id);
-      const adminEmployee = employees2.find((e) => e.role === "admin" || e.email === email);
-      res.json({
-        success: true,
-        licenseKey: activeLicense.licenseKey,
-        isNew,
-        tenant: {
-          id: tenant.id,
-          name: tenant.businessName,
-          email: tenant.ownerEmail,
-          setupCompleted: tenant.setupCompleted
-        },
-        employee: adminEmployee ? {
-          id: adminEmployee.id,
-          name: adminEmployee.name,
-          role: adminEmployee.role,
-          permissions: adminEmployee.permissions
-        } : null
-      });
-    } catch (e) {
-      console.error("[GOOGLE AUTH] Error:", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/tenant/onboarding-status", async (req, res) => {
-    try {
-      const tenantId = Number(req.query.tenantId);
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const status = await storage.getOnboardingStatus(tenantId);
-      res.json(status);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/tenant/onboarding-complete", async (req, res) => {
-    try {
-      const { tenantId, businessName, ownerPhone, storeType, logo } = req.body;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      await storage.updateTenant(tenantId, {
-        businessName,
-        ownerPhone,
-        storeType,
-        logo,
-        setupCompleted: true
-      });
-      const config = await storage.getLandingPageConfig(tenantId);
-      if (!config) {
-        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-        const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        await db2.insert(landingConfig).values({
-          tenantId,
-          slug: businessName.toLowerCase().replace(/\s+/g, "-"),
-          heroTitle: businessName,
-          phone: ownerPhone,
-          socialWhatsapp: ownerPhone
-        });
-      } else {
-        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-        const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq10 } = await import("drizzle-orm");
-        await db2.update(landingConfig).set({
-          heroTitle: businessName,
-          phone: ownerPhone,
-          socialWhatsapp: ownerPhone
-        }).where(eq10(landingConfig.tenantId, tenantId));
-      }
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post(
-    "/api/license/validate",
-    rateLimit({ name: "license-ip", max: 30, windowMs: 10 * 60 * 1e3 }),
-    async (req, res) => {
-      try {
-        const { licenseKey, email, password, deviceId } = req.body;
-        if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] Incoming request details:", { licenseKey, email: email ? email.substring(0, 2) + "***" : void 0, deviceId });
-        if (!licenseKey) {
-          return res.json({ isValid: false, reason: "License key is required" });
-        }
-        const license = await storage.getLicenseByKey(licenseKey);
-        if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] getLicenseByKey result for", licenseKey, ":", !!license);
-        if (!license) {
-          return res.json({ isValid: false, reason: "Invalid license key" });
-        }
-        if (license.status !== "active") {
-          return res.json({ isValid: false, reason: `License is ${license.status}` });
-        }
-        if (license.expiresAt && new Date(license.expiresAt) < /* @__PURE__ */ new Date()) {
-          return res.json({ isValid: false, reason: "License has expired" });
-        }
-        const tenant = await storage.getTenant(license.tenantId);
-        if (!tenant) {
-          return res.json({ isValid: false, reason: "Tenant not found" });
-        }
-        if (tenant.status !== "active") {
-          return res.json({ isValid: false, reason: `Store account is ${tenant.status}` });
-        }
-        if (email) {
-          if (tenant.ownerEmail.toLowerCase() !== email.toLowerCase()) {
-            return res.json({ isValid: false, reason: "Email does not match this license" });
-          }
-          if (password) {
-            if (!tenant.passwordHash) {
-              return res.json({ isValid: false, reason: "Account credentials not configured" });
-            }
-            const passwordValid = await bcrypt6.compare(password, tenant.passwordHash);
-            if (!passwordValid) {
-              return res.json({ isValid: false, reason: "Invalid password" });
-            }
-          }
-        }
-        const isNewActivation = !!email;
-        if (isNewActivation) {
-          const currentCount = license.currentActivations || 0;
-          const maxCount = license.maxActivations || 3;
-          if (currentCount >= maxCount) {
-            return res.json({ isValid: false, reason: `Maximum activations reached (${maxCount}). Contact support to add more.` });
-          }
-        }
-        const subs = await storage.getTenantSubscriptions(tenant.id);
-        const activeSub = subs.find((s) => s.status === "active");
-        await storage.updateLicenseKey(license.id, {
-          lastValidatedAt: /* @__PURE__ */ new Date(),
-          deviceInfo: deviceId || license.deviceInfo,
-          currentActivations: (license.currentActivations || 0) + (isNewActivation ? 1 : 0)
-        });
-        const subInfo = activeSub ? {
-          active: true,
-          plan: activeSub.planName,
-          daysRemaining: activeSub.endDate ? Math.max(0, Math.ceil((new Date(activeSub.endDate).getTime() - Date.now()) / (1e3 * 60 * 60 * 24))) : 365,
-          requiresUpgrade: false
-        } : {
-          active: false,
-          plan: "No active plan",
-          daysRemaining: 0,
-          requiresUpgrade: true
-        };
-        res.json({
-          isValid: true,
-          tenant: {
-            id: tenant.id,
-            name: tenant.businessName,
-            logo: tenant.logo,
-            storeType: tenant.storeType
-          },
-          subscription: subInfo
-        });
-      } catch (e) {
-        console.error("License validation error:", e);
-        res.status(500).json({ isValid: false, reason: "Server error during validation" });
-      }
-    }
-  );
-  app2.get("/api/dashboard", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const stats = await storage.getDashboardStats(tenantId);
-      res.json(stats);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/dashboard/multi-branch", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const allBranches = await storage.getBranchesByTenant(tenantId);
-      const allEmployees = await storage.getEmployeesByTenant(tenantId);
-      const allInventory = await storage.getInventory(void 0, tenantId);
-      const allSales = await storage.getSales({ tenantId });
-      const allShifts = await storage.getShifts(tenantId);
-      const allProducts = await storage.getProductsByTenant(tenantId);
-      const allCategories = await storage.getCategories(tenantId);
-      const allCustomers = await storage.getCustomers(void 0, tenantId);
-      const todayStart = /* @__PURE__ */ new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const weekStart = /* @__PURE__ */ new Date();
-      weekStart.setDate(weekStart.getDate() - 7);
-      weekStart.setHours(0, 0, 0, 0);
-      const monthStart = /* @__PURE__ */ new Date();
-      monthStart.setDate(1);
-      monthStart.setHours(0, 0, 0, 0);
-      const branchStats = allBranches.map((branch) => {
-        const branchSales = allSales.filter((s) => s.branchId === branch.id);
-        const branchEmployees = allEmployees.filter((e) => e.branchId === branch.id);
-        const branchInventory = allInventory.filter((i) => i.branchId === branch.id);
-        const activeShifts = allShifts.filter((s) => s.branchId === branch.id && s.status === "open");
-        const todaySales = branchSales.filter((s) => s.createdAt && new Date(s.createdAt) >= todayStart);
-        const weekSales = branchSales.filter((s) => s.createdAt && new Date(s.createdAt) >= weekStart);
-        const monthSales = branchSales.filter((s) => s.createdAt && new Date(s.createdAt) >= monthStart);
-        const todayRevenue = todaySales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
-        const weekRevenue = weekSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
-        const monthRevenue = monthSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
-        const totalRevenue2 = branchSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
-        const lowStockItems = branchInventory.filter((i) => (i.quantity || 0) <= (i.lowStockThreshold || 10));
-        const outOfStockItems = branchInventory.filter((i) => (i.quantity || 0) === 0);
-        const paymentBreakdown = {};
-        branchSales.forEach((s) => {
-          const method = s.paymentMethod || "cash";
-          if (!paymentBreakdown[method]) paymentBreakdown[method] = { count: 0, total: 0 };
-          paymentBreakdown[method].count++;
-          paymentBreakdown[method].total += Number(s.totalAmount || 0);
-        });
-        return {
-          id: branch.id,
-          name: branch.name,
-          address: branch.address,
-          phone: branch.phone,
-          isMain: branch.isMain,
-          isActive: branch.isActive,
-          currency: branch.currency || "USD",
-          todayRevenue,
-          weekRevenue,
-          monthRevenue,
-          totalRevenue: totalRevenue2,
-          todaySalesCount: todaySales.length,
-          totalSalesCount: branchSales.length,
-          employeeCount: branchEmployees.length,
-          activeEmployees: branchEmployees.filter((e) => e.isActive).length,
-          activeShifts: activeShifts.length,
-          inventoryCount: branchInventory.length,
-          lowStockCount: lowStockItems.length,
-          outOfStockCount: outOfStockItems.length,
-          paymentBreakdown
-        };
-      });
-      const totalRevenue = allSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
-      const todayTotalRevenue = allSales.filter((s) => s.createdAt && new Date(s.createdAt) >= todayStart).reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
-      const monthTotalRevenue = allSales.filter((s) => s.createdAt && new Date(s.createdAt) >= monthStart).reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
-      res.json({
-        summary: {
-          totalBranches: allBranches.length,
-          activeBranches: allBranches.filter((b) => b.isActive).length,
-          totalEmployees: allEmployees.length,
-          totalProducts: allProducts.length,
-          totalCategories: allCategories.length,
-          totalCustomers: allCustomers.length,
-          totalSales: allSales.length,
-          totalRevenue,
-          todayRevenue: todayTotalRevenue,
-          monthRevenue: monthTotalRevenue,
-          activeShifts: allShifts.filter((s) => s.status === "open").length
-        },
-        branches: branchStats
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/dashboard/subscriptions", async (_req, res) => {
-    try {
-      const tenantSubs = await storage.getTenantSubscriptions();
-      const tenants2 = await storage.getTenants();
-      const licenses = await storage.getLicenseKeys();
-      const subsWithTenant = tenantSubs.map((sub) => {
-        const tenant = tenants2.find((t2) => t2.id === sub.tenantId);
-        const tenantLicenses = licenses.filter((l) => l.tenantId === sub.tenantId);
-        return {
-          ...sub,
-          tenantName: tenant?.businessName || "Unknown",
-          tenantEmail: tenant?.ownerEmail || "",
-          tenantStatus: tenant?.status || "unknown",
-          licenseCount: tenantLicenses.length,
-          activeLicenses: tenantLicenses.filter((l) => l.status === "active").length
-        };
-      });
-      res.json({
-        subscriptions: subsWithTenant,
-        summary: {
-          total: tenantSubs.length,
-          active: tenantSubs.filter((s) => s.status === "active").length,
-          trial: tenantSubs.filter((s) => s.planType === "trial").length,
-          monthly: tenantSubs.filter((s) => s.planType === "monthly").length,
-          yearly: tenantSubs.filter((s) => s.planType === "yearly").length,
-          expiringSoon: tenantSubs.filter((s) => {
-            if (!s.endDate) return false;
-            const daysLeft = Math.ceil((new Date(s.endDate).getTime() - Date.now()) / (1e3 * 60 * 60 * 24));
-            return daysLeft > 0 && daysLeft <= 7;
-          }).length,
-          totalMRR: tenantSubs.filter((s) => s.status === "active" && s.planType === "monthly").reduce((sum2, s) => sum2 + Number(s.price || 0), 0)
-        }
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/branches", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getBranchesByTenant(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/branches", async (req, res) => {
-    try {
-      res.json(await storage.createBranch(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/branches/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateBranch(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/branches/:id", async (req, res) => {
-    try {
-      await storage.deleteBranch(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/employees", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const emps = await storage.getEmployeesByTenant(tenantId);
-      res.json(emps.map(({ pin, ...rest }) => ({ ...rest, hasPin: !!pin })));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/employees/:id", async (req, res) => {
-    try {
-      const emp = await storage.getEmployee(Number(req.params.id));
-      if (!emp) return res.status(404).json({ error: "Employee not found" });
-      const { pin, ...safe } = emp;
-      res.json({ ...safe, hasPin: !!pin });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/employees", requireAdmin, async (req, res) => {
-    try {
-      const data = sanitizeDates(req.body);
-      if (data.pin) data.pin = await hashPin(String(data.pin));
-      const created = await storage.createEmployee(data);
-      const { pin, ...safe } = created ?? {};
-      res.json(safe);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/employees/:id", requireAdmin, async (req, res) => {
-    try {
-      const data = sanitizeDates(req.body);
-      if (data.pin) data.pin = await hashPin(String(data.pin));
-      else delete data.pin;
-      const updated = await storage.updateEmployee(Number(req.params.id), data);
-      const { pin, ...safe } = updated ?? {};
-      res.json(safe);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/employees/:id", requireAdmin, async (req, res) => {
-    try {
-      await storage.deleteEmployee(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post(
-    "/api/employees/login",
-    rateLimit({ name: "pin-ip", max: 20, windowMs: 10 * 60 * 1e3, message: "Too many attempts. Wait a moment and try again." }),
-    rateLimit({
-      name: "pin-tenant",
-      max: 40,
-      windowMs: 10 * 60 * 1e3,
-      keyFn: (req) => String(req.tenantId ?? req.header("x-license-key") ?? "unknown"),
-      message: "Too many attempts. Wait a moment and try again."
-    }),
-    async (req, res) => {
-      try {
-        const pin = String(req.body?.pin ?? "");
-        if (!pin) return res.status(400).json({ error: "PIN is required" });
-        const tenantId = req.tenantId;
-        let emp;
-        if (req.body.employeeId) {
-          emp = await storage.getEmployee(Number(req.body.employeeId));
-          if (!emp) return res.status(401).json({ error: "Invalid PIN for this employee" });
-          if (tenantId && emp.tenantId && emp.tenantId !== tenantId) {
-            return res.status(401).json({ error: "Invalid PIN for this employee" });
-          }
-          if (!await verifyPin(pin, emp.pin)) {
-            return res.status(401).json({ error: "Invalid PIN for this employee" });
-          }
-        } else if (tenantId) {
-          const staff = await storage.getEmployeesByTenant(tenantId);
-          emp = null;
-          for (const candidate of staff) {
-            if (await verifyPin(pin, candidate.pin)) {
-              emp = candidate;
-              break;
-            }
-          }
-          if (!emp) return res.status(401).json({ error: "Invalid PIN" });
-        } else {
-          emp = await storage.getEmployeeByPin(pin);
-          if (!emp) return res.status(401).json({ error: "Invalid PIN" });
-        }
-        if (!emp.isActive) return res.status(401).json({ error: "Account deactivated" });
-        if (!isHashedPin(emp.pin)) {
-          try {
-            await storage.updateEmployee(emp.id, { pin: await hashPin(pin) });
-          } catch (err) {
-            console.error("[employeeAuth] PIN re-hash failed for employee", emp.id, err);
-          }
-        }
-        await storage.createActivityLog({
-          employeeId: emp.id,
-          action: "login",
-          entityType: "employee",
-          entityId: emp.id,
-          details: `${emp.name} logged in`
-        });
-        const token = generateEmployeeToken({
-          employeeId: emp.id,
-          tenantId: emp.tenantId ?? tenantId ?? null,
-          branchId: emp.branchId ?? null,
-          role: emp.role,
-          name: emp.name,
-          permissions: Array.isArray(emp.permissions) ? emp.permissions : []
-        });
-        const { pin: _pin, ...safeEmp } = emp;
-        res.json({ ...safeEmp, token });
-      } catch (e) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-  app2.get("/api/categories", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const categories2 = await storage.getCategories(tenantId);
-      res.json(sortCategoriesByPriority(categories2));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/categories", async (req, res) => {
-    try {
-      const c = await storage.createCategory(sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
-      res.json(c);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/categories/:id", async (req, res) => {
-    try {
-      const c = await storage.updateCategory(Number(req.params.id), sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
-      res.json(c);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/categories/:id", async (req, res) => {
-    try {
-      const c = await storage.getCategory(Number(req.params.id));
-      await storage.deleteCategory(Number(req.params.id));
-      if (c) callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/products", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const search = req.query.search;
-      const applyMarkup = req.query.applyMarkup === "true";
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      let products2 = await storage.getProductsByTenant(tenantId, search);
-      if (applyMarkup) {
-        const commissionRate = await storage.getCommissionRate();
-        if (commissionRate > 0) {
-          const factor = 1 + commissionRate / 100;
-          products2 = products2.map((p) => {
-            const rawPrice = parseFloat(p.price) * factor;
-            const rounded = Math.round(rawPrice * 2) / 2;
-            return { ...p, price: rounded.toFixed(2) };
-          });
-        }
-      }
-      res.json(products2);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/products/template", (req, res) => {
-    const templateData = [
-      { Name: "Sample Product 1", Price: "9.99", CostPrice: "5.00", SKU: "SKU001", Barcode: "1234567890", Unit: "piece", NameArabic: "\u0645\u0646\u062A\u062C 1" },
-      { Name: "Sample Product 2", Price: "15.50", CostPrice: "8.00", SKU: "SKU002", Barcode: "0987654321", Unit: "kg", NameArabic: "\u0645\u0646\u062A\u062C 2" }
-    ];
-    const ws = xlsx.utils.json_to_sheet(templateData);
-    const wb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(wb, ws, "Products");
-    const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Disposition", "attachment; filename=products_template.xlsx");
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.send(buf);
-  });
-  app2.post("/api/products/import", async (req, res) => {
-    try {
-      const { fileBase64, tenantId, branchId } = req.body;
-      const buffer = Buffer.from(fileBase64, "base64");
-      const workbook = xlsx.read(buffer, { type: "buffer" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = xlsx.utils.sheet_to_json(sheet);
-      const productsToInsert = data.map((item) => ({
-        tenantId: Number(tenantId),
-        name: item.Name || item.name,
-        nameAr: item.NameArabic || item.name_ar,
-        sku: item.SKU || item.sku || void 0,
-        barcode: String(item.Barcode || item.barcode || ""),
-        price: String(item.Price || item.price || "0"),
-        costPrice: String(item.CostPrice || item.cost_price || "0"),
-        unit: item.Unit || item.unit || "piece",
-        isActive: true
-      }));
-      const results = await storage.bulkCreateProducts(productsToInsert);
-      if (branchId) {
-        for (const prod of results) {
-          await storage.upsertInventory({
-            productId: prod.id,
-            branchId: Number(branchId),
-            quantity: 0
-          });
-        }
-      }
-      res.json({ success: true, count: results.length });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/products/:id", async (req, res) => {
-    try {
-      const prod = await storage.getProduct(Number(req.params.id));
-      if (!prod) return res.status(404).json({ error: "Product not found" });
-      res.json(prod);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/products/barcode/:barcode", async (req, res) => {
-    try {
-      const tenantId = Number(req.tenantId) || 0;
-      if (!tenantId) return res.status(401).json({ error: "Store not identified" });
-      const prod = await storage.getProductByBarcode(String(req.params.barcode), tenantId);
-      if (!prod) return res.status(404).json({ error: "Product not found" });
-      res.json(prod);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/products", async (req, res) => {
-    try {
-      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
-      if (body.isAddon) body.price = "0";
-      const p = await storage.createProduct(body);
-      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
-      res.json(p);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/products/:id", async (req, res) => {
-    try {
-      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
-      if (body.isAddon) body.price = "0";
-      const p = await storage.updateProduct(Number(req.params.id), body);
-      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
-      res.json(p);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/products/:id", async (req, res) => {
-    try {
-      const p = await storage.getProduct(Number(req.params.id));
-      await storage.deleteProduct(Number(req.params.id));
-      if (p) callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/inventory", async (req, res) => {
-    try {
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getInventory(branchId, tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/inventory", async (req, res) => {
-    try {
-      res.json(await storage.upsertInventory(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/inventory/adjust", async (req, res) => {
-    try {
-      const { productId, branchId, adjustment } = req.body;
-      res.json(await storage.adjustInventory(productId, branchId, adjustment));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/inventory/low-stock", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      if (!tenantId && !branchId) return res.status(400).json({ error: "tenantId or branchId is required" });
-      if (branchId) {
-        res.json(await storage.getLowStockItems(branchId));
-      } else if (tenantId) {
-        const tenantBranches = await storage.getBranchesByTenant(tenantId);
-        const allLowStock = [];
-        for (const branch of tenantBranches) {
-          const items = await storage.getLowStockItems(branch.id);
-          allLowStock.push(...items);
-        }
-        res.json(allLowStock);
-      }
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/customers", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const limit = req.query.limit ? Math.min(Number(req.query.limit), 200) : 50;
-      const offset = req.query.offset ? Number(req.query.offset) : 0;
-      res.json(await storage.getCustomers(req.query.search, tenantId, limit, offset));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/customers/count", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const search = req.query.search;
-      res.json({ count: await storage.getCustomerCount(search, tenantId) });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/customers/template", (req, res) => {
-    const templateData = [
-      { Name: "John Doe", Phone: "+41791234567", Email: "john@example.com", Address: "123 Main St" },
-      { Name: "Jane Smith", Phone: "+41799876543", Email: "jane@example.com", Address: "456 Elm Ave" }
-    ];
-    const ws = xlsx.utils.json_to_sheet(templateData);
-    const wb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(wb, ws, "Customers");
-    const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Disposition", "attachment; filename=customers_template.xlsx");
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.send(buf);
-  });
-  app2.get("/api/customers/export", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const customers2 = await storage.getCustomers(void 0, tenantId);
-      const exportData = customers2.map((c) => ({
-        Nr: c.customerNr || "",
-        Anrede: c.salutation || "",
-        Namen: c.lastName || "",
-        Vorname: c.firstName || "",
-        Name: c.name || "",
-        Firma: c.company || "",
-        Phone: c.phone || "",
-        Email: c.email || "",
-        Strasse: c.street || "",
-        StrassNr: c.streetNr || "",
-        HausNr: c.houseNr || "",
-        PLZ: c.postalCode || "",
-        Ort: c.city || "",
-        Address: c.address || "",
-        HowToGo: c.howToGo || "",
-        ZHD: c.zhd || "",
-        ScreenInfo: c.screenInfo || "",
-        LoyaltyPoints: c.loyaltyPoints || 0,
-        TotalSpent: c.totalSpent || "0",
-        OrderCount: c.orderCount || 0,
-        AvgOrderValue: c.averageOrderValue || "0",
-        FirstOrder: c.firstOrderDate || "",
-        LastOrder: c.lastOrderDate || "",
-        Source: c.source || "",
-        Notes: c.notes || "",
-        Quadrat: c.quadrat || "",
-        LegacyRef: c.legacyRef || "",
-        LegacyTotalSpent: c.legacyTotalSpent || "0",
-        R1: c.r1 || "",
-        R3: c.r3 || "",
-        R4: c.r4 || "",
-        R5: c.r5 || "",
-        R8: c.r8 || "",
-        R9: c.r9 || "",
-        R10: c.r10 || "",
-        R14: c.r14 || "",
-        R15: c.r15 || "",
-        R16: c.r16 ? "TRUE" : "FALSE",
-        R17: c.r17 ? "TRUE" : "FALSE",
-        R18: c.r18 ? "TRUE" : "FALSE",
-        R19: c.r19 ? "TRUE" : "FALSE",
-        R20: c.r20 ? "TRUE" : "FALSE",
-        CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ""
-      }));
-      const ws = xlsx.utils.json_to_sheet(exportData);
-      const wb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(wb, ws, "Customers");
-      const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
-      res.setHeader("Content-Disposition", "attachment; filename=customers_export.xlsx");
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.send(buf);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/customers/phone-lookup", async (req, res) => {
-    try {
-      const phone = req.query.phone;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!phone) return res.status(400).json({ error: "phone is required" });
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const results = await storage.findCustomerByPhone(phone, tenantId);
-      res.json(results);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/customers/import", async (req, res) => {
-    try {
-      const { fileBase64, tenantId } = req.body;
-      if (!fileBase64) return res.status(400).json({ error: "fileBase64 is required" });
-      const buffer = Buffer.from(fileBase64, "base64");
-      const workbook = xlsx.read(buffer, { type: "buffer" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = xlsx.utils.sheet_to_json(sheet);
-      const customersToInsert = data.map((item) => ({
-        name: item.Name || item.name || "",
-        email: item.Email || item.email || void 0,
-        phone: String(item.Phone || item.phone || ""),
-        address: item.Address || item.address || void 0,
-        tenantId: tenantId ? Number(tenantId) : void 0,
-        isActive: true
-      })).filter((c) => c.name);
-      const results = await storage.bulkCreateCustomers(customersToInsert);
-      res.json({ success: true, count: results.length });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/customers/import-csv", async (req, res) => {
-    try {
-      const tenantId = req.body.tenantId ? Number(req.body.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const csvPath = require("path").resolve(process.cwd(), "KUNDEN_ALL_fixed.csv");
-      if (!require("fs").existsSync(csvPath)) {
-        return res.status(404).json({ error: "CSV file not found on server" });
-      }
-      const csvContent = require("fs").readFileSync(csvPath, "utf-8");
-      const lines = csvContent.split("\n");
-      const headers = lines[0].replace(/\r$/, "").split(",");
-      let imported = 0;
-      let skipped = 0;
-      const batchSize = 100;
-      let batch = [];
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].replace(/\r$/, "").trim();
-        if (!line) {
-          skipped++;
-          continue;
-        }
-        const values = [];
-        let current = "";
-        let inQuotes = false;
-        for (let j = 0; j < line.length; j++) {
-          const ch = line[j];
-          if (ch === '"') {
-            inQuotes = !inQuotes;
-            continue;
-          }
-          if (ch === "," && !inQuotes) {
-            values.push(current.trim());
-            current = "";
-            continue;
-          }
-          current += ch;
-        }
-        values.push(current.trim());
-        const nr = values[0] || "";
-        const anrede = values[1] || "";
-        const namen = values[2] || "";
-        const vorname = values[3] || "";
-        const strasse = values[4] || "";
-        const howToGo = values[5] || "";
-        const firma = values[6] || "";
-        const zhd = values[7] || "";
-        const ort = values[8] || "";
-        const plz = values[9] || "";
-        const tel1 = values[10] || "";
-        const strassNr = values[11] || "";
-        const hausNr = values[12] || "";
-        const quadrat = values[13] || "";
-        const screenInfo = values[14] || "";
-        const r1 = values[15] || "";
-        const r6 = values[20] || "";
-        const r7 = values[21] || "";
-        const r10 = values[24] || "";
-        const r11 = values[25] || "";
-        const r12 = values[26] || "";
-        const _source = values[values.length - 1] || "";
-        const fullName = [namen, vorname].filter((s) => s && s.trim()).join(", ").trim() || tel1 || "Unknown";
-        const addressParts = [strasse, strassNr, hausNr].filter((s) => s && s.trim()).join(" ").trim();
-        const cityParts = [plz, ort].filter((s) => s && s.trim()).join(" ").trim();
-        const address = [addressParts, cityParts].filter((s) => s).join(", ");
-        const noteParts = [];
-        if (screenInfo) noteParts.push(screenInfo);
-        if (howToGo) noteParts.push(`Directions: ${howToGo}`);
-        if (quadrat) noteParts.push(`Quadrat: ${quadrat}`);
-        const notes = noteParts.join(" | ") || void 0;
-        const customerData = {
-          tenantId,
-          name: fullName,
-          phone: tel1 || void 0,
-          address: address || void 0,
-          notes,
-          isActive: true,
-          customerNr: nr ? parseInt(nr) || void 0 : void 0,
-          salutation: anrede || void 0,
-          firstName: vorname || void 0,
-          lastName: namen || void 0,
-          street: strasse || void 0,
-          streetNr: strassNr || void 0,
-          houseNr: hausNr || void 0,
-          city: ort || void 0,
-          postalCode: plz || void 0,
-          company: firma || void 0,
-          zhd: zhd || void 0,
-          howToGo: howToGo || void 0,
-          screenInfo: screenInfo || void 0,
-          source: _source || void 0,
-          firstOrderDate: r6 || void 0,
-          lastOrderDate: r7 || void 0,
-          legacyTotalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
-          averageOrderValue: r11 ? String(parseFloat(r11) || 0) : "0",
-          orderCount: r12 ? parseInt(r12) || 0 : 0,
-          legacyRef: r1 || void 0,
-          totalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
-          visitCount: r12 ? parseInt(r12) || 0 : 0
-        };
-        batch.push(customerData);
-        if (batch.length >= batchSize) {
-          const results = await storage.bulkCreateCustomers(batch);
-          imported += results.length;
-          batch = [];
-        }
-      }
-      if (batch.length > 0) {
-        const results = await storage.bulkCreateCustomers(batch);
-        imported += results.length;
-      }
-      res.json({ success: true, imported, skipped, total: lines.length - 1 });
-    } catch (e) {
-      console.error("[CSV Import Error]", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/customers/:id", async (req, res) => {
-    try {
-      const cust = await storage.getCustomer(Number(req.params.id));
-      if (!cust) return res.status(404).json({ error: "Customer not found" });
-      res.json(cust);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/customers", async (req, res) => {
-    try {
-      res.json(await storage.createCustomer(stripProtectedCustomerFields(sanitizeDates(req.body))));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/customers/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateCustomer(Number(req.params.id), stripProtectedCustomerFields(sanitizeDates(req.body))));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/customers/:id", async (req, res) => {
-    try {
-      await storage.deleteCustomer(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/customers/:id/loyalty", async (req, res) => {
-    try {
-      res.json(await storage.addLoyaltyPoints(Number(req.params.id), req.body.points));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/customers/:id/sales", async (req, res) => {
-    try {
-      res.json(await storage.getCustomerSales(Number(req.params.id)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/calls", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const limit = req.query.limit ? Number(req.query.limit) : 500;
-      const calls2 = await storage.getCalls(tenantId, limit);
-      res.json(calls2);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/sales", async (req, res) => {
-    try {
-      const limit = req.query.limit ? Number(req.query.limit) : void 0;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      res.json(await storage.getSales({ limit, tenantId, branchId }));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/sales/:id", async (req, res) => {
-    try {
-      const sale = await storage.getSale(Number(req.params.id));
-      if (!sale) return res.status(404).json({ error: "Sale not found" });
-      const items = await storage.getSaleItems(sale.id);
-      res.json({ ...sale, items });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/sales", async (req, res) => {
-    try {
-      const { items, loyaltyPointsRedeemed, ...saleData } = sanitizeDates(req.body);
-      const loyaltyTenantId = req.tenantId ?? (saleData.customerId ? (await storage.getCustomer(saleData.customerId))?.tenantId ?? void 0 : void 0);
-      const redeemPoints = Math.max(0, Math.floor(Number(loyaltyPointsRedeemed) || 0));
-      if (redeemPoints > 0) {
-        const refusal = saleData.customerId && loyaltyTenantId ? await checkLoyaltyRedemption(Number(saleData.customerId), loyaltyTenantId, redeemPoints) : "A customer is required to redeem points";
-        if (refusal) return res.status(400).json({ error: refusal });
-      }
-      const swissDateRcp = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(/* @__PURE__ */ new Date()).replace(/-/g, "");
-      const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`);
-      const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
-      let creditHold = null;
-      if (saleData.paymentMethod === "credit") {
-        try {
-          creditHold = await holdCreditForSale(req.tenantId, saleData.customerId, saleData.totalAmount);
-        } catch (err) {
-          return res.status(err?.statusCode || 400).json({ error: err?.message, code: err?.code, ...err?.details || {} });
-        }
-        saleData.customerId = creditHold.customerId;
-        saleData.totalAmount = (creditHold.cents / 100).toFixed(2);
-        saleData.paymentStatus = "pending";
-      }
-      const sale = await storage.createSale({ ...saleData, receiptNumber }).catch(async (err) => {
-        if (creditHold) await releaseCreditHold(creditHold);
-        throw err;
-      });
-      if (items && items.length > 0) {
-        for (const item of items) {
-          await storage.createSaleItem({ ...item, saleId: sale.id });
-          if (saleData.branchId) {
-            await storage.adjustInventory(item.productId, saleData.branchId, -item.quantity);
-            await storage.createInventoryMovement({
-              productId: item.productId,
-              branchId: saleData.branchId,
-              type: "sale",
-              quantity: -item.quantity,
-              referenceType: "sale",
-              referenceId: sale.id,
-              employeeId: saleData.employeeId
-            });
-          }
-        }
-      }
-      if (saleData.customerId) {
-        const existingCustomer = await storage.getCustomer(saleData.customerId);
-        if (loyaltyTenantId && existingCustomer && (existingCustomer.tenantId == null || existingCustomer.tenantId === loyaltyTenantId)) {
-          try {
-            await settlePosSaleLoyalty({
-              customerId: existingCustomer.id,
-              tenantId: loyaltyTenantId,
-              receiptNumber: sale.receiptNumber,
-              amountPaid: Number(saleData.totalAmount),
-              redeemPoints
-            });
-          } catch (e) {
-            console.error("[loyalty] POS sale", sale.id, e?.message || e);
-          }
-        }
-        if (existingCustomer) {
-          await storage.updateCustomer(saleData.customerId, {
-            visitCount: (existingCustomer.visitCount || 0) + 1,
-            totalSpent: String(Number(existingCustomer.totalSpent || 0) + Number(saleData.totalAmount))
-          });
-        }
-      }
-      if (req.body.callId) {
-        await storage.updateCall(Number(req.body.callId), { saleId: sale.id, status: "answered" });
-      }
-      await storage.createActivityLog({
-        employeeId: saleData.employeeId,
-        action: "sale_created",
-        entityType: "sale",
-        entityId: sale.id,
-        details: `Sale ${sale.receiptNumber} completed for $${saleData.totalAmount}`
-      });
-      if (saleData.employeeId) {
-        const emp = await storage.getEmployee(saleData.employeeId);
-        if (emp && Number(emp.commissionRate || 0) > 0) {
-          const commRate = Number(emp.commissionRate);
-          const commAmount = Number(saleData.totalAmount) * (commRate / 100);
-          await storage.createEmployeeCommission({
-            employeeId: saleData.employeeId,
-            saleId: sale.id,
-            commissionRate: String(commRate),
-            commissionAmount: String(commAmount.toFixed(2))
-          });
-        }
-      }
-      const saleEmp = await storage.getEmployee(saleData.employeeId);
-      await storage.notifyAdmins(
-        saleData.employeeId,
-        "sale_completed",
-        "New Sale",
-        `${saleEmp?.name || "Employee"} completed sale ${sale.receiptNumber} for $${saleData.totalAmount} (${saleData.paymentMethod || "cash"})`,
-        "sale",
-        sale.id
-      );
-      if (saleData.vehicleId) {
-        try {
-          const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const { onlineOrders: onlineOrders2, customers: customers2, branches: branches2, vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq10 } = await import("drizzle-orm");
-          let resolvedTenantId = saleData.tenantId;
-          if (!resolvedTenantId && saleData.branchId) {
-            const [br] = await db2.select({ tenantId: branches2.tenantId }).from(branches2).where(eq10(branches2.id, saleData.branchId)).limit(1);
-            resolvedTenantId = br?.tenantId ?? void 0;
-          }
-          if (!resolvedTenantId) {
-            const [veh] = await db2.select({ tenantId: vehicles2.tenantId }).from(vehicles2).where(eq10(vehicles2.id, saleData.vehicleId)).limit(1);
-            resolvedTenantId = veh?.tenantId ?? void 0;
-          }
-          const [cust] = saleData.customerId ? await db2.select().from(customers2).where(eq10(customers2.id, saleData.customerId)).limit(1) : [null];
-          const customerName = cust?.name || saleData.customerName || "Walk-in";
-          const customerPhone = cust?.phone || "";
-          const customerAddress = cust?.address || [cust?.street, cust?.streetNr || cust?.houseNr, cust?.postalCode, cust?.city].filter(Boolean).join(" ") || "";
-          const onlineItems = (items || []).map((it) => ({
-            productId: it.productId,
-            name: it.productName || it.name,
-            quantity: it.quantity,
-            unitPrice: Number(it.unitPrice),
-            total: Number(it.total),
-            notes: it.notes || void 0
-          }));
-          const trackingToken = require("crypto").randomBytes(24).toString("hex");
-          const orderNumber = sale.receiptNumber || `POS-${sale.id}`;
-          const [inserted] = await db2.insert(onlineOrders2).values({
-            tenantId: resolvedTenantId || 24,
-            orderNumber,
-            customerName,
-            customerPhone: customerPhone || "\u2014",
-            customerAddress: customerAddress || null,
-            customerEmail: cust?.email || null,
-            items: onlineItems,
-            subtotal: String(saleData.subtotal || 0),
-            taxAmount: String(saleData.taxAmount || 0),
-            deliveryFee: "0",
-            totalAmount: String(saleData.totalAmount || 0),
-            paymentMethod: saleData.paymentMethod || "cash",
-            paymentStatus: saleData.paymentStatus === "completed" ? "paid" : "pending",
-            status: "accepted",
-            // POS already confirmed it
-            orderType: "delivery",
-            notes: saleData.notes || null,
-            driverId: saleData.vehicleId,
-            sourceChannel: "pos",
-            trackingToken
-          }).$returningId();
-          try {
-            const { callerIdService: callerIdService2 } = await Promise.resolve().then(() => (init_callerIdService(), callerIdService_exports));
-            callerIdService2.broadcast({
-              type: "delivery_status_change",
-              orderId: inserted.id,
-              vehicleId: saleData.vehicleId,
-              status: "accepted",
-              orderNumber,
-              customerName
-            }, resolvedTenantId);
-          } catch {
-          }
-        } catch (mirrorErr) {
-          console.error("[/api/sales] online_orders mirror failed:", mirrorErr);
-        }
-      }
-      res.json(sale);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/sales/:id", async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      const { items, ...saleData } = req.body;
-      const sale = await storage.updateSale(id, sanitizeDates(saleData));
-      if (items !== void 0) {
-        await storage.deleteSaleItems(id);
-        for (const item of items) {
-          await storage.createSaleItem({
-            saleId: id,
-            productId: item.productId,
-            productName: item.productName || item.name,
-            quantity: item.quantity,
-            unitPrice: String(item.unitPrice),
-            total: String(item.total),
-            modifiers: item.modifiers || [],
-            notes: item.notes || null
-          });
-        }
-      }
-      res.json(sale);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/sales/:id", async (req, res) => {
-    try {
-      await reverseCreditSale(req.tenantId, Number(req.params.id));
-      await storage.deleteSale(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/suppliers", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getSuppliers(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/suppliers/:id", async (req, res) => {
-    try {
-      const sup = await storage.getSupplier(Number(req.params.id));
-      if (!sup) return res.status(404).json({ error: "Supplier not found" });
-      res.json(sup);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/suppliers", async (req, res) => {
-    try {
-      res.json(await storage.createSupplier(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/suppliers/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateSupplier(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/purchase-orders", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getPurchaseOrders(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/purchase-orders", async (req, res) => {
-    try {
-      res.json(await storage.createPurchaseOrder(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/purchase-orders/:id", async (req, res) => {
-    try {
-      res.json(await storage.updatePurchaseOrder(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/shifts", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getShifts(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/shifts/stats", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getShiftStats(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/shifts/active", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getAllActiveShifts(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/shifts", async (req, res) => {
-    try {
-      const shift = await storage.createShift(sanitizeDates(req.body));
-      const emp = await storage.getEmployee(shift.employeeId);
-      await storage.createActivityLog({
-        employeeId: shift.employeeId,
-        action: "shift_started",
-        entityType: "shift",
-        entityId: shift.id,
-        details: `Shift started by ${emp?.name || "Unknown"} with $${shift.openingCash || 0} opening cash`
-      });
-      await storage.notifyAdmins(
-        shift.employeeId,
-        "shift_started",
-        "Shift Started",
-        `${emp?.name || "Employee"} has started a new shift with $${shift.openingCash || 0} opening cash`,
-        "shift",
-        shift.id,
-        "normal"
-      );
-      res.json(shift);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/shifts/:id", async (req, res) => {
-    try {
-      const shift = await storage.updateShift(Number(req.params.id), sanitizeDates(req.body));
-      res.json(shift);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/shifts/:id/close", async (req, res) => {
-    try {
-      const shift = await storage.closeShift(Number(req.params.id), sanitizeDates(req.body));
-      const emp = await storage.getEmployee(shift.employeeId);
-      await storage.createActivityLog({
-        employeeId: shift.employeeId,
-        action: "shift_closed",
-        entityType: "shift",
-        entityId: shift.id,
-        details: `Shift closed with ${shift.totalTransactions || 0} transactions and $${shift.closingCash || 0} closing cash`
-      });
-      await storage.notifyAdmins(
-        shift.employeeId,
-        "shift_ended",
-        "Shift Ended",
-        `${emp?.name || "Employee"} has ended their shift. Transactions: ${shift.totalTransactions || 0}, Sales: $${shift.totalSales || 0}`,
-        "shift",
-        shift.id,
-        "normal"
-      );
-      res.json(shift);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/notifications/:employeeId", async (req, res) => {
-    try {
-      res.json(await storage.getNotifications(Number(req.params.employeeId)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/notifications/:employeeId/unread-count", async (req, res) => {
-    try {
-      res.json({ count: await storage.getUnreadNotificationCount(Number(req.params.employeeId)) });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/notifications", async (req, res) => {
-    try {
-      res.json(await storage.createNotification(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/notifications/:id/read", async (req, res) => {
-    try {
-      res.json(await storage.markNotificationRead(Number(req.params.id)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/notifications/:employeeId/read-all", async (req, res) => {
-    try {
-      await storage.markAllNotificationsRead(Number(req.params.employeeId));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/expenses", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getExpenses(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/expenses", async (req, res) => {
-    try {
-      res.json(await storage.createExpense(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/tables", async (req, res) => {
-    try {
-      res.json(await storage.getTables(req.query.branchId ? Number(req.query.branchId) : void 0));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/tables", async (req, res) => {
-    try {
-      res.json(await storage.createTable(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/tables/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateTable(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/table-qr-codes", async (req, res) => {
-    try {
-      const tenantId = Number(req.query.tenantId);
-      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      res.json(await storage.getTableQrCodes(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/table-qr-codes", async (req, res) => {
-    try {
-      const { tenantId, tableId, branchId, tableName } = req.body;
-      if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
-      const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
-      const qr = await storage.createTableQrCode({
-        tenantId: Number(tenantId),
-        tableId: Number(tableId),
-        branchId: branchId ? Number(branchId) : null,
-        qrToken,
-        tableName,
-        isActive: true
-      });
-      res.status(201).json(qr);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/table-qr-codes/generate-all", async (req, res) => {
-    try {
-      const { tenantId, branchId } = req.body;
-      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      const allTables = await storage.getTables(branchId ? Number(branchId) : void 0);
-      const existing = await storage.getTableQrCodes(Number(tenantId));
-      const existingTableIds = new Set(existing.map((q7) => q7.tableId));
-      const created = [];
-      for (const table of allTables) {
-        if (existingTableIds.has(table.id)) continue;
-        const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
-        const qr = await storage.createTableQrCode({
-          tenantId: Number(tenantId),
-          tableId: table.id,
-          branchId: table.branchId ?? null,
-          qrToken,
-          tableName: table.name,
-          isActive: true
-        });
-        created.push(qr);
-      }
-      res.json({ created: created.length, qrCodes: created });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/table-qr-codes/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateTableQrCode(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/table-qr-codes/:id", async (req, res) => {
-    try {
-      await storage.deleteTableQrCode(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/dine-in/validate/:token", async (req, res) => {
-    try {
-      const qr = await storage.getTableQrCodeByToken(req.params.token);
-      if (!qr || !qr.isActive) return res.status(404).json({ error: "Invalid or inactive QR code" });
-      await storage.incrementQrScanCount(req.params.token);
-      const config = await storage.getLandingPageConfigByTenantId(qr.tenantId);
-      res.json({
-        valid: true,
-        tableId: qr.tableId,
-        tableName: qr.tableName,
-        branchId: qr.branchId,
-        tenantId: qr.tenantId,
-        slug: config?.slug || null
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/kitchen-orders", async (req, res) => {
-    try {
-      res.json(await storage.getKitchenOrders(req.query.branchId ? Number(req.query.branchId) : void 0));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/kitchen-orders", async (req, res) => {
-    try {
-      res.json(await storage.createKitchenOrder(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/kitchen-orders/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateKitchenOrder(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/subscription-plans", async (_req, res) => {
-    try {
-      res.json(await storage.getSubscriptionPlans());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/subscription-plans", async (req, res) => {
-    try {
-      res.json(await storage.createSubscriptionPlan(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/subscriptions", async (_req, res) => {
-    try {
-      res.json(await storage.getSubscriptions());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/subscriptions", async (req, res) => {
-    try {
-      res.json(await storage.createSubscription(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/expenses/:id", async (req, res) => {
-    try {
-      await storage.deleteExpense(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/purchase-orders/:id", async (req, res) => {
-    try {
-      const po = await storage.getPurchaseOrder(Number(req.params.id));
-      if (!po) return res.status(404).json({ error: "Purchase order not found" });
-      const items = await storage.getPurchaseOrderItems(po.id);
-      res.json({ ...po, items });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/purchase-orders/:id/items", async (req, res) => {
-    try {
-      const item = await storage.createPurchaseOrderItem({ ...sanitizeDates(req.body), purchaseOrderId: Number(req.params.id) });
-      res.json(item);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/purchase-orders/:id/receive", async (req, res) => {
-    try {
-      const result = await storage.receivePurchaseOrder(Number(req.params.id), req.body.items);
-      if (!result) return res.status(404).json({ error: "Purchase order not found" });
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/employees/:id/shifts", async (req, res) => {
-    try {
-      res.json(await storage.getEmployeeAttendance(Number(req.params.id)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/top-products", async (req, res) => {
-    try {
-      const limit = req.query.limit ? Number(req.query.limit) : void 0;
-      res.json(await storage.getTopProducts(limit));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/sales-by-payment", async (_req, res) => {
-    try {
-      res.json(await storage.getSalesByPaymentMethod());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/sales-range", async (req, res) => {
-    try {
-      const startDate = req.query.startDate ? new Date(req.query.startDate) : /* @__PURE__ */ new Date(0);
-      const endDate = req.query.endDate ? new Date(req.query.endDate) : /* @__PURE__ */ new Date();
-      res.json(await storage.getSalesByDateRange(startDate, endDate));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/seed", async (_req, res) => {
-    try {
-      const seeded = await storage.seedInitialData();
-      if (!seeded) return res.json({ message: "Data already seeded" });
-      res.json({ message: "Seed data created successfully" });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/fix-schema-and-seed", async (_req, res) => {
-    try {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql8 } = await import("drizzle-orm");
-      console.log("[API-SEED] Fixing schema...");
-      const tables2 = ["branches", "products", "employees", "sales", "inventory", "customers", "suppliers"];
-      for (const table of tables2) {
-        try {
-          await db2.execute(sql8.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
-          console.log(`[API-SEED] Table ${table} fixed`);
-        } catch (e) {
-          console.log(`[API-SEED] Table ${table} skip: ${e.message}`);
-        }
-      }
-      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
-      await seedAllDemoData2();
-      res.json({ success: true, message: "Schema fixed and comprehensive demo data seeded." });
-    } catch (e) {
-      console.error("Manual fix & seed error:", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/force-full-seed", async (_req, res) => {
-    try {
-      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
-      await seedAllDemoData2();
-      res.json({ success: true, message: "Comprehensive demo data seeded successfully" });
-    } catch (e) {
-      console.error("Manual seed error:", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/activity-log", async (req, res) => {
-    try {
-      const limit = req.query.limit ? Number(req.query.limit) : void 0;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getActivityLog(limit, tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/returns", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getReturns(tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/returns/:id", async (req, res) => {
-    try {
-      const ret = await storage.getReturn(Number(req.params.id));
-      if (!ret) return res.status(404).json({ error: "Return not found" });
-      const items = await storage.getReturnItems(ret.id);
-      res.json({ ...ret, items });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/returns", async (req, res) => {
-    try {
-      const { items, ...returnData } = sanitizeDates(req.body);
-      const ret = await storage.createReturn(returnData);
-      if (items && items.length > 0) {
-        for (const item of items) {
-          await storage.createReturnItem({ ...item, returnId: ret.id });
-          if (returnData.branchId) {
-            await storage.adjustInventory(item.productId, returnData.branchId, item.quantity);
-            await storage.createInventoryMovement({
-              productId: item.productId,
-              branchId: returnData.branchId,
-              type: "return",
-              quantity: item.quantity,
-              referenceType: "return",
-              referenceId: ret.id,
-              employeeId: returnData.employeeId
-            });
-          }
-        }
-      }
-      if (returnData.originalSaleId) {
-        await storage.updateSale(returnData.originalSaleId, { status: "refunded" });
-        try {
-          await creditReturnForSale(req.tenantId, returnData.originalSaleId, ret.id, returnData.totalAmount, returnData.employeeId ?? null);
-        } catch (err) {
-          console.error("[/api/returns] wholesale balance not reduced:", err?.message || err);
-        }
-      }
-      await storage.createActivityLog({
-        employeeId: returnData.employeeId,
-        action: "return_created",
-        entityType: "return",
-        entityId: ret.id,
-        details: `Return/refund processed for sale #${returnData.originalSaleId}, amount: $${returnData.totalAmount}`
-      });
-      const retEmp = await storage.getEmployee(returnData.employeeId);
-      await storage.notifyAdmins(
-        returnData.employeeId,
-        "return_processed",
-        "Return Processed",
-        `${retEmp?.name || "Employee"} processed a ${returnData.type || "refund"} for $${returnData.totalAmount}`,
-        "return",
-        ret.id,
-        "high"
-      );
-      res.json(ret);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/cash-drawer/:shiftId", async (req, res) => {
-    try {
-      res.json(await storage.getCashDrawerOperations(Number(req.params.shiftId)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/cash-drawer", async (req, res) => {
-    try {
-      const op = await storage.createCashDrawerOperation(sanitizeDates(req.body));
-      await storage.createActivityLog({ employeeId: req.body.employeeId, action: "cash_drawer_" + req.body.type, entityType: "cash_drawer", entityId: op.id, details: `Cash drawer ${req.body.type}: $${req.body.amount}` });
-      const cdEmp = await storage.getEmployee(req.body.employeeId);
-      await storage.notifyAdmins(
-        req.body.employeeId,
-        "cash_drawer",
-        `Cash Drawer: ${req.body.type}`,
-        `${cdEmp?.name || "Employee"} performed ${req.body.type} of $${req.body.amount}${req.body.reason ? ` - ${req.body.reason}` : ""}`,
-        "cash_drawer",
-        op.id,
-        req.body.type === "withdrawal" ? "high" : "normal"
-      );
-      res.json(op);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/warehouses", async (req, res) => {
-    try {
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getWarehouses(branchId, tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/warehouses", async (req, res) => {
-    try {
-      res.json(await storage.createWarehouse(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/warehouses/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateWarehouse(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/warehouse-transfers", async (_req, res) => {
-    try {
-      res.json(await storage.getWarehouseTransfers());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/warehouse-transfers", async (req, res) => {
-    try {
-      const transfer = await storage.createWarehouseTransfer(sanitizeDates(req.body));
-      await storage.createInventoryMovement({ productId: req.body.productId, branchId: null, type: "transfer", quantity: req.body.quantity, referenceType: "transfer", referenceId: transfer.id, employeeId: req.body.employeeId, notes: `Transfer from warehouse ${req.body.fromWarehouseId} to ${req.body.toWarehouseId}` });
-      res.json(transfer);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/product-batches", async (req, res) => {
-    try {
-      const productId = req.query.productId ? Number(req.query.productId) : void 0;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      res.json(await storage.getProductBatches(productId, tenantId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/product-batches", async (req, res) => {
-    try {
-      res.json(await storage.createProductBatch(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/product-batches/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateProductBatch(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/product-batches/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateProductBatch(Number(req.params.id), { isActive: false }));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/inventory-movements", async (req, res) => {
-    try {
-      const productId = req.query.productId ? Number(req.query.productId) : void 0;
-      const limit = req.query.limit ? Number(req.query.limit) : void 0;
-      res.json(await storage.getInventoryMovements(productId, limit));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/stock-counts", async (_req, res) => {
-    try {
-      res.json(await storage.getStockCounts());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/stock-counts/:id", async (req, res) => {
-    try {
-      const sc = await storage.getStockCount(Number(req.params.id));
-      if (!sc) return res.status(404).json({ error: "Stock count not found" });
-      const items = await storage.getStockCountItems(sc.id);
-      res.json({ ...sc, items });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/stock-counts", async (req, res) => {
-    try {
-      const { items, ...countData } = sanitizeDates(req.body);
-      const sc = await storage.createStockCount(countData);
-      if (items && items.length > 0) {
-        for (const item of items) {
-          await storage.createStockCountItem({ ...item, stockCountId: sc.id });
-        }
-      }
-      res.json(sc);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/stock-counts/:id/approve", async (req, res) => {
-    try {
-      const sc = await storage.updateStockCount(Number(req.params.id), { status: "approved", approvedBy: req.body.approvedBy });
-      const items = await storage.getStockCountItems(sc.id);
-      for (const item of items) {
-        if (item.actualQuantity !== null && item.difference !== null && item.difference !== 0) {
-          await storage.adjustInventory(item.productId, sc.branchId, item.difference);
-          await storage.createInventoryMovement({ productId: item.productId, branchId: sc.branchId, type: "count", quantity: item.difference, referenceType: "manual", referenceId: sc.id, notes: `Stock count adjustment: system ${item.systemQuantity} \u2192 actual ${item.actualQuantity}` });
-        }
-      }
-      await storage.createActivityLog({ employeeId: req.body.approvedBy, action: "stock_count_approved", entityType: "stock_count", entityId: sc.id, details: `Stock count #${sc.id} approved with ${sc.discrepancies || 0} discrepancies` });
-      res.json(sc);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/supplier-contracts", async (req, res) => {
-    try {
-      res.json(await storage.getSupplierContracts(req.query.supplierId ? Number(req.query.supplierId) : void 0));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/supplier-contracts", async (req, res) => {
-    try {
-      res.json(await storage.createSupplierContract(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/supplier-contracts/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateSupplierContract(Number(req.params.id), sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/employee-commissions", async (req, res) => {
-    try {
-      res.json(await storage.getEmployeeCommissions(req.query.employeeId ? Number(req.query.employeeId) : void 0));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/employee-commissions", async (req, res) => {
-    try {
-      res.json(await storage.createEmployeeCommission(sanitizeDates(req.body)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/employee-sales/:id", async (req, res) => {
-    try {
-      res.json(await storage.getEmployeeSalesReport(Number(req.params.id)));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/slow-moving", async (req, res) => {
-    try {
-      res.json(await storage.getSlowMovingProducts(req.query.days ? Number(req.query.days) : 30));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/profit-by-product", async (_req, res) => {
-    try {
-      res.json(await storage.getProfitByProduct());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/cashier-performance", async (_req, res) => {
-    try {
-      res.json(await storage.getCashierPerformance());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/returns-report", async (_req, res) => {
-    try {
-      res.json(await storage.getReturnsReport());
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/reports/daily-sales-report", async (req, res) => {
-    try {
-      const date = req.query.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      const startOfDay = /* @__PURE__ */ new Date(date + "T00:00:00.000Z");
-      const endOfDay = /* @__PURE__ */ new Date(date + "T23:59:59.999Z");
-      const salesData = await storage.getSalesWithCustomerByDateRange(startOfDay, endOfDay);
-      res.json(salesData);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/reports/sales-export", async (req, res) => {
-    try {
-      const startDate = req.query.startDate || "2000-01-01";
-      const endDate = req.query.endDate || "2099-12-31";
-      const salesData = await storage.getSalesByDateRange(new Date(startDate), new Date(endDate));
-      const headers = ["Receipt #", "Date", "Total", "Payment Method", "Status", "Employee ID", "Customer ID"];
-      const rows = salesData.map((s) => [
-        s.receiptNumber || `#${s.id}`,
-        new Date(s.createdAt).toLocaleString(),
-        Number(s.totalAmount).toFixed(2),
-        s.paymentMethod,
-        s.status,
-        s.employeeId,
-        s.customerId || "Walk-in"
-      ]);
-      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename=sales-report-${startDate}-to-${endDate}.csv`);
-      res.send(csv);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/reports/inventory-export", async (_req, res) => {
-    try {
-      const allProducts = await storage.getProducts();
-      const headers = ["ID", "Name", "Category", "Barcode", "Price", "Cost Price", "Stock Qty", "Low Stock Threshold", "Status"];
-      const rows = allProducts.map((p) => [
-        p.id,
-        `"${p.name}"`,
-        p.categoryId,
-        p.barcode || "N/A",
-        Number(p.price).toFixed(2),
-        Number(p.costPrice || 0).toFixed(2),
-        p.stockQuantity || 0,
-        p.lowStockThreshold || 10,
-        p.isActive ? "Active" : "Inactive"
-      ]);
-      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", "attachment; filename=inventory-report.csv");
-      res.send(csv);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/reports/profit-export", async (_req, res) => {
-    try {
-      const profitData = await storage.getProfitByProduct();
-      const headers = ["Product", "Total Sold", "Revenue", "Total Cost", "Profit", "Cost Price"];
-      const rows = profitData.map((p) => [
-        `"${p.productName}"`,
-        p.totalSold,
-        Number(p.totalRevenue).toFixed(2),
-        Number(p.totalCost).toFixed(2),
-        Number(p.profit).toFixed(2),
-        Number(p.costPrice).toFixed(2)
-      ]);
-      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", "attachment; filename=profit-report.csv");
-      res.send(csv);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/reports/employee-performance-export", async (_req, res) => {
-    try {
-      const perfData = await storage.getCashierPerformance();
-      const headers = ["Employee", "Role", "Sales Count", "Total Revenue", "Avg Sale Value"];
-      const rows = perfData.map((p) => [
-        `"${p.employeeName}"`,
-        p.role,
-        p.salesCount,
-        Number(p.totalRevenue).toFixed(2),
-        Number(p.avgSaleValue).toFixed(2)
-      ]);
-      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", "attachment; filename=employee-performance-report.csv");
-      res.send(csv);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/analytics/predictions", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const stats = await storage.getDashboardStats(tenantId);
-      const limit = 10;
-      const topProducts = stats.topProducts || [];
-      const slowMoving = await storage.getSlowMovingProducts(30);
-      const allProds = tenantId ? await storage.getProductsByTenant(tenantId) : await storage.getProducts();
-      let lowStockData = [];
-      if (tenantId) {
-        const tenantBranches = await storage.getBranchesByTenant(tenantId);
-        for (const branch of tenantBranches) {
-          const items = await storage.getLowStockItems(branch.id);
-          lowStockData.push(...items);
-        }
-      } else {
-        lowStockData = await storage.getLowStockItems();
-      }
-      const avgDailyRevenue = Number(stats.monthRevenue || 0) / 30;
-      const projectedMonthly = avgDailyRevenue * 30;
-      const projectedYearly = avgDailyRevenue * 365;
-      const stockAlerts = lowStockData.map((item) => {
-        const prod = allProds.find((p) => p.id === item.productId);
-        return {
-          productId: item.productId,
-          productName: prod?.name || `Product #${item.productId}`,
-          currentStock: item.quantity || 0,
-          threshold: item.lowStockThreshold || 10,
-          urgency: (item.quantity || 0) <= 5 ? "critical" : "warning",
-          recommendation: `Reorder ${Math.max(50 - (item.quantity || 0), 20)} units`
-        };
-      });
-      const categoryPerf = topProducts.reduce((acc, p) => {
-        const prod = allProds.find((pr) => pr.id === p.productId);
-        const catId = prod?.categoryId || 0;
-        if (!acc[catId]) acc[catId] = { revenue: 0, count: 0 };
-        acc[catId].revenue += Number(p.revenue || 0);
-        acc[catId].count += Number(p.totalSold || 0);
-        return acc;
-      }, {});
-      res.json({
-        projectedMonthlyRevenue: projectedMonthly,
-        projectedYearlyRevenue: projectedYearly,
-        avgDailyRevenue,
-        totalActiveProducts: allProds.filter((p) => p.isActive).length,
-        slowMovingCount: slowMoving.length,
-        topSellingProducts: topProducts.slice(0, 5).map((p) => ({
-          name: p.name,
-          revenue: Number(p.revenue || 0),
-          soldCount: Number(p.totalSold || 0)
-        })),
-        stockAlerts,
-        categoryPerformance: Object.entries(categoryPerf).map(([catId, data]) => ({
-          categoryId: Number(catId),
-          revenue: data.revenue,
-          itemsSold: data.count
-        })),
-        insights: [
-          avgDailyRevenue > 0 ? `Average daily revenue: $${avgDailyRevenue.toFixed(2)}` : "No sales data yet for predictions",
-          slowMoving.length > 0 ? `${slowMoving.length} products with low sales in the last 30 days - consider promotions` : "All products are selling well",
-          stockAlerts.filter((a) => a.urgency === "critical").length > 0 ? `${stockAlerts.filter((a) => a.urgency === "critical").length} products critically low on stock - reorder immediately` : "Stock levels are healthy"
-        ]
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/public-objects/*filePath", async (req, res) => {
-    const filePath = req.params.filePath;
-    const objectStorageService = new ObjectStorageService();
-    try {
-      const file = await objectStorageService.searchPublicObject(filePath);
-      if (!file) return res.status(404).json({ error: "File not found" });
-      objectStorageService.downloadObject(file, res);
-    } catch (error) {
-      console.error("Error serving public object:", error);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  });
-  app2.get("/objects/*objectPath", async (req, res) => {
-    const uploadsDir = import_node_path.default.resolve(process.cwd(), "uploads");
-    const filename = req.path.replace(/^\/objects\//, "");
-    const localPath = import_node_path.default.join(uploadsDir, filename);
-    if (import_node_fs.default.existsSync(localPath)) {
-      return res.sendFile(localPath);
-    }
-    const objectStorageService = new ObjectStorageService();
-    try {
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-      objectStorageService.downloadObject(objectFile, res);
-    } catch (error) {
-      return res.sendStatus(404);
-    }
-  });
-  app2.post("/api/objects/upload", async (req, res) => {
-    try {
-      const { imageData, contentType = "image/jpeg" } = req.body;
-      if (!imageData) {
-        return res.status(400).json({ error: "imageData is required" });
-      }
-      const uploadsDir = import_node_path.default.resolve(process.cwd(), "uploads");
-      if (!import_node_fs.default.existsSync(uploadsDir)) import_node_fs.default.mkdirSync(uploadsDir, { recursive: true });
-      const ext = (contentType.split("/")[1] || "jpg").split(";")[0];
-      const filename = `${(0, import_node_crypto.randomUUID)()}.${ext}`;
-      const filePath = import_node_path.default.join(uploadsDir, filename);
-      const buffer = Buffer.from(imageData, "base64");
-      import_node_fs.default.writeFileSync(filePath, buffer);
-      const objectPath = `/objects/${filename}`;
-      res.json({ objectPath });
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-  app2.put("/api/images/save", async (req, res) => {
-    const { imageURL } = req.body;
-    if (!imageURL) {
-      return res.status(400).json({ error: "imageURL is required" });
-    }
-    res.status(200).json({ objectPath: imageURL });
-  });
-  app2.post("/api/products-with-stock", async (req, res) => {
-    try {
-      const { initialStock, branchId, ...productData } = normalizeWholesaleProductFields(sanitizeDates(req.body));
-      const product = await storage.createProduct(productData);
-      if (initialStock && initialStock > 0 && branchId) {
-        await storage.upsertInventory({ productId: product.id, branchId: Number(branchId), quantity: Number(initialStock) });
-        await storage.createInventoryMovement({
-          productId: product.id,
-          branchId: Number(branchId),
-          type: "purchase",
-          quantity: Number(initialStock),
-          referenceType: "manual",
-          notes: "Initial stock on product creation"
-        });
-      }
-      res.json(product);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/shifts/active/:employeeId", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const shifts2 = await storage.getShifts(tenantId);
-      const active = shifts2.find((s) => s.employeeId === Number(req.params.employeeId) && s.status === "open");
-      res.json(active || null);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/store-settings", async (req, res) => {
-    try {
-      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
-      let branches2 = [];
-      if (tenantId) {
-        branches2 = await storage.getBranchesByTenant(tenantId);
-      } else {
-        branches2 = await storage.getBranches();
-      }
-      const mainBranch = branches2.find((b) => b.isMain) || branches2[0];
-      if (!mainBranch) return res.status(404).json({ error: "No branch found" });
-      const tenant = mainBranch.tenantId ? await storage.getTenant(mainBranch.tenantId) : null;
-      res.json({
-        ...mainBranch,
-        storeType: tenant?.storeType || "supermarket",
-        commissionRate: 0,
-        // commission is baked into product prices via applyMarkup
-        whatsappAdminPhone: tenant?.metadata?.whatsappAdminPhone || "",
-        whatsappVerified: !!verifiedStorePhone(tenant?.metadata),
-        // BIZ-01: opt-in minimum-order top-up, delivery only. 0 = disabled.
-        minOrderAmount: Number(tenant?.metadata?.minOrderAmount) || 0
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/store-settings", async (req, res) => {
-    try {
-      const { storeType, tenantId: bodyTenantId, ...branchData } = sanitizeDates(req.body);
-      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : bodyTenantId ? Number(bodyTenantId) : void 0);
-      let branches2 = [];
-      if (tenantId) {
-        branches2 = await storage.getBranchesByTenant(tenantId);
-      } else {
-        branches2 = await storage.getBranches();
-      }
-      const mainBranch = branches2.find((b) => b.isMain) || branches2[0];
-      if (!mainBranch) return res.status(404).json({ error: "No branch found" });
-      const { whatsappAdminPhone, minOrderAmount, ...cleanBranchData } = branchData;
-      const updatedBranch = await storage.updateBranch(mainBranch.id, cleanBranchData);
-      if (mainBranch.tenantId) {
-        const tenantUpdates = {};
-        if (storeType) tenantUpdates.storeType = storeType;
-        if (whatsappAdminPhone !== void 0 || minOrderAmount !== void 0) {
-          const existingTenant = await storage.getTenant(mainBranch.tenantId);
-          const metadata = { ...existingTenant?.metadata || {} };
-          if (whatsappAdminPhone !== void 0 && !String(whatsappAdminPhone).replace(/\D/g, "")) {
-            metadata.whatsappAdminPhone = "";
-            metadata.whatsappVerifiedAt = null;
-          }
-          if (minOrderAmount !== void 0) metadata.minOrderAmount = Math.max(0, Number(minOrderAmount) || 0);
-          tenantUpdates.metadata = metadata;
-        }
-        if (Object.keys(tenantUpdates).length > 0) {
-          await storage.updateTenant(mainBranch.tenantId, tenantUpdates);
-        }
-      }
-      res.json({
-        ...updatedBranch,
-        storeType,
-        whatsappAdminPhone: mainBranch.tenantId ? verifiedStorePhone((await storage.getTenant(mainBranch.tenantId))?.metadata) : "",
-        minOrderAmount: Math.max(0, Number(minOrderAmount) || 0)
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/system-language", async (req, res) => {
-    try {
-      const { language } = req.body;
-      if (!["en", "ar", "de"].includes(language)) {
-        return res.status(400).json({ error: "Invalid language. Must be en, ar, or de" });
-      }
-      const tenantId = req.tenantId;
-      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      await storage.upsertLandingPageConfig(tenantId, { language });
-      res.json({ success: true, language });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/caller-id/simulate", async (req, res) => {
-    const { phoneNumber, tenantId: bodyTenantId } = req.body;
-    const tenantId = bodyTenantId || req.tenantId;
-    await callerIdService.handleIncomingCall(phoneNumber || "0551234567", void 0, tenantId ? Number(tenantId) : void 0);
-    res.json({ success: true });
-  });
-  app2.get("/api/caller-id/incoming", (_req, res) => {
-    res.send(`<!DOCTYPE html><html><head><title>Caller ID Test</title>
-<style>body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:20px}
-input,button{display:block;width:100%;margin:8px 0;padding:10px;font-size:16px;box-sizing:border-box}
-button{background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer}
-#result{margin-top:16px;padding:12px;border-radius:6px;display:none}
-.ok{background:#d1fae5;color:#065f46}.err{background:#fee2e2;color:#991b1b}</style></head>
-<body><h2>Caller ID Test</h2>
-<input id="phone" placeholder="Phone number" value="01012345678"/>
-<input id="secret" placeholder="Bridge secret" value="fritzbridge-secret-change-me"/>
-<button onclick="test()">Simulate Incoming Call</button>
-<div id="result"></div>
-<script>
-async function test(){
-  const r=document.getElementById('result');
-  r.style.display='block';r.className='';r.textContent='Sending...';
-  try{
-    const res=await fetch('/api/caller-id/incoming',{method:'POST',
-      headers:{'Content-Type':'application/json','x-bridge-secret':document.getElementById('secret').value},
-      body:JSON.stringify({phoneNumber:document.getElementById('phone').value,tenantId:1,slot:1})});
-    const d=await res.json();
-    r.className=res.ok?'ok':'err';
-    r.textContent=res.ok?'\u2713 Success! Check POS for popup.':'\u2717 '+JSON.stringify(d);
-  }catch(e){r.className='err';r.textContent='\u2717 '+e.message;}
-}
-</script></body></html>`);
-  });
-  app2.get("/api/caller-id/active-calls", (req, res) => {
-    const tenantId = req.tenantId || Number(req.query.tenantId);
-    if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-    const calls2 = callerIdService.getActiveCallsForTenant(Number(tenantId));
-    res.json({ calls: calls2 });
-  });
-  app2.get("/api/events", (req, res) => {
-    const tenantIdRaw = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-    const tenantId = tenantIdRaw && !isNaN(tenantIdRaw) ? tenantIdRaw : void 0;
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache, no-store, no-transform");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders?.();
-    res.write(`: connected ${(/* @__PURE__ */ new Date()).toISOString()}
-
-`);
-    res.write(`data: ${JSON.stringify({ type: "sse_connected", tenantId: tenantId ?? null })}
-
-`);
-    const teardown = callerIdService.addSseClient(res, tenantId);
-    const heartbeat = setInterval(() => {
-      try {
-        res.write(`: hb ${Date.now()}
-
-`);
-      } catch {
-      }
-    }, 25e3);
-    req.on("close", () => {
-      clearInterval(heartbeat);
-      teardown();
-    });
-  });
-  app2.post("/api/caller-id/incoming", async (req, res) => {
-    try {
-      const secret = req.headers["x-bridge-secret"] || req.body.secret;
-      const expectedSecret = process.env.CALLER_ID_BRIDGE_SECRET;
-      if (!expectedSecret || secret !== expectedSecret) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const { phoneNumber, slot } = req.body;
-      const tenantId = req.body.tenantId || req.tenantId;
-      const callInfo = await callerIdService.handleIncomingCall(
-        phoneNumber || "0123456789",
-        slot ? Number(slot) : void 0,
-        tenantId ? Number(tenantId) : void 0
-      );
-      const customerName = callInfo?.customer?.name;
-      const customerAddress = callInfo?.customer?.address;
-      pushService.notifyIncomingCall(phoneNumber || "0123456789", tenantId ? Number(tenantId) : void 0, customerName, customerAddress).catch(() => {
-      });
-      res.json({ success: true });
-    } catch (e) {
-      console.error("[CallerID] Error handling incoming call:", e);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-  app2.get("/api/push/vapid-public-key", (_req, res) => {
-    res.json({ publicKey: pushService.publicKey });
-  });
-  app2.post("/api/push/subscribe", (req, res) => {
-    const sub = req.body;
-    if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
-    const rawTenantId = req.tenantId ?? req.body?.tenantId;
-    const tenantId = Number(rawTenantId);
-    if (!Number.isFinite(tenantId) || tenantId <= 0) {
-      return res.status(401).json({ error: "Tenant identification required" });
-    }
-    pushService.subscribe(sub, tenantId);
-    res.json({ success: true });
-  });
-  app2.post("/api/push/unsubscribe", (req, res) => {
-    const { endpoint } = req.body;
-    if (endpoint) pushService.unsubscribe(endpoint);
-    res.json({ success: true });
-  });
-  function sortCategoriesByPriority(cats) {
-    const getPriority = (name) => {
-      const n = name.toLowerCase();
-      if (/pizza|بيتزا|calzone|pide|lahmacun|burger|burg|sandwich|wrap|grill|shawarma|شاورما/.test(n)) return 1;
-      if (/pasta|meal|main|plate|chicken|meat|fish|teller|nuggets|schnitzel|kebab|دجاج|لحم|سمك/.test(n)) return 2;
-      if (/appetizer|starter|finger|snack|مقبلات|فاتح/.test(n)) return 3;
-      if (/salad|سلطة/.test(n)) return 6;
-      if (/dessert|sweet|حلوى|حلويات|baklava|tiramisu/.test(n)) return 7;
-      if (/drink|beverage|juice|water|coke|cola|bier|beer|wine|alcohol|عصير|مشروب/.test(n)) return 8;
-      if (/tabak|tobacco|cigarette/.test(n)) return 9;
-      return 5;
-    };
-    return [...cats].sort((a, b) => {
-      const aOrder = a.sortOrder || 0;
-      const bOrder = b.sortOrder || 0;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return getPriority(a.name) - getPriority(b.name);
-    });
-  }
-  app2.get("/api/store/:tenantId/menu", async (req, res) => {
-    try {
-      const tenantId = Number(req.params.tenantId);
-      if (!tenantId || isNaN(tenantId)) {
-        return res.status(400).json({ error: "Valid tenantId is required" });
-      }
-      const tenant = await storage.getTenant(tenantId);
-      if (!tenant) {
-        return res.status(404).json({ error: "Store not found" });
-      }
-      const categories2 = sortCategoriesByPriority(await storage.getCategories(tenantId));
-      const products2 = await storage.getProductsByTenant(tenantId);
-      const categoryOrder = categories2.map((c) => c.id);
-      products2.sort((a, b) => categoryOrder.indexOf(a.categoryId) - categoryOrder.indexOf(b.categoryId));
-      const config = await storage.getLandingPageConfig(tenantId);
-      res.json({
-        store: {
-          id: tenant.id,
-          name: tenant.businessName,
-          logo: tenant.logo,
-          storeType: tenant.storeType
-        },
-        config: config || null,
-        products: products2,
-        categories: categories2
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/store-public/:slug", async (req, res) => {
-    try {
-      const { slug } = req.params;
-      const config = await storage.getLandingPageConfigBySlug(slug);
-      if (!config) return res.status(404).json({ error: "Store not found" });
-      if (!config.isPublished) return res.status(404).json({ error: "Store is currently unavailable" });
-      const tenant = await storage.getTenant(config.tenantId);
-      let products2 = await storage.getProductsByTenant(config.tenantId);
-      const commissionRate = await storage.getCommissionRate();
-      if (commissionRate > 0) {
-        const factor = 1 + commissionRate / 100;
-        products2 = products2.map((p) => {
-          const rawPrice = parseFloat(p.price) * factor;
-          const rounded = Math.round(rawPrice * 2) / 2;
-          return { ...p, price: rounded.toFixed(2) };
-        });
-      }
-      const categories2 = sortCategoriesByPriority(await storage.getCategories(config.tenantId));
-      const categoryOrder = categories2.map((c) => c.id);
-      products2.sort((a, b) => categoryOrder.indexOf(a.categoryId) - categoryOrder.indexOf(b.categoryId));
-      const publicTenant = tenant ? {
-        id: tenant.id,
-        businessName: tenant.businessName,
-        name: tenant.businessName,
-        logo: tenant.logo,
-        storeType: tenant.storeType,
-        currency: tenant.currency,
-        address: tenant.address,
-        city: tenant.city,
-        country: tenant.country,
-        phone: tenant.businessPhone ?? tenant.phone ?? null
-      } : null;
-      res.json({ config, tenant: publicTenant, products: products2, categories: categories2 });
-    } catch (e) {
-      console.error(`[API] Public store error for ${req.params.slug}:`, e);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-  app2.post("/api/online-orders/public", async (req, res) => {
-    try {
-      const { slug, tenantId: bodyTenantId, ...orderData } = req.body;
-      let resolvedTenantId;
-      if (slug) {
-        const config = await storage.getLandingPageConfigBySlug(slug);
-        if (config) resolvedTenantId = config.tenantId;
-      }
-      if (!resolvedTenantId && bodyTenantId) {
-        resolvedTenantId = Number(bodyTenantId);
-      }
-      if (!resolvedTenantId) return res.status(404).json({ error: "Store not found" });
-      const swissDateOnl = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(/* @__PURE__ */ new Date()).replace(/-/g, "");
-      const dailySeqOnl = await storage.getNextSequenceNumber(`tenant-${resolvedTenantId}`);
-      const orderNumber = `${resolvedTenantId}-${swissDateOnl}-${dailySeqOnl}`;
-      const order = await storage.createOnlineOrder({
-        ...orderData,
-        tenantId: resolvedTenantId,
-        orderNumber,
-        paymentStatus: orderData.paymentMethod === "cash" ? "pending" : "pending",
-        status: "pending"
-      });
-      try {
-        const { customerName, customerPhone, customerEmail, customerAddress } = orderData;
-        if (customerName) {
-          let existing = [];
-          if (customerPhone) {
-            existing = await storage.findCustomerByPhone(customerPhone, resolvedTenantId);
-          }
-          if (existing.length === 0) {
-            await storage.createCustomer({
-              tenantId: resolvedTenantId,
-              name: customerName,
-              phone: customerPhone || null,
-              email: customerEmail || null,
-              address: customerAddress || null
-            });
-          }
-        }
-      } catch (autoErr) {
-        console.error("[AutoCustomer] Failed to auto-save customer from online order:", autoErr);
-      }
-      try {
-        const commissionRate = await storage.getCommissionRate();
-        const saleTotal = parseFloat(orderData.totalAmount || "0");
-        const commissionAmount = saleTotal * commissionRate / (100 + commissionRate);
-        if (commissionAmount > 0) {
-          await storage.createPlatformCommission({
-            tenantId: resolvedTenantId,
-            orderId: order.id,
-            saleTotal: String(saleTotal.toFixed(2)),
-            commissionRate: String(commissionRate),
-            commissionAmount: String(commissionAmount.toFixed(2)),
-            status: "pending"
-          });
-        }
-      } catch (commErr) {
-        console.error("[Commission] Failed to track commission:", commErr);
-      }
-      callerIdService.broadcast({
-        type: "new_online_order",
-        order
-      }, resolvedTenantId);
-      pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => {
-      });
-      try {
-        const tenant = await storage.getTenant(resolvedTenantId);
-        const adminPhone = verifiedStorePhone(tenant?.metadata) || void 0;
-        await whatsappService.orderPlaced(order, resolvedTenantId, adminPhone);
-      } catch (waErr) {
-        console.error("[WhatsApp] Failed to send order notifications:", waErr);
-      }
-      res.json(order);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/online-orders", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const status = req.query.status;
-      const orders = await storage.getOnlineOrders(tenantId, status);
-      res.json(orders);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/online-orders/:id", async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      const order = await storage.updateOnlineOrder(id, req.body);
-      callerIdService.broadcast({ type: "online_order_updated", order });
-      if (app2._broadcastOrderStatus) {
-        app2._broadcastOrderStatus(id, { type: "status_update", order });
-      }
-      if (req.body.status && order.customerPhone) {
-        try {
-          if (order.tenantId) {
-            await whatsappService.orderStatusChanged(order, req.body.status, order.tenantId);
-          }
-        } catch (waErr) {
-          console.error("[WhatsApp] Failed to send status update:", waErr);
-        }
-      }
-      res.json(order);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/online-orders/:id", async (req, res) => {
-    try {
-      await storage.deleteOnlineOrder(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/super-admin/whatsapp/status", requireSuperAdmin, async (_req, res) => {
-    res.json(whatsappService.getStatus());
-  });
-  app2.post("/api/super-admin/whatsapp/connect", requireSuperAdmin, async (_req, res) => {
-    try {
-      const result = await whatsappService.connect();
-      const qr = whatsappService.getQrCode();
-      res.json({ ...result, qrCode: qr });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/super-admin/whatsapp/disconnect", requireSuperAdmin, async (_req, res) => {
-    await whatsappService.disconnect();
-    res.json({ success: true });
-  });
-  app2.get("/api/super-admin/whatsapp/qr", requireSuperAdmin, async (_req, res) => {
-    const qr = whatsappService.getQrCode();
-    res.json({ qrCode: qr });
-  });
-  app2.get("/api/super-admin/whatsapp/session-info", requireSuperAdmin, async (_req, res) => {
-    res.json({ hasSession: whatsappService.hasSession(), sessionModified: whatsappService.sessionModified() });
-  });
-  app2.post("/api/super-admin/whatsapp/test", requireSuperAdmin, async (req, res) => {
-    const globalPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
-    const targetPhone = (req.body?.phone || globalPhone || "").replace(/\D/g, "");
-    if (!targetPhone) return res.status(400).json({ error: "No phone number specified and no global admin phone configured" });
-    const sent = await whatsappService.sendText(
-      targetPhone,
-      "\u{1F9EA} *Test Message*\n\nThis is a test from Kassenta POS WhatsApp integration.\n\n\u2705 If you receive this, the connection is working!"
-    );
-    res.json({ success: sent, phone: targetPhone });
-  });
-  app2.get("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin, async (_req, res) => {
-    try {
-      const phone = await storage.getPlatformSetting("whatsapp_admin_phone");
-      res.json({ phone: phone || "" });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin, async (req, res) => {
-    try {
-      const { phone } = req.body;
-      if (phone === void 0) return res.status(400).json({ error: "phone required" });
-      await storage.setPlatformSetting("whatsapp_admin_phone", phone.replace(/\D/g, ""));
-      res.json({ success: true, phone: phone.replace(/\D/g, "") });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin, async (req, res) => {
-    try {
-      const tenant = await storage.getTenant(Number(req.params.tenantId));
-      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
-      const phone = tenant.metadata?.whatsappAdminPhone || "";
-      res.json({ phone });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin, async (req, res) => {
-    try {
-      const tenant = await storage.getTenant(Number(req.params.tenantId));
-      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
-      const phone = (req.body?.phone || "").replace(/\D/g, "");
-      const metadata = {
-        ...tenant.metadata || {},
-        whatsappAdminPhone: phone,
-        whatsappVerifiedAt: phone ? (/* @__PURE__ */ new Date()).toISOString() : null
-      };
-      await storage.updateTenant(Number(req.params.tenantId), { metadata });
-      res.json({ success: true, phone });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/landing-page-config", async (req, res) => {
-    try {
-      const tenantId = Number(req.query.tenantId);
-      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      const config = await storage.getLandingPageConfig(tenantId);
-      res.json(config || null);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/landing-page-config", requireSuperAdmin, async (req, res) => {
-    try {
-      const { tenantId, ...data } = req.body;
-      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      const config = await storage.upsertLandingPageConfig(Number(tenantId), data);
-      res.json(config);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/tenant/landing-config", async (req, res) => {
-    try {
-      const tenantId = req.tenantId;
-      if (!tenantId) return res.status(401).json({ error: "License authentication required" });
-      const { tenantId: _t, id: _i, createdAt: _c, updatedAt: _u, ...data } = req.body;
-      const config = await storage.upsertLandingPageConfig(Number(tenantId), data);
-      res.json(config);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/store-public/commission-rate", async (_req, res) => {
-    try {
-      const rate = await storage.getCommissionRate();
-      res.json({ rate });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/create-payment-intent", async (req, res) => {
-    try {
-      const { amount, currency, tenantId } = req.body;
-      const stripe = await getUncachableStripeClient();
-      const amountInCents = Math.round(parseFloat(amount) * 100);
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency: (currency || "chf").toLowerCase(),
-        metadata: { tenantId: String(tenantId || ""), source: "online_order" }
-      });
-      res.json({ clientSecret: paymentIntent.client_secret, publishableKey: await getStripePublishableKey() });
-    } catch (e) {
-      console.error("[Stripe] PaymentIntent error:", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-  const orderSseClients = /* @__PURE__ */ new Map();
-  app2.get("/api/online-orders/:id/status-stream", (req, res) => {
-    const orderId = Number(req.params.id);
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
-    if (!orderSseClients.has(orderId)) orderSseClients.set(orderId, /* @__PURE__ */ new Set());
-    orderSseClients.get(orderId).add(res);
-    res.write(`data: ${JSON.stringify({ type: "connected" })}
-
-`);
-    const keepAlive = setInterval(() => res.write(`: ping
-
-`), 25e3);
-    req.on("close", () => {
-      clearInterval(keepAlive);
-      orderSseClients.get(orderId)?.delete(res);
-    });
-  });
-  app2._broadcastOrderStatus = (orderId, data) => {
-    const clients = orderSseClients.get(orderId);
-    if (clients) {
-      const msg = `data: ${JSON.stringify(data)}
-
-`;
-      clients.forEach((c) => {
-        try {
-          c.write(msg);
-        } catch {
-        }
-      });
-    }
-  };
-  app2.get("/store/:slug", async (req, res) => {
-    try {
-      const { slug } = req.params;
-      const config = await storage.getLandingPageConfigBySlug(slug);
-      if (!config || !config.isPublished) {
-        return res.status(404).send("<h1>Store not found</h1>");
-      }
-      const templatePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
-      let html = import_node_fs.default.readFileSync(templatePath, "utf8");
-      const branches2 = await storage.getBranchesByTenant(config.tenantId);
-      const currency = branches2?.[0]?.currency || "CHF";
-      const storeTenant = await storage.getTenant(config.tenantId);
-      const storeName = String(storeTenant?.businessName || config.businessName || "Kassenta Store").replace(/[<>"]/g, "");
-      const storeLogo = String(config.logoUrl || storeTenant?.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
-      html = html.replace(/\{\{SLUG\}\}/g, slug);
-      html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
-      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
-      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
-      html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
-      html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
-      html = html.replace(/\{\{CURRENCY\}\}/g, currency);
-      html = html.replace(/\{\{LANGUAGE\}\}/g, config.language || "en");
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.send(html);
-    } catch (e) {
-      console.error("[store/:slug] Error:", e);
-      res.status(500).send("<h1>Server error</h1>");
-    }
-  });
-  const TENANT_BACKUP_DIR = import_node_path.default.resolve(process.cwd(), "backups");
-  if (!import_node_fs.default.existsSync(TENANT_BACKUP_DIR)) import_node_fs.default.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
-  app2.get("/api/backup/list", async (req, res) => {
-    try {
-      const tenantId = req.tenantId;
-      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      const files = import_node_fs.default.readdirSync(TENANT_BACKUP_DIR).filter((f) => f.startsWith(`backup_tenant_${tenantId}_`) && f.endsWith(".json")).map((f) => {
-        const stat = import_node_fs.default.statSync(import_node_path.default.join(TENANT_BACKUP_DIR, f));
-        return { filename: f, size: stat.size, createdAt: stat.mtime.toISOString() };
-      }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      res.json(files);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/backup/create", async (req, res) => {
-    try {
-      const tenantId = req.tenantId;
-      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      const tenant = await storage.getTenant(tenantId);
-      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
-      const [branches2, employees2, products2, categories2, customers2] = await Promise.all([
-        storage.getBranchesByTenant(tenantId),
-        storage.getEmployeesByTenant(tenantId),
-        storage.getProductsByTenant(tenantId),
-        storage.getCategories(tenantId),
-        storage.getCustomers(void 0, tenantId)
-      ]);
-      let inventory2 = [];
-      let expenses2 = [];
-      for (const b of branches2) {
-        try {
-          const inv = await storage.getInventory(b.id, tenantId);
-          inventory2.push(...inv);
-        } catch {
-        }
-      }
-      try {
-        expenses2 = await storage.getExpenses(tenantId);
-      } catch {
-      }
-      const sales2 = await storage.getSales({ tenantId, limit: 1e4 });
-      const snapshot = {
-        version: "2.0",
-        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        tenantId,
-        tenant: { ...tenant, passwordHash: "[REDACTED]" },
-        branches: branches2,
-        employees: employees2.map((e) => ({ ...e, pin: "[REDACTED]", passwordHash: "[REDACTED]" })),
-        categories: categories2,
-        products: products2,
-        inventory: inventory2,
-        customers: customers2,
-        expenses: expenses2,
-        sales: sales2.slice(0, 5e3)
-      };
-      const filename = `backup_tenant_${tenantId}_${Date.now()}.json`;
-      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
-      import_node_fs.default.writeFileSync(filepath, JSON.stringify(snapshot));
-      const stat = import_node_fs.default.statSync(filepath);
-      console.log(`[BACKUP] Manual by tenant ${tenantId}: ${filename} (${Math.round(stat.size / 1024)}KB)`);
-      res.json({ success: true, filename, size: stat.size, createdAt: stat.mtime.toISOString() });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/backup/restore/:filename", async (req, res) => {
-    try {
-      const tenantId = req.tenantId;
-      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      const filename = import_node_path.default.basename(req.params.filename);
-      if (!filename.startsWith(`backup_tenant_${tenantId}_`)) {
-        return res.status(403).json({ error: "Not authorized to restore this backup" });
-      }
-      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
-      if (!import_node_fs.default.existsSync(filepath)) return res.status(404).json({ error: "Backup not found" });
-      const snapshot = JSON.parse(import_node_fs.default.readFileSync(filepath, "utf-8"));
-      const restored = { branches: 0, categories: 0, products: 0, customers: 0, expenses: 0 };
-      if (snapshot.categories?.length) {
-        const existingCats = await storage.getCategories(tenantId);
-        for (const c of snapshot.categories) {
-          try {
-            if (!existingCats.find((ec) => ec.name === c.name)) {
-              await storage.createCategory({ ...c, id: void 0, tenantId });
-              restored.categories++;
-            }
-          } catch {
-          }
-        }
-      }
-      if (snapshot.products?.length) {
-        const existingProducts = await storage.getProductsByTenant(tenantId);
-        const freshCats = await storage.getCategories(tenantId);
-        const catMap = new Map(freshCats.map((c) => [c.name, c.id]));
-        const origCatMap = new Map((snapshot.categories || []).map((c) => [c.id, c.name]));
-        for (const p of snapshot.products) {
-          try {
-            let newCatId = p.categoryId;
-            if (p.categoryId && origCatMap.has(p.categoryId)) {
-              newCatId = catMap.get(origCatMap.get(p.categoryId)) ?? p.categoryId;
-            }
-            const match = p.barcode ? existingProducts.find((ep) => ep.barcode === p.barcode) : existingProducts.find((ep) => ep.name === p.name);
-            if (match) {
-              await storage.updateProduct(match.id, { name: p.name, price: p.price, costPrice: p.costPrice, description: p.description, isActive: p.isActive, categoryId: newCatId });
-            } else {
-              await storage.createProduct({ ...p, id: void 0, tenantId, categoryId: newCatId });
-            }
-            restored.products++;
-          } catch {
-          }
-        }
-      }
-      if (snapshot.customers?.length) {
-        const existingCustomers = await storage.getCustomers(void 0, tenantId);
-        const existingEmails = new Set(existingCustomers.filter((c) => c.email).map((c) => c.email?.toLowerCase()));
-        for (const c of snapshot.customers) {
-          try {
-            if (!c.email || !existingEmails.has(c.email.toLowerCase())) {
-              await storage.createCustomer({ ...c, id: void 0, tenantId });
-              restored.customers++;
-            }
-          } catch {
-          }
-        }
-      }
-      res.json({ success: true, tenantId, restored });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/backup/:filename", async (req, res) => {
-    try {
-      const tenantId = req.tenantId;
-      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      const filename = import_node_path.default.basename(req.params.filename);
-      if (!filename.startsWith(`backup_tenant_${tenantId}_`)) {
-        return res.status(403).json({ error: "Not authorized" });
-      }
-      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
-      if (import_node_fs.default.existsSync(filepath)) import_node_fs.default.unlinkSync(filepath);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/vehicles", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      res.json(await storage.getVehicles(tenantId, branchId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/vehicles", async (req, res) => {
-    try {
-      res.json(await storage.createVehicle(req.body));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/vehicles/:id", async (req, res) => {
-    try {
-      res.json(await storage.updateVehicle(Number(req.params.id), req.body));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/vehicles/:id", async (req, res) => {
-    try {
-      await storage.deleteVehicle(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/printer-configs", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      res.json(await storage.getPrinterConfigs(tenantId, branchId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/printer-configs", async (req, res) => {
-    try {
-      res.json(await storage.upsertPrinterConfig(req.body));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/daily-closings", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      res.json(await storage.getDailyClosings(tenantId, branchId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/daily-closings", async (req, res) => {
-    try {
-      const { tenantId, branchId, closingDate } = req.body;
-      const today = closingDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      const startOfDay = /* @__PURE__ */ new Date(today + "T00:00:00.000Z");
-      const endOfDay = /* @__PURE__ */ new Date(today + "T23:59:59.999Z");
-      const daySales = await storage.getSalesByDateRange(startOfDay, endOfDay);
-      const totalSales = daySales.reduce((s, sale) => s + Number(sale.totalAmount || 0), 0);
-      const totalCash = daySales.filter((s) => s.paymentMethod === "cash").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
-      const totalCard = daySales.filter((s) => s.paymentMethod === "card").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
-      const totalMobile = daySales.filter((s) => s.paymentMethod === "mobile").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
-      const totalDiscounts = daySales.reduce((s, sale) => s + Number(sale.discountAmount || 0), 0);
-      const dc = await storage.createDailyClosing({
-        tenantId,
-        branchId: branchId || null,
-        employeeId: req.body.employeeId || null,
-        closingDate: today,
-        totalSales: String(totalSales),
-        totalCash: String(totalCash),
-        totalCard: String(totalCard),
-        totalMobile: String(totalMobile),
-        totalTransactions: daySales.length,
-        totalReturns: "0",
-        totalDiscounts: String(totalDiscounts),
-        openingCash: String(req.body.openingCash || 0),
-        closingCash: String(req.body.closingCash || 0),
-        notes: req.body.notes || null,
-        status: "closed"
-      });
-      res.json(dc);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/monthly-closings", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
-      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
-      res.json(await storage.getMonthlyClosings(tenantId, branchId));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/monthly-closings", async (req, res) => {
-    try {
-      const { tenantId, branchId, closingMonth } = req.body;
-      const month = closingMonth || (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
-      const startOfMonth = /* @__PURE__ */ new Date(month + "-01T00:00:00.000Z");
-      const endOfMonth = /* @__PURE__ */ new Date(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0).toISOString().split("T")[0] + "T23:59:59.999Z");
-      const monthSales = await storage.getSalesByDateRange(startOfMonth, endOfMonth);
-      const totalSales = monthSales.reduce((s, sale) => s + Number(sale.totalAmount || 0), 0);
-      const totalCash = monthSales.filter((s) => s.paymentMethod === "cash").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
-      const totalCard = monthSales.filter((s) => s.paymentMethod === "card").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
-      const totalMobile = monthSales.filter((s) => s.paymentMethod === "mobile").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
-      const totalDiscounts = monthSales.reduce((s, sale) => s + Number(sale.discountAmount || 0), 0);
-      const expenses2 = await storage.getExpensesByDateRange(startOfMonth, endOfMonth);
-      const totalExpenses = expenses2.reduce((s, e) => s + Number(e.amount || 0), 0);
-      const mc = await storage.createMonthlyClosing({
-        tenantId,
-        branchId: branchId || null,
-        employeeId: req.body.employeeId || null,
-        closingMonth: month,
-        totalSales: String(totalSales),
-        totalCash: String(totalCash),
-        totalCard: String(totalCard),
-        totalMobile: String(totalMobile),
-        totalTransactions: monthSales.length,
-        totalReturns: "0",
-        totalDiscounts: String(totalDiscounts),
-        totalExpenses: String(totalExpenses),
-        netRevenue: String(totalSales - totalExpenses),
-        notes: req.body.notes || null,
-        status: "closed"
-      });
-      res.json(mc);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/maintenance/fix-tenant-ids", async (req, res) => {
-    const secret = req.headers["x-maintenance-secret"] || req.query.secret;
-    if (secret !== "fix-tenant-2024-barmagly") {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-    try {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql8 } = await import("drizzle-orm");
-      const firstTenant = (await storage.getTenants())[0];
-      if (!firstTenant) {
-        return res.status(404).json({ error: "No tenants found" });
-      }
-      const tid = firstTenant.id;
-      const tables2 = [
-        "products",
-        "categories",
-        "employees",
-        "customers",
-        "branches",
-        "inventory",
-        "sales",
-        "sale_items",
-        "expenses",
-        "shifts",
-        "notifications",
-        "calls",
-        "purchase_orders",
-        "purchase_order_items",
-        "suppliers",
-        "tables",
-        "kitchen_orders",
-        "returns",
-        "return_items",
-        "cash_drawer_operations",
-        "warehouses",
-        "warehouse_transfers",
-        "product_batches",
-        "inventory_movements",
-        "stock_counts",
-        "stock_count_items",
-        "employee_commissions",
-        "daily_closings",
-        "monthly_closings"
-      ];
-      const results = {};
-      for (const table of tables2) {
-        try {
-          const r = await db2.execute(
-            sql8.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
-          );
-          results[table] = r[0]?.affectedRows ?? 0;
-        } catch (e) {
-          results[table] = -1;
-        }
-      }
-      res.json({
-        success: true,
-        tenant: { id: tid, name: firstTenant.businessName },
-        updates: results
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post(
-    "/api/delivery/auth/request-otp",
-    rateLimit({
-      name: "customer-otp",
-      max: 5,
-      windowMs: 15 * 60 * 1e3,
-      keyFn: (req) => `${req.body?.tenantId}:${String(req.body?.phone || "").replace(/\D/g, "")}`,
-      message: "\u0645\u062D\u0627\u0648\u0644\u0627\u062A \u0643\u062B\u064A\u0631\u0629\u060C \u0627\u0646\u062A\u0638\u0631 \u0642\u0644\u064A\u0644\u0627\u064B \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629. / Too many attempts, try again shortly."
-    }),
-    async (req, res) => {
-      try {
-        const { phone, tenantId } = req.body;
-        if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
-        if (String(phone).replace(/\D/g, "").length < 8) return res.status(400).json({ error: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u2014 \u0627\u0643\u062A\u0628\u0647 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629" });
-        const otp = await createOtp(phone, Number(tenantId));
-        if (process.env.NODE_ENV === "development") {
-          return res.json({ success: true, otp });
-        }
-        const tenant = await storage.getTenant(Number(tenantId));
-        const sent = await whatsappService.sendMessage(
-          phone,
-          `\u{1F510} \u0631\u0645\u0632 \u0627\u0644\u062F\u062E\u0648\u0644 \u0625\u0644\u0649 ${tenant?.businessName || "\u0627\u0644\u0645\u062A\u062C\u0631"}: *${otp}*
-Your login code: *${otp}*
-
-\u0635\u0627\u0644\u062D \u0644\u0645\u062F\u0629 10 \u062F\u0642\u0627\u0626\u0642. \u0644\u0627 \u062A\u0634\u0627\u0631\u0643\u0647 \u0645\u0639 \u0623\u062D\u062F.`
-        );
-        if (!sent) {
-          return res.status(503).json({ error: "\u062A\u0639\u0630\u0651\u0631 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632 \u0639\u0628\u0631 \u0648\u0627\u062A\u0633\u0627\u0628. \u062A\u0623\u0643\u062F \u0623\u0646 \u0627\u0644\u0631\u0642\u0645 \u0645\u0633\u062C\u0651\u0644 \u0639\u0644\u0649 \u0648\u0627\u062A\u0633\u0627\u0628 \u0648\u0645\u0643\u062A\u0648\u0628 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629\u060C \u0623\u0648 \u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0628\u0640 Google." });
-        }
-        res.json({ success: true, channel: "whatsapp" });
-      } catch (e) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-  app2.post("/api/delivery/auth/verify-otp", async (req, res) => {
-    try {
-      const { phone, tenantId, otp } = req.body;
-      if (!phone || !tenantId || !otp) return res.status(400).json({ error: "phone, tenantId, otp required" });
-      const result = await verifyOtp(phone, Number(tenantId), otp);
-      if (!result.success) return res.status(400).json({ error: result.error });
-      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
-      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
-      res.json({ success: true, token, customer: { id: customer.id, name: customer.name, phone: customer.phone, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post(
-    "/api/delivery/auth/login",
-    rateLimit({ name: "cust-login-ip", max: 15, windowMs: 15 * 60 * 1e3 }),
-    rateLimit({
-      name: "cust-login-email",
-      max: 6,
-      windowMs: 15 * 60 * 1e3,
-      keyFn: (req) => String(req.body?.email || "").toLowerCase().slice(0, 160)
-    }),
-    async (req, res) => {
-      try {
-        const { email, password, tenantId } = req.body;
-        if (!email || !password || !tenantId) return res.status(400).json({ error: "email, password, tenantId required" });
-        const customer = await findCustomerByEmail(email, Number(tenantId));
-        if (!customer) return res.status(401).json({ error: "Invalid credentials" });
-        const valid = await verifyCustomerPassword(customer, password);
-        if (!valid) return res.status(401).json({ error: "Invalid credentials" });
-        const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
-        res.json({ success: true, token, customer: { id: customer.id, name: customer.name, email: customer.email, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
-      } catch (e) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-  app2.post("/api/delivery/auth/register", async (req, res) => {
-    try {
-      const { name, email, phone, password, tenantId, referralCode } = req.body;
-      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
-      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
-      const updates = { name: name || customer.name, hasAccount: true };
-      if (email) updates.email = email;
-      if (password) {
-        await setCustomerPassword(customer.id, password);
-      }
-      await storage.updateCustomer(customer.id, updates);
-      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
-      res.json({ success: true, token, customer: { id: customer.id, name: updates.name, phone } });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/auth/google", async (req, res) => {
-    try {
-      const { credential, accessToken, profile, tenantId } = req.body || {};
-      const tid = Number(tenantId) || 24;
-      const expectedAud = process.env.GOOGLE_CLIENT_ID || "";
-      let payload = null;
-      if (credential) {
-        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-        if (!verifyRes.ok) return res.status(401).json({ error: "Invalid Google credential" });
-        payload = await verifyRes.json();
-        if (expectedAud && payload.aud !== expectedAud) {
-          return res.status(401).json({ error: "Token audience mismatch" });
-        }
-      } else if (accessToken) {
-        const ui = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        if (!ui.ok) return res.status(401).json({ error: "Invalid Google access token" });
-        payload = await ui.json();
-      } else if (profile && profile.email) {
-        return res.status(400).json({ error: "credential or accessToken required" });
-      } else {
-        return res.status(400).json({ error: "credential or accessToken required" });
-      }
-      if (!payload || !payload.email) return res.status(400).json({ error: "Email not present in token" });
-      const email = String(payload.email).toLowerCase();
-      const name = payload.name || payload.given_name || email.split("@")[0];
-      const picture = payload.picture || null;
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { customers: customers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10 } = await import("drizzle-orm");
-      let customer = await findCustomerByEmail(email, tid);
-      if (!customer) {
-        const [inserted] = await db2.insert(customers2).values({
-          tenantId: tid,
-          name,
-          email,
-          hasAccount: true,
-          loyaltyPoints: 0,
-          loyaltyTier: "bronze"
-        }).$returningId();
-        const [created] = await db2.select().from(customers2).where(eq10(customers2.id, inserted.id)).limit(1);
-        customer = created;
-      } else if (!customer.name || customer.name === customer.email) {
-        await storage.updateCustomer(customer.id, { name });
-      }
-      const token = await createCustomerSession(customer.id, tid, req.headers["user-agent"]);
-      res.json({
-        success: true,
-        token,
-        customer: {
-          id: customer.id,
-          name: customer.name || name,
-          email: customer.email,
-          picture,
-          loyaltyPoints: customer.loyaltyPoints,
-          loyaltyTier: customer.loyaltyTier,
-          walletBalance: customer.walletBalance
-        }
-      });
-    } catch (e) {
-      console.error("[google-auth]", e);
-      res.status(500).json({ error: e.message || "Google sign-in failed" });
-    }
-  });
-  app2.post("/api/delivery/auth/logout", async (req, res) => {
-    try {
-      const authHeader = req.headers.authorization;
-      if (authHeader?.startsWith("Bearer ")) {
-        await deleteCustomerSession(authHeader.split(" ")[1]);
-      }
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/auth/me", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      res.json({ customer });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/delivery/auth/me", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { name, email, dateOfBirth, gender, preferredLanguage } = req.body;
-      const updates = {};
-      if (name) updates.name = name;
-      if (email) updates.email = email;
-      if (dateOfBirth) updates.dateOfBirth = dateOfBirth;
-      if (gender) updates.gender = gender;
-      if (preferredLanguage) updates.preferredLanguage = preferredLanguage;
-      await storage.updateCustomer(customer.id, updates);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/addresses", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const addresses = await storage.getCustomerAddresses(customer.id);
-      res.json(addresses);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/addresses", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const address = await storage.createCustomerAddress({ ...req.body, customerId: customer.id, tenantId: customer.tenantId });
-      res.status(201).json(address);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/delivery/addresses/:id", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const address = await storage.updateCustomerAddress(Number(req.params.id), req.body);
-      res.json(address);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/delivery/addresses/:id", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      await storage.deleteCustomerAddress(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/delivery/addresses/:id/default", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      await storage.setDefaultAddress(Number(req.params.id), customer.id);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/restaurants", async (req, res) => {
-    try {
-      const tenantId = req.query.tenantId;
-      const configs = await storage.getAllLandingPageConfigs(tenantId);
-      const restaurants = (configs || []).map((c) => ({
-        id: c.tenantId,
-        slug: c.slug,
-        name: c.storeName || c.restaurantName || "Restaurant",
-        logo: c.logo || c.logomark || null,
-        coverImage: c.coverImage || c.headerBgImage || null,
-        cuisine: c.cuisineType || c.cuisine || "",
-        rating: c.rating || 4.5,
-        reviewCount: c.reviewCount || 0,
-        deliveryTime: c.minDeliveryTime || 25,
-        deliveryFee: c.deliveryFee || 0,
-        minOrder: c.minOrderAmount || 0,
-        isOpen: c.isOpen !== false,
-        primaryColor: c.primaryColor || "#FF5722"
-      }));
-      for (const r of restaurants) {
-        if (r.name === "Restaurant" && r.slug) {
-          r.name = r.slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-        }
-        if (!r.cuisine || !r.coverImage || !r.reviewCount) {
-          try {
-            const cats = await storage.getCategories(r.id);
-            if (!r.cuisine && cats.length > 0) {
-              const catNames = cats.filter((c) => c.isActive !== false).map((c) => c.name).slice(0, 3);
-              r.cuisine = catNames.join(", ");
-            }
-            if (!r.reviewCount) {
-              const prods = await storage.getProductsByTenant(r.id);
-              r.reviewCount = Math.max(50, prods.length * 3);
-            }
-          } catch {
-          }
-        }
-      }
-      res.json(restaurants);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  async function mainBranchCurrency(tenantId) {
-    if (!tenantId) return null;
-    try {
-      const brs = await storage.getBranchesByTenant(Number(tenantId));
-      const main = brs.find((b) => b.isMain) || brs[0];
-      return main?.currency || null;
-    } catch {
-      return null;
-    }
-  }
-  async function resolveSlugConfig(slug) {
-    if (slug === "barmagly") {
-      const config2 = await storage.getLandingPageConfigBySlug("pizza-lemon");
-      if (config2) {
-        config2.storeName = "Kassenta";
-        config2.heroTitle = "Kassenta Delivery";
-      }
-      return config2;
-    }
-    let config = await storage.getLandingPageConfigBySlug(slug);
-    if (config) return config;
-    config = await storage.getLandingPageConfigBySlug("pizza-lemon");
-    if (config) {
-      const displayName = slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-      config.storeName = displayName;
-      config.heroTitle = displayName;
-    }
-    return config;
-  }
-  app2.get("/api/delivery/store/:slug", async (req, res) => {
-    try {
-      const config = await resolveSlugConfig(req.params.slug);
-      if (!config) return res.status(404).json({ error: "Store not found" });
-      const tenant = await storage.getTenant(config.tenantId).catch(() => null);
-      const currency = await mainBranchCurrency(config.tenantId) || config.currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
-      res.setHeader("Cache-Control", "public, max-age=300");
-      res.json({
-        slug: config.slug,
-        tenantId: config.tenantId,
-        storeName: config.storeName || config.heroTitle || tenant?.businessName || "Store",
-        name: config.storeName || config.heroTitle || tenant?.businessName || "Store",
-        primaryColor: config.primaryColor || "#FF5722",
-        accentColor: config.accentColor || "#2FD3C6",
-        currency,
-        phone: config.phone,
-        address: config.address,
-        openingHours: config.openingHours,
-        minOrderAmount: config.minOrderAmount,
-        deliveryFee: config.deliveryFee || 0,
-        estimatedDeliveryTime: config.estimatedDeliveryTime,
-        enableDelivery: config.enableDelivery !== false,
-        enablePickup: config.enablePickup !== false,
-        enableLoyalty: config.enableLoyalty ?? true,
-        enableWallet: config.enableWallet ?? false,
-        enableScheduledOrders: config.enableScheduledOrders ?? true,
-        enablePromos: config.enablePromos ?? true,
-        minDeliveryTime: config.minDeliveryTime ?? 20,
-        maxDeliveryTime: config.maxDeliveryTime ?? 45,
-        bannerImages: config.bannerImages ?? [],
-        promoText: config.promoText,
-        logo: config.heroImage || config.logo,
-        coverImage: config.coverImage || config.headerBgImage,
-        socialWhatsapp: config.socialWhatsapp,
-        supportPhone: config.supportPhone || config.phone || "",
-        rating: config.rating || 4.5,
-        reviewCount: config.reviewCount || 0,
-        cuisine: config.cuisineType || config.cuisine || ""
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/store/:slug/menu", async (req, res) => {
-    try {
-      const config = await resolveSlugConfig(req.params.slug);
-      if (!config) return res.status(404).json({ error: "Store not found" });
-      const [cats, prods] = await Promise.all([
-        storage.getCategories(config.tenantId),
-        storage.getProductsByTenant(config.tenantId)
-      ]);
-      const activeProds = prods.filter((p) => p.isActive !== false).map((p) => ({ ...p, imageUrl: p.imageUrl || p.image || null }));
-      const menu = cats.filter((c) => c.isActive !== false).map((cat) => ({
-        ...cat,
-        items: activeProds.filter((p) => p.categoryId === cat.id)
-      })).filter((cat) => cat.items.length > 0);
-      res.setHeader("Cache-Control", "public, max-age=300").json({ categories: menu, allProducts: activeProds });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/store/:slug/product/:id", async (req, res) => {
-    try {
-      const config = await resolveSlugConfig(req.params.slug);
-      if (!config) return res.status(404).json({ error: "Store not found" });
-      const product = await storage.getProduct(Number(req.params.id));
-      if (!product || product.tenantId !== config.tenantId) return res.status(404).json({ error: "Product not found" });
-      res.json({ ...product, imageUrl: product.imageUrl || product.image || null });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/store/:slug/promos", async (req, res) => {
-    try {
-      const config = await resolveSlugConfig(req.params.slug);
-      if (!config) return res.status(404).json({ error: "Store not found" });
-      const now = /* @__PURE__ */ new Date();
-      const codes = await storage.getPromoCodes ? await storage.getPromoCodes(config.tenantId) : [];
-      const active = codes.filter((c) => c.isActive && (!c.validFrom || new Date(c.validFrom) <= now) && (!c.validUntil || new Date(c.validUntil) >= now));
-      res.json({ promos: active, bannerImages: config.bannerImages ?? [], promoText: config.promoText });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/promo/validate", async (req, res) => {
-    try {
-      const { tenantId, code, orderTotal, orderType, customerId } = req.body;
-      if (!tenantId || !code || orderTotal === void 0) return res.status(400).json({ error: "tenantId, code, orderTotal required" });
-      const result = await validatePromoCode(Number(tenantId), code, Number(orderTotal), orderType || "delivery", customerId ? Number(customerId) : void 0);
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/zones", async (req, res) => {
-    try {
-      const { tenantId } = req.query;
-      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      const zones = await storage.getDeliveryZones(Number(tenantId));
-      res.json(zones);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/orders", async (req, res) => {
-    try {
-      const {
-        tenantId,
-        customerName,
-        customerPhone,
-        customerEmail,
-        customerAddress,
-        items,
-        subtotal,
-        deliveryFee,
-        totalAmount,
-        paymentMethod,
-        orderType,
-        notes,
-        promoCode,
-        promoCodeId,
-        discountAmount,
-        customerLat,
-        customerLng,
-        floor,
-        buildingName,
-        addressNotes,
-        scheduledAt,
-        loyaltyPointsUsed,
-        walletAmountUsed,
-        savedAddressId,
-        tableQrToken,
-        tableNumber
-      } = req.body;
-      if (!tenantId || !customerPhone || !items?.length) {
-        return res.status(400).json({ error: "tenantId, customerPhone, items required" });
-      }
-      const trackingToken = generateTrackingToken();
-      const isDineIn = orderType === "dine_in" && tableQrToken;
-      const orderNumber = isDineIn ? `DIN-${Date.now()}` : `DEL-${Date.now()}`;
-      let finalDiscount = Number(discountAmount ?? 0);
-      let resolvedPromoId = promoCodeId ? Number(promoCodeId) : null;
-      if (promoCode && !promoCodeId) {
-        const promoResult = await validatePromoCode(Number(tenantId), promoCode, Number(subtotal), orderType || "delivery");
-        if (promoResult.valid && promoResult.promoCode) {
-          finalDiscount = promoResult.discountAmount ?? 0;
-          resolvedPromoId = promoResult.promoCode.id;
-        }
-      }
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      let walletUsed = Number(walletAmountUsed ?? 0);
-      if (walletUsed > 0 && customer) {
-        const walletResult = await deductWallet(customer.id, Number(tenantId), walletUsed);
-        if (!walletResult.success) {
-          return res.status(400).json({ error: walletResult.error });
-        }
-      }
-      let pricing2;
-      try {
-        pricing2 = await repriceOrder({
-          tenantId: Number(tenantId),
-          items,
-          clientSubtotal: subtotal,
-          clientDeliveryFee: deliveryFee,
-          clientTotal: totalAmount,
-          discountAmount: finalDiscount,
-          walletUsed,
-          orderType: orderType || "delivery"
-        });
-      } catch (e) {
-        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
-        throw e;
-      }
-      const order = await storage.createOnlineOrder({
-        tenantId: Number(tenantId),
-        orderNumber,
-        customerName: customerName || customerPhone,
-        customerPhone,
-        customerEmail: customerEmail ?? null,
-        customerAddress: customerAddress ?? null,
-        items: pricing2.items,
-        subtotal: pricing2.subtotal.toFixed(2),
-        taxAmount: "0",
-        deliveryFee: pricing2.deliveryFee.toFixed(2),
-        totalAmount: pricing2.totalAmount.toFixed(2),
-        paymentMethod: paymentMethod || "cash",
-        paymentStatus: "pending",
-        status: "pending",
-        orderType: orderType || "delivery",
-        notes: notes ?? null,
-        estimatedTime: 35,
-        language: req.body.language || "en",
-        trackingToken,
-        sourceChannel: isDineIn ? "dine_in_qr" : "web",
-        tableNumber: tableNumber ?? null,
-        tableQrToken: tableQrToken ?? null,
-        promoCodeId: resolvedPromoId ?? void 0,
-        discountAmount: finalDiscount.toFixed(2),
-        customerLat: customerLat ? String(customerLat) : null,
-        customerLng: customerLng ? String(customerLng) : null,
-        floor: floor ?? null,
-        buildingName: buildingName ?? null,
-        addressNotes: addressNotes ?? null,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-        walletAmountUsed: walletUsed.toFixed(2),
-        loyaltyPointsUsed: Number(loyaltyPointsUsed ?? 0),
-        savedAddressId: savedAddressId ? Number(savedAddressId) : null
-      });
-      if (resolvedPromoId && finalDiscount > 0) {
-        await recordPromoUsage(resolvedPromoId, customer?.id, order.id, finalDiscount);
-      }
-      try {
-        const tenantRow = await storage.getTenant(Number(tenantId));
-        const config = await storage.getLandingPageConfigByTenantId(Number(tenantId));
-        const adminPhone = verifiedStorePhone(tenantRow?.metadata) || config?.socialWhatsapp || void 0;
-        whatsappService.orderPlaced(order, Number(tenantId), adminPhone).catch(() => {
-        });
-      } catch (_) {
-      }
-      try {
-        callerIdService.broadcast({
-          type: "new_online_order",
-          order: { id: order.id, orderNumber, customerName, totalAmount, orderType }
-        }, Number(tenantId));
-      } catch (_) {
-      }
-      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken, totalAmount: Number(order.totalAmount) });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/orders/track/:token", async (req, res) => {
-    try {
-      const order = await storage.getOnlineOrderByTrackingToken(req.params.token);
-      if (!order) return res.status(404).json({ error: "Order not found" });
-      if (typeof order.items === "string") {
-        try {
-          order.items = JSON.parse(order.items);
-        } catch {
-          order.items = [];
-        }
-      }
-      if (!Array.isArray(order.items)) order.items = [];
-      let driver = null;
-      if (order.driverId) {
-        driver = await storage.getDriverLocation(order.driverId);
-      }
-      let store = null;
-      try {
-        if (order.tenantId) {
-          const cfg = await storage.getLandingPageConfigByTenantId(Number(order.tenantId));
-          if (cfg) {
-            store = {
-              name: cfg.storeName || cfg.name,
-              primaryColor: cfg.primaryColor || "#FF5722",
-              currency: await mainBranchCurrency(Number(order.tenantId)) || cfg.currency || process.env.DEFAULT_CURRENCY || "CHF",
-              logo: cfg.logo,
-              supportPhone: cfg.supportPhone,
-              slug: cfg.slug
-            };
-          }
-        }
-      } catch (_) {
-      }
-      res.json({ order, driver, store });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/orders/history", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const orders = await storage.getCustomerOrderHistory(customer.id, customer.tenantId);
-      res.json(orders);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/orders/:id/rate", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      const { overallRating, foodRating, deliveryRating, comment } = req.body;
-      if (!overallRating) return res.status(400).json({ error: "overallRating required" });
-      const orderId = Number(req.params.id);
-      const order = await storage.getOnlineOrder(orderId);
-      if (!order) return res.status(404).json({ error: "Order not found" });
-      const rating = await storage.createOrderRating({
-        orderId,
-        customerId: customer?.id ?? null,
-        driverId: order.driverId ?? null,
-        overallRating: Number(overallRating),
-        foodRating: foodRating ? Number(foodRating) : null,
-        deliveryRating: deliveryRating ? Number(deliveryRating) : null,
-        comment: comment ?? null
-      });
-      res.json(rating);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/driver/auth", async (req, res) => {
-    try {
-      const { accessToken } = req.body;
-      if (!accessToken) return res.status(400).json({ error: "accessToken required" });
-      const driver = await storage.getVehicleByAccessToken(accessToken);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      res.json({ driver: { id: driver.id, driverName: driver.driverName, driverPhone: driver.driverPhone, driverStatus: driver.driverStatus } });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  const driverTokenFromRequest = (req) => {
-    const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
-    return (bearer || req.body && req.body.token || req.query && req.query.token || "").trim();
-  };
-  app2.get("/api/delivery/driver/orders", async (req, res) => {
-    try {
-      const token = driverTokenFromRequest(req);
-      if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      const orders = await storage.getDriverActiveOrders(driver.id, driver.tenantId);
-      res.json(orders);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/driver/orders/:id/accept", async (req, res) => {
-    try {
-      const token = driverTokenFromRequest(req);
-      if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      const orderId = Number(req.params.id);
-      await assignDriverToOrder(orderId, driver.id);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/driver/orders/:id/picked-up", async (req, res) => {
-    try {
-      const token = driverTokenFromRequest(req);
-      if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      const orderId = Number(req.params.id);
-      await storage.updateOnlineOrder(orderId, { status: "on_way", riderPickedUpAt: /* @__PURE__ */ new Date() });
-      const order = await storage.getOnlineOrder(orderId);
-      if (order?.customerPhone && order.trackingToken) {
-        try {
-          if (order.tenantId) await whatsappService.orderStatusChanged(order, "on_way", order.tenantId);
-        } catch (_) {
-        }
-      }
-      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "on_way", driverName: driver.driverName }, driver.tenantId);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/driver/orders/:id/delivered", async (req, res) => {
-    try {
-      const token = driverTokenFromRequest(req);
-      if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      const orderId = Number(req.params.id);
-      await storage.updateOnlineOrder(orderId, { status: "delivered", riderDeliveredAt: /* @__PURE__ */ new Date() });
-      await releaseDriver(driver.id);
-      const order = await storage.getOnlineOrder(orderId);
-      if (order) {
-        const customerId = await storage.getCustomerIdByPhone(order.customerPhone, driver.tenantId);
-        if (customerId) {
-          await awardLoyaltyPoints(customerId, driver.tenantId, orderId, Number(order.totalAmount));
-        }
-        if (order.customerPhone && order.tenantId) {
-          whatsappService.orderStatusChanged(order, "delivered", order.tenantId).catch(() => {
-          });
-        }
-      }
-      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "delivered", driverName: driver.driverName }, driver.tenantId);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/driver/status", async (req, res) => {
-    try {
-      const token = driverTokenFromRequest(req);
-      if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      const status = String(req.body?.status || "").trim();
-      if (!["available", "offline", "on_delivery"].includes(status)) {
-        return res.status(400).json({ error: "status must be available | offline | on_delivery" });
-      }
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10 } = await import("drizzle-orm");
-      await db2.update(vehicles2).set({ driverStatus: status, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
-      try {
-        callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId);
-      } catch {
-      }
-      res.json({ success: true, driverStatus: status });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/driver/location", async (req, res) => {
-    try {
-      const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
-      const token = (req.body?.token || bearer || "").trim();
-      const { lat, lng, orderId, status } = req.body || {};
-      if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      if (status && ["available", "offline", "on_delivery"].includes(status)) {
-        try {
-          const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq10 } = await import("drizzle-orm");
-          await db2.update(vehicles2).set({ driverStatus: status, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
-          try {
-            callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId);
-          } catch {
-          }
-        } catch (_) {
-        }
-      }
-      if (lat === void 0 || lat === null || lng === void 0 || lng === null) {
-        return res.json({ success: true, statusOnly: true });
-      }
-      const oid = orderId ? Number(orderId) : void 0;
-      await storage.updateDriverLocation(driver.id, Number(lat), Number(lng), oid);
-      if (oid) {
-        try {
-          await storage.updateOnlineOrder(oid, {
-            driverLat: Number(lat).toFixed(7),
-            driverLng: Number(lng).toFixed(7)
-          });
-        } catch (_) {
-        }
-      }
-      callerIdService.broadcastDriverLocation(driver.tenantId, driver.id, Number(lat), Number(lng), oid);
-      if (oid) {
-        try {
-          const sseMap = app2._orderSseClients;
-          const set = sseMap?.get(oid);
-          if (set && set.size) {
-            const msg = `data: ${JSON.stringify({ type: "driver_location_update", driverLat: Number(lat), driverLng: Number(lng), vehicleId: driver.id })}
-
-`;
-            set.forEach((c) => {
-              try {
-                c.write(msg);
-              } catch {
-              }
-            });
-          }
-        } catch (_) {
-        }
-      }
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/driver/earnings", async (req, res) => {
-    try {
-      const token = driverTokenFromRequest(req);
-      const days = req.query.days || "7";
-      if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token);
-      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      const earnings = await storage.getDriverEarnings(driver.id, Number(days ?? 7));
-      res.json(earnings);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/manage/orders", async (req, res) => {
-    try {
-      const { tenantId, status, orderType } = req.query;
-      const tid = req.tenantId || Number(tenantId);
-      const orders = await storage.getDeliveryOrders(tid, { status, orderType });
-      res.json(orders);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/delivery/manage/orders/:id/assign", async (req, res) => {
-    try {
-      const { vehicleId } = req.body;
-      if (!vehicleId) return res.status(400).json({ error: "vehicleId required" });
-      const orderId = Number(req.params.id);
-      await storage.assignDriverToOrder(orderId, Number(vehicleId));
-      const driver = await storage.getVehicle(Number(vehicleId));
-      const order = await storage.getOnlineOrder(orderId);
-      if (driver?.driverPhone && driver.driverAccessToken && order) {
-        try {
-          await whatsappService.sendMessage(
-            driver.driverPhone,
-            `\u{1F6F5} New delivery assignment!
-Order #${order.orderNumber}
-Customer: ${order.customerName}
-Address: ${order.customerAddress || "Pickup"}
-Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`,
-            order.tenantId || void 0
-          );
-        } catch (_) {
-        }
-      }
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/delivery/manage/orders/:id/status", async (req, res) => {
-    try {
-      const { status } = req.body;
-      if (!status) return res.status(400).json({ error: "status required" });
-      const orderId = Number(req.params.id);
-      await storage.updateOnlineOrder(orderId, { status });
-      const order = await storage.getOnlineOrder(orderId);
-      if (order?.customerPhone && order.tenantId) {
-        try {
-          await whatsappService.orderStatusChanged(order, status, order.tenantId);
-        } catch (_) {
-        }
-      }
-      if (order?.tenantId) {
-        callerIdService.broadcast({ type: "delivery_status_change", orderId, status }, order.tenantId);
-      }
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/manage/drivers", async (req, res) => {
-    try {
-      const tid = req.tenantId;
-      const drivers = await storage.getActiveDrivers(tid);
-      res.json(drivers);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/manage/stats", async (req, res) => {
-    try {
-      const tid = req.tenantId;
-      const stats = await storage.getDeliveryStats(tid);
-      res.json(stats);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/manage/zones", async (req, res) => {
-    try {
-      const tid = req.tenantId;
-      res.json(await storage.getDeliveryZones(tid));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/manage/zones", async (req, res) => {
-    try {
-      const tid = req.tenantId;
-      const zone = await storage.createDeliveryZone({ ...req.body, tenantId: tid });
-      res.status(201).json(zone);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/delivery/manage/zones/:id", async (req, res) => {
-    try {
-      const zone = await storage.updateDeliveryZone(Number(req.params.id), req.body);
-      res.json(zone);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/delivery/manage/zones/:id", async (req, res) => {
-    try {
-      await storage.deleteDeliveryZone(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/promos", async (req, res) => {
-    try {
-      const tid = req.tenantId;
-      res.json(await storage.getPromoCodes(tid));
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/promos", async (req, res) => {
-    try {
-      const tid = req.tenantId;
-      const promo = await storage.createPromoCode({ ...req.body, tenantId: tid });
-      res.status(201).json(promo);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/delivery/promos/:id", async (req, res) => {
-    try {
-      const promo = await storage.updatePromoCode(Number(req.params.id), req.body);
-      res.json(promo);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/delivery/promos/:id", async (req, res) => {
-    try {
-      await storage.deletePromoCode(Number(req.params.id));
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/loyalty/:customerId", async (req, res) => {
-    try {
-      const customerId = Number(req.params.customerId);
-      const [customer, transactions] = await Promise.all([
-        storage.getCustomer(customerId),
-        storage.getLoyaltyTransactions(customerId)
-      ]);
-      if (!customer) return res.status(404).json({ error: "Customer not found" });
-      res.json({ points: customer.loyaltyPoints, tier: customer.loyaltyTier, transactions });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/loyalty/redeem", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { points } = req.body;
-      const result = await redeemLoyaltyPoints(customer.id, customer.tenantId, Number(points));
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/wallet/:customerId", async (req, res) => {
-    try {
-      const customerId = Number(req.params.customerId);
-      const [customer, transactions] = await Promise.all([
-        storage.getCustomer(customerId),
-        storage.getWalletTransactions(customerId)
-      ]);
-      if (!customer) return res.status(404).json({ error: "Customer not found" });
-      res.json({ balance: customer.walletBalance, transactions });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/wallet/topup", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { amount } = req.body;
-      if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "Valid amount required" });
-      const stripe = await getUncachableStripeClient();
-      const intent = await stripe.paymentIntents.create({
-        amount: Math.round(Number(amount) * 100),
-        currency: "chf",
-        metadata: { type: "wallet_topup", customerId: customer.id, tenantId: customer.tenantId }
-      });
-      res.json({ clientSecret: intent.client_secret, paymentIntentId: intent.id });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/referral/:code", async (req, res) => {
-    try {
-      const customer = await storage.getCustomerByReferralCode(req.params.code);
-      if (!customer) return res.status(404).json({ error: "Referral code not found" });
-      res.json({ valid: true, referrerName: customer.name });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/orders/:idOrToken/status-stream", (req, res) => {
-    const idOrToken = req.params.idOrToken;
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders();
-    const heartbeat = setInterval(() => {
-      try {
-        res.write(": heartbeat\n\n");
-      } catch (_) {
-      }
-    }, 25e3);
-    const resolveAndListen = async () => {
-      try {
-        let orderId;
-        if (/^\d+$/.test(idOrToken)) {
-          orderId = Number(idOrToken);
-        } else {
-          const order = await storage.getOnlineOrderByTrackingToken(idOrToken);
-          if (!order) {
-            res.write(`data: ${JSON.stringify({ type: "error", error: "Order not found" })}
-
-`);
-            clearInterval(heartbeat);
-            res.end();
-            return;
-          }
-          orderId = order.id;
-          res.write(`data: ${JSON.stringify({ type: "status_update", order: { id: order.id, status: order.status, orderNumber: order.orderNumber } })}
-
-`);
-        }
-        if (!app2._orderSseClients) {
-          app2._orderSseClients = /* @__PURE__ */ new Map();
-        }
-        const sseMap = app2._orderSseClients;
-        if (!sseMap.has(orderId)) sseMap.set(orderId, /* @__PURE__ */ new Set());
-        sseMap.get(orderId).add(res);
-        req.on("close", () => {
-          clearInterval(heartbeat);
-          sseMap.get(orderId)?.delete(res);
-          if (sseMap.get(orderId)?.size === 0) sseMap.delete(orderId);
-        });
-      } catch (err) {
-        clearInterval(heartbeat);
-        res.end();
-      }
-    };
-    resolveAndListen();
-  });
-  if (!app2._broadcastDeliveryStatus) {
-    app2._broadcastDeliveryStatus = (orderId, payload) => {
-      const sseMap = app2._orderSseClients;
-      if (!sseMap) return;
-      const clients = sseMap.get(orderId);
-      if (!clients) return;
-      const msg = `data: ${JSON.stringify(payload)}
-
-`;
-      clients.forEach((client) => {
-        try {
-          client.write(msg);
-        } catch (_) {
-          clients.delete(client);
-        }
-      });
-    };
-  }
-  app2.post("/api/delivery/orders/:id/reorder", async (req, res) => {
-    try {
-      const orderId = Number(req.params.id);
-      const originalOrder = await storage.getOnlineOrder(orderId);
-      if (!originalOrder) return res.status(404).json({ error: "Order not found" });
-      const trackingToken = generateTrackingToken();
-      const orderNumber = `DEL-${Date.now()}`;
-      const newOrder = await storage.createOnlineOrder({
-        tenantId: originalOrder.tenantId,
-        orderNumber,
-        customerName: originalOrder.customerName,
-        customerPhone: originalOrder.customerPhone,
-        customerEmail: originalOrder.customerEmail ?? null,
-        customerAddress: originalOrder.customerAddress ?? null,
-        items: originalOrder.items,
-        subtotal: originalOrder.subtotal,
-        taxAmount: "0",
-        deliveryFee: originalOrder.deliveryFee ?? "0",
-        totalAmount: originalOrder.totalAmount,
-        paymentMethod: originalOrder.paymentMethod || "cash",
-        paymentStatus: "pending",
-        status: "pending",
-        orderType: originalOrder.orderType || "delivery",
-        notes: originalOrder.notes ?? null,
-        estimatedTime: 35,
-        language: originalOrder.language || "en",
-        trackingToken,
-        sourceChannel: "web"
-      });
-      try {
-        callerIdService.broadcast({
-          type: "new_online_order",
-          order: { id: newOrder.id, orderNumber, customerName: originalOrder.customerName, totalAmount: originalOrder.totalAmount, orderType: originalOrder.orderType }
-        }, originalOrder.tenantId);
-      } catch (_) {
-      }
-      res.status(201).json({ success: true, orderId: newOrder.id, orderNumber, trackingToken });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/favorites", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { customerFavorites: customerFavorites2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7 } = await import("drizzle-orm");
-      const favs = await db2.select({
-        id: customerFavorites2.id,
-        productId: customerFavorites2.productId,
-        createdAt: customerFavorites2.createdAt,
-        productName: products2.name,
-        productNameAr: products2.nameAr,
-        productPrice: products2.price,
-        productImage: products2.image,
-        productDescription: products2.description
-      }).from(customerFavorites2).innerJoin(products2, eq10(products2.id, customerFavorites2.productId)).where(and7(eq10(customerFavorites2.customerId, customer.id), eq10(customerFavorites2.tenantId, customer.tenantId)));
-      res.json(favs);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/favorites", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { productId } = req.body;
-      if (!productId) return res.status(400).json({ error: "productId required" });
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const [fav] = await db2.insert(customerFavorites2).values({
-        tenantId: customer.tenantId,
-        customerId: customer.id,
-        productId: Number(productId)
-      }).$returningId();
-      res.status(201).json({ id: fav.id, productId: Number(productId) });
-    } catch (e) {
-      if (e.code === "ER_DUP_ENTRY") return res.status(409).json({ error: "Already in favorites" });
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.delete("/api/delivery/favorites/:id", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7 } = await import("drizzle-orm");
-      await db2.delete(customerFavorites2).where(
-        and7(eq10(customerFavorites2.id, Number(req.params.id)), eq10(customerFavorites2.customerId, customer.id))
-      );
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/search", async (req, res) => {
-    try {
-      const q7 = (req.query.q || "").trim();
-      const tenantId = Number(req.query.tenantId);
-      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      if (!q7) return res.json([]);
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, or: or5, like: like2, sql: sql8 } = await import("drizzle-orm");
-      const pattern = `%${q7}%`;
-      const results = await db2.select({
-        id: products2.id,
-        name: products2.name,
-        nameAr: products2.nameAr,
-        description: products2.description,
-        price: products2.price,
-        image: products2.image,
-        categoryId: products2.categoryId,
-        categoryName: categories2.name
-      }).from(products2).leftJoin(categories2, eq10(categories2.id, products2.categoryId)).where(and7(
-        eq10(products2.tenantId, tenantId),
-        eq10(products2.isActive, true),
-        or5(
-          like2(products2.name, pattern),
-          like2(products2.nameAr, pattern),
-          like2(products2.description, pattern)
-        )
-      )).limit(50);
-      res.json(results);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/help/faq", async (req, res) => {
-    try {
-      const tenantId = Number(req.query.tenantId);
-      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { faqEntries: faqEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, asc } = await import("drizzle-orm");
-      const faqs = await db2.select().from(faqEntries2).where(and7(eq10(faqEntries2.tenantId, tenantId), eq10(faqEntries2.isActive, true))).orderBy(asc(faqEntries2.sortOrder));
-      res.json(faqs);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/delivery/help/ticket", async (req, res) => {
-    try {
-      const { subject, message, orderId, tenantId } = req.body;
-      if (!subject || !message || !tenantId) return res.status(400).json({ error: "subject, message, tenantId required" });
-      const customer = await getAuthenticatedCustomer(req.headers.authorization).catch(() => null);
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const [ticket] = await db2.insert(helpTickets2).values({
-        tenantId: Number(tenantId),
-        customerId: customer?.id ?? null,
-        orderId: orderId ? Number(orderId) : null,
-        subject,
-        message,
-        status: "open",
-        priority: "normal"
-      }).$returningId();
-      res.status(201).json({ id: ticket.id, status: "open" });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/help/tickets", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, desc: desc5 } = await import("drizzle-orm");
-      const tickets = await db2.select().from(helpTickets2).where(and7(eq10(helpTickets2.customerId, customer.id), eq10(helpTickets2.tenantId, customer.tenantId))).orderBy(desc5(helpTickets2.createdAt));
-      res.json(tickets);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/recently-ordered", async (req, res) => {
-    try {
-      const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { onlineOrders: onlineOrders2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, desc: desc5 } = await import("drizzle-orm");
-      const orders = await db2.select({ items: onlineOrders2.items }).from(onlineOrders2).where(and7(
-        eq10(onlineOrders2.customerPhone, customer.phone),
-        eq10(onlineOrders2.tenantId, customer.tenantId)
-      )).orderBy(desc5(onlineOrders2.createdAt)).limit(20);
-      const seenIds = /* @__PURE__ */ new Set();
-      const recentItems = [];
-      for (const order of orders) {
-        const items = order.items || [];
-        for (const item of items) {
-          if (item.productId && !seenIds.has(item.productId)) {
-            seenIds.add(item.productId);
-            recentItems.push({ productId: item.productId, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice });
-          }
-        }
-      }
-      const enriched = [];
-      for (const item of recentItems.slice(0, 20)) {
-        const [product] = await db2.select({ id: products2.id, name: products2.name, nameAr: products2.nameAr, price: products2.price, image: products2.image, isActive: products2.isActive }).from(products2).where(eq10(products2.id, item.productId)).limit(1);
-        enriched.push({
-          productId: item.productId,
-          name: product?.name || item.name,
-          nameAr: product?.nameAr || null,
-          price: product?.price || String(item.unitPrice),
-          image: product?.image || null,
-          isActive: product?.isActive ?? true,
-          lastOrderedQuantity: item.quantity
-        });
-      }
-      res.json(enriched);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/sitemap.xml", async (_req, res) => {
-    try {
-      const configs = await storage.getAllLandingPageConfigs();
-      const baseUrl = process.env.APP_URL || "https://kassenta.com";
-      let xml = `<?xml version="1.0" encoding="UTF-8"?>
-`;
-      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-`;
-      for (const config of configs || []) {
-        if (!config.slug) continue;
-        xml += `  <url>
-`;
-        xml += `    <loc>${baseUrl}/order/${config.slug}</loc>
-`;
-        xml += `    <changefreq>daily</changefreq>
-`;
-        xml += `    <priority>0.8</priority>
-`;
-        xml += `  </url>
-`;
-      }
-      xml += `</urlset>`;
-      res.set("Content-Type", "application/xml");
-      res.send(xml);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/order-ratings", async (req, res) => {
-    try {
-      const tid = req.tenantId;
-      const ratings = await storage.getOrderRatings(tid);
-      res.json(ratings);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/delivery/store/:slug/reviews", async (req, res) => {
-    try {
-      const slug = req.params.slug;
-      const page = parseInt(req.query.page) || 1;
-      const limit = Math.min(parseInt(req.query.limit) || 10, 50);
-      const config = await resolveSlugConfig(slug);
-      const tenant = config ? await storage.getTenant(config.tenantId).catch(() => null) : null;
-      if (!tenant) {
-        return res.json({ reviews: [], summary: { avgRating: 0, totalReviews: 0, distribution: {} } });
-      }
-      const ratings = await storage.getOrderRatings(tenant.id);
-      const total = ratings.length;
-      const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-      let sum2 = 0;
-      for (const r of ratings) {
-        const star = Math.round(r.overallRating || r.foodRating || 0);
-        if (star >= 1 && star <= 5) distribution[star]++;
-        sum2 += r.overallRating || r.foodRating || 0;
-      }
-      const avgRating = total > 0 ? sum2 / total : 0;
-      const offset = (page - 1) * limit;
-      const pagedRatings = ratings.slice(offset, offset + limit);
-      const reviews = pagedRatings.map((r) => ({
-        id: r.id,
-        rating: r.overallRating || r.foodRating || 0,
-        comment: r.comment || "",
-        customerName: r.customerName || "Customer",
-        createdAt: r.createdAt,
-        orderItems: r.orderItems || ""
-      }));
-      res.json({
-        reviews,
-        summary: { avgRating: Math.round(avgRating * 10) / 10, totalReviews: total, distribution },
-        page,
-        limit,
-        hasMore: offset + limit < total
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  const _recoCache = /* @__PURE__ */ new Map();
-  const RECO_TTL = 5 * 60 * 1e3;
-  app2.get("/api/delivery/recommendations", async (req, res) => {
-    try {
-      const tid = parseInt(req.query.tenantId) || req.tenantId;
-      if (!tid) return res.json({ popular: [], recentlyOrdered: [] });
-      const cacheKey = `reco_${tid}`;
-      const cached2 = _recoCache.get(cacheKey);
-      if (cached2 && Date.now() - cached2.ts < RECO_TTL) {
-        return res.json(cached2.data);
-      }
-      const products2 = await storage.getProductsByTenant(tid);
-      const popular = products2.filter((p) => p.isActive !== false && parseFloat(p.price || "0") > 0).sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0)).slice(0, 10).map((p) => ({
-        id: p.id,
-        name: p.name,
-        nameAr: p.nameAr,
-        price: p.price,
-        imageUrl: p.imageUrl,
-        categoryId: p.categoryId
-      }));
-      const result = { popular, recentlyOrdered: [] };
-      _recoCache.set(cacheKey, { data: result, ts: Date.now() });
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/robots.txt", (_req, res) => {
-    res.type("text/plain").send(
-      `User-agent: *
-Allow: /api/order/
-Allow: /api/restaurants
-Disallow: /api/delivery/
-Sitemap: https://kassenta.com/api/delivery/sitemap.xml
-`
-    );
-  });
-  const httpServer = (0, import_node_http.createServer)(app2);
-  return httpServer;
-}
-
-// server/superAdminRoutes.ts
-var bcrypt7 = __toESM(require("bcrypt"));
-var crypto7 = __toESM(require("crypto"));
-var fs4 = __toESM(require("fs"));
-var path3 = __toESM(require("path"));
-init_storage();
-var import_date_fns5 = require("date-fns");
-init_db();
-var import_drizzle_orm7 = require("drizzle-orm");
 
 // server/paymentService.ts
 init_db();
@@ -14172,6 +9735,16 @@ async function currencyFor(tenantId) {
   if (!tenantId) return DEFAULT_CURRENCY;
   try {
     const rows = await q3(
+      `SELECT currency FROM branches WHERE tenant_id = ? AND currency IS NOT NULL AND currency <> ''
+        ORDER BY is_main DESC, id LIMIT 1`,
+      [tenantId]
+    );
+    const c = rows[0]?.currency;
+    if (c) return String(c).toLowerCase();
+  } catch {
+  }
+  try {
+    const rows = await q3(
       `SELECT currency FROM payment_gateway_settings WHERE tenant_id IN (?, 0)
         ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId]
@@ -14182,7 +9755,14 @@ async function currencyFor(tenantId) {
     return DEFAULT_CURRENCY;
   }
 }
+var CARD_UNSUPPORTED = /* @__PURE__ */ new Set(["syp", "irr", "kpw", "cup", "sdg"]);
+function cardSupported(currency) {
+  return !CARD_UNSUPPORTED.has(String(currency || "").toLowerCase());
+}
 async function buildIntent(opts) {
+  if (!cardSupported(opts.currency)) {
+    throw badRequest("\u0627\u0644\u062F\u0641\u0639 \u0628\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u062A\u062C\u0631 \u2014 \u0627\u062F\u0641\u0639 \u0646\u0642\u062F\u0627\u064B \u0623\u0648 \u0639\u0628\u0631 \u0634\u0627\u0645 \u0643\u0627\u0634. / Card payment is not available for this store.");
+  }
   const stripe = await requireStripeClient();
   const metadata = { [MK.kind]: opts.kind };
   if (opts.tenantId) metadata[MK.tenantId] = String(opts.tenantId);
@@ -14432,8 +10012,6306 @@ async function createCheckoutSession(opts) {
   return { id: session.id, url: session.url, amount: amountMinor, currency };
 }
 
+// server/wholesale.ts
+init_db();
+init_storeTime();
+async function q4(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return Array.isArray(rows) ? rows : [];
+}
+var WholesaleError = class extends Error {
+  statusCode;
+  code;
+  details;
+  constructor(message, statusCode = 400, code, details) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+};
+var COLUMNS = [
+  ["products", "wholesale_price", "decimal(12,2) NULL DEFAULT NULL"],
+  ["products", "wholesale_min_qty", "int NULL DEFAULT NULL"],
+  ["customers", "customer_type", "varchar(20) NOT NULL DEFAULT 'retail'"],
+  ["customers", "shop_name", "varchar(160) NULL DEFAULT NULL"],
+  ["customers", "tax_number", "varchar(64) NULL DEFAULT NULL"],
+  ["customers", "credit_limit", "decimal(14,2) NULL DEFAULT NULL"],
+  ["customers", "wholesale_balance", "decimal(14,2) NOT NULL DEFAULT 0"]
+];
+var PAYMENTS_TABLE = `
+  CREATE TABLE IF NOT EXISTS wholesale_payments (
+    id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    tenant_id int NOT NULL,
+    customer_id int NOT NULL,
+    kind varchar(20) NOT NULL DEFAULT 'payment',
+    amount decimal(14,2) NOT NULL,
+    method varchar(30) NULL DEFAULT NULL,
+    note varchar(500) NULL DEFAULT NULL,
+    sale_id int NULL DEFAULT NULL,
+    return_id int NULL DEFAULT NULL,
+    employee_id int NULL DEFAULT NULL,
+    balance_after decimal(14,2) NULL DEFAULT NULL,
+    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY ix_wp_tenant (tenant_id, created_at),
+    KEY ix_wp_customer (customer_id, created_at),
+    KEY ix_wp_sale (sale_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
+async function columnExists2(table, column) {
+  const rows = await q4(
+    `SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [table, column]
+  );
+  return rows.length > 0;
+}
+async function indexExists2(table, index) {
+  const rows = await q4(
+    `SELECT 1 FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
+    [table, index]
+  );
+  return rows.length > 0;
+}
+async function runWholesaleMigrations() {
+  let added = 0;
+  for (const [table, column, def] of COLUMNS) {
+    try {
+      if (await columnExists2(table, column)) continue;
+      await q4(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${def}`);
+      added++;
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (!/duplicate column/i.test(msg)) console.error(`[wholesale] ${table}.${column}: ${msg}`);
+    }
+  }
+  try {
+    await q4(PAYMENTS_TABLE);
+  } catch (e) {
+    console.error("[wholesale] wholesale_payments:", e?.message || e);
+  }
+  try {
+    if (!await indexExists2("customers", "ix_customers_tenant_type")) {
+      await q4(`ALTER TABLE customers ADD INDEX ix_customers_tenant_type (tenant_id, customer_type)`);
+    }
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (!/duplicate key name/i.test(msg)) console.error("[wholesale] customers index:", msg);
+  }
+  console.log(added > 0 ? `[wholesale] added ${added} column(s)` : "[wholesale] schema up to date");
+}
+var MAX_AMOUNT_CENTS = 1e13;
+function toCents(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+var fromCents = (c) => (c / 100).toFixed(2);
+var num2 = (v) => v == null ? 0 : Number(v) || 0;
+var numOrNull = (v) => v == null || v === "" ? null : Number(v);
+function parsePositiveAmount(v, field = "amount") {
+  const raw = typeof v === "string" ? v.trim().replace(",", ".") : v;
+  const n = Number(raw);
+  if (raw === "" || raw == null || !Number.isFinite(n)) {
+    throw new WholesaleError(`${field} must be a number`, 400, "INVALID_AMOUNT");
+  }
+  const cents = Math.round(n * 100);
+  if (cents <= 0) throw new WholesaleError(`${field} must be greater than zero`, 400, "INVALID_AMOUNT");
+  if (cents > MAX_AMOUNT_CENTS) throw new WholesaleError(`${field} is too large`, 400, "INVALID_AMOUNT");
+  return cents;
+}
+function parseOptionalMoney(v, field) {
+  if (v === void 0 || v === null) return null;
+  const raw = typeof v === "string" ? v.trim().replace(",", ".") : v;
+  if (raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) throw new WholesaleError(`${field} must be zero or more`, 400, "INVALID_AMOUNT");
+  const cents = Math.round(n * 100);
+  if (cents > MAX_AMOUNT_CENTS) throw new WholesaleError(`${field} is too large`, 400, "INVALID_AMOUNT");
+  return cents;
+}
+var clip = (v, n) => {
+  const t2 = String(v ?? "").trim();
+  return t2 ? t2.slice(0, n) : null;
+};
+function normalizeWholesaleProductFields(body) {
+  if (!body || typeof body !== "object") return body;
+  const b = body;
+  if ("wholesalePrice" in b) {
+    const cents = parseOptionalMoney(b.wholesalePrice, "wholesalePrice");
+    b.wholesalePrice = cents == null ? null : fromCents(cents);
+  }
+  if ("wholesaleMinQty" in b) {
+    const raw = b.wholesaleMinQty;
+    if (raw === "" || raw == null) {
+      b.wholesaleMinQty = null;
+    } else {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 1 || n > 1e6) {
+        throw new WholesaleError("wholesaleMinQty must be a whole number of at least 1", 400, "INVALID_QTY");
+      }
+      b.wholesaleMinQty = n;
+    }
+  }
+  return body;
+}
+function stripProtectedCustomerFields(body) {
+  if (!body || typeof body !== "object") return body;
+  const b = { ...body };
+  delete b.wholesaleBalance;
+  delete b.wholesale_balance;
+  delete b.creditLimit;
+  delete b.credit_limit;
+  delete b.customerType;
+  delete b.customer_type;
+  return b;
+}
+function mapTrader(r) {
+  const balance = num2(r.wholesale_balance);
+  const creditLimit = numOrNull(r.credit_limit);
+  return {
+    id: Number(r.id),
+    name: r.name,
+    shopName: r.shop_name ?? null,
+    phone: r.phone ?? null,
+    email: r.email ?? null,
+    address: r.address ?? null,
+    taxNumber: r.tax_number ?? null,
+    notes: r.notes ?? null,
+    creditLimit,
+    balance,
+    availableCredit: creditLimit == null ? null : Math.max(0, (toCents(creditLimit) - toCents(balance)) / 100),
+    overLimit: creditLimit != null && toCents(balance) > toCents(creditLimit),
+    isActive: r.is_active == null ? true : !!Number(r.is_active),
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+    lastPaymentAt: r.last_payment_at ? new Date(r.last_payment_at).toISOString() : null,
+    lastCreditSaleAt: r.last_credit_sale_at ? new Date(r.last_credit_sale_at).toISOString() : null
+  };
+}
+var TRADER_COLUMNS = `c.id, c.name, c.shop_name, c.phone, c.email, c.address, c.tax_number, c.notes,
+  c.credit_limit, c.wholesale_balance, c.is_active, c.created_at`;
+async function listTraders(tenantId, opts = {}) {
+  const where = ["c.tenant_id = ?", "c.customer_type = 'wholesale'"];
+  const params = [tenantId];
+  if (!opts.includeInactive) where.push("(c.is_active = 1 OR c.is_active IS NULL)");
+  const s = String(opts.search ?? "").trim();
+  if (s) {
+    const like2 = `%${s.slice(0, 80)}%`;
+    where.push("(c.name LIKE ? OR c.shop_name LIKE ? OR c.phone LIKE ? OR c.tax_number LIKE ?)");
+    params.push(like2, like2, like2, like2);
+  }
+  const rows = await q4(
+    `SELECT ${TRADER_COLUMNS},
+       (SELECT MAX(p.created_at) FROM wholesale_payments p
+         WHERE p.customer_id = c.id AND p.kind = 'payment') AS last_payment_at,
+       (SELECT MAX(s.created_at) FROM sales s
+         WHERE s.customer_id = c.id AND s.payment_method = 'credit') AS last_credit_sale_at
+     FROM customers c
+     WHERE ${where.join(" AND ")}
+     ORDER BY c.wholesale_balance DESC, c.name ASC
+     LIMIT 1000`,
+    params
+  );
+  return rows.map(mapTrader);
+}
+async function getTrader(tenantId, id) {
+  const rows = await q4(
+    `SELECT ${TRADER_COLUMNS} FROM customers c
+      WHERE c.id = ? AND c.tenant_id = ? AND c.customer_type = 'wholesale' LIMIT 1`,
+    [id, tenantId]
+  );
+  if (!rows[0]) throw new WholesaleError("Trader not found", 404, "NOT_FOUND");
+  return mapTrader(rows[0]);
+}
+async function withTx(fn) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const out = await fn(conn);
+    await conn.commit();
+    return out;
+  } catch (e) {
+    try {
+      await conn.rollback();
+    } catch {
+    }
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+async function cq(conn, sqlText, params = []) {
+  const [rows] = await conn.query(sqlText, params);
+  return rows;
+}
+async function lockTrader(conn, tenantId, customerId, requireWholesale = true) {
+  const rows = await cq(
+    conn,
+    `SELECT id, name, customer_type, is_active, credit_limit, wholesale_balance
+       FROM customers WHERE id = ? AND tenant_id = ? FOR UPDATE`,
+    [customerId, tenantId]
+  );
+  const row = rows?.[0];
+  if (!row) throw new WholesaleError("Trader not found", 404, "NOT_FOUND");
+  if (requireWholesale && row.customer_type !== "wholesale") {
+    throw new WholesaleError("This customer is not a wholesale trader", 409, "NOT_WHOLESALE");
+  }
+  return row;
+}
+async function createTrader(tenantId, input, employeeId) {
+  const name = clip(input.name, 160);
+  const limitCents = parseOptionalMoney(input.creditLimit, "creditLimit");
+  const openingCents = parseOptionalMoney(input.openingBalance, "openingBalance") ?? 0;
+  const existingId = input.customerId != null && input.customerId !== "" ? Number(input.customerId) : null;
+  if (existingId != null && !Number.isInteger(existingId)) throw new WholesaleError("Invalid customerId", 400);
+  if (!name && existingId == null) throw new WholesaleError("Name is required", 400, "NAME_REQUIRED");
+  const id = await withTx(async (conn) => {
+    let customerId;
+    if (existingId != null) {
+      const row = await lockTrader(conn, tenantId, existingId, false);
+      if (row.customer_type === "wholesale") {
+        throw new WholesaleError("This customer is already a wholesale trader", 409, "ALREADY_WHOLESALE");
+      }
+      await cq(
+        conn,
+        `UPDATE customers SET customer_type = 'wholesale',
+            name = COALESCE(?, name), shop_name = ?, tax_number = ?, credit_limit = ?,
+            phone = COALESCE(?, phone), email = COALESCE(?, email), address = COALESCE(?, address),
+            notes = COALESCE(?, notes), is_active = 1, wholesale_balance = 0
+          WHERE id = ? AND tenant_id = ?`,
+        [
+          name,
+          clip(input.shopName, 160),
+          clip(input.taxNumber, 64),
+          limitCents == null ? null : fromCents(limitCents),
+          clip(input.phone, 40),
+          clip(input.email, 160),
+          clip(input.address, 500),
+          clip(input.notes, 1e3),
+          existingId,
+          tenantId
+        ]
+      );
+      customerId = existingId;
+    } else {
+      const res = await cq(
+        conn,
+        `INSERT INTO customers
+           (tenant_id, name, phone, email, address, notes, customer_type, shop_name, tax_number,
+            credit_limit, wholesale_balance, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, 'wholesale', ?, ?, ?, 0, 1)`,
+        [
+          tenantId,
+          name,
+          clip(input.phone, 40),
+          clip(input.email, 160),
+          clip(input.address, 500),
+          clip(input.notes, 1e3),
+          clip(input.shopName, 160),
+          clip(input.taxNumber, 64),
+          limitCents == null ? null : fromCents(limitCents)
+        ]
+      );
+      customerId = Number(res.insertId);
+    }
+    if (openingCents > 0) {
+      await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(openingCents), customerId]);
+      await cq(
+        conn,
+        `INSERT INTO wholesale_payments
+           (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
+         VALUES (?, ?, 'charge', ?, 'opening', ?, ?, ?)`,
+        [tenantId, customerId, fromCents(openingCents), "Opening balance", employeeId, fromCents(openingCents)]
+      );
+    }
+    return customerId;
+  });
+  return getTrader(tenantId, id);
+}
+async function updateTrader(tenantId, id, input) {
+  await getTrader(tenantId, id);
+  const sets = [];
+  const params = [];
+  const text2 = (key, col2, max) => {
+    if (input[key] !== void 0) {
+      sets.push(`${col2} = ?`);
+      params.push(clip(input[key], max));
+    }
+  };
+  if (input.name !== void 0) {
+    const name = clip(input.name, 160);
+    if (!name) throw new WholesaleError("Name is required", 400, "NAME_REQUIRED");
+    sets.push("name = ?");
+    params.push(name);
+  }
+  text2("shopName", "shop_name", 160);
+  text2("phone", "phone", 40);
+  text2("email", "email", 160);
+  text2("address", "address", 500);
+  text2("taxNumber", "tax_number", 64);
+  text2("notes", "notes", 1e3);
+  if (input.creditLimit !== void 0) {
+    const cents = parseOptionalMoney(input.creditLimit, "creditLimit");
+    sets.push("credit_limit = ?");
+    params.push(cents == null ? null : fromCents(cents));
+  }
+  if (input.isActive !== void 0) {
+    sets.push("is_active = ?");
+    params.push(input.isActive ? 1 : 0);
+  }
+  if (sets.length > 0) {
+    params.push(id, tenantId);
+    await q4(`UPDATE customers SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ? AND customer_type = 'wholesale'`, params);
+  }
+  return getTrader(tenantId, id);
+}
+async function deactivateTrader(tenantId, id) {
+  return updateTrader(tenantId, id, { isActive: false });
+}
+var PAYMENT_METHODS = ["cash", "card", "transfer", "shamcash", "cheque", "other"];
+async function recordPayment(tenantId, customerId, body, employeeId) {
+  const cents = parsePositiveAmount(body.amount);
+  const method = String(body.method || "cash").toLowerCase();
+  if (!PAYMENT_METHODS.includes(method)) {
+    throw new WholesaleError("Unknown payment method", 400, "INVALID_METHOD");
+  }
+  return withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, customerId);
+    const balance = toCents(row.wholesale_balance);
+    if (cents > balance) {
+      throw new WholesaleError("Amount exceeds the outstanding balance", 409, "OVERPAYMENT", {
+        balance: balance / 100
+      });
+    }
+    const next = balance - cents;
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), customerId]);
+    const res = await cq(
+      conn,
+      `INSERT INTO wholesale_payments
+         (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
+       VALUES (?, ?, 'payment', ?, ?, ?, ?, ?)`,
+      [tenantId, customerId, fromCents(cents), method, clip(body.note, 500), employeeId, fromCents(next)]
+    );
+    return { id: Number(res.insertId), amount: cents / 100, method, balance: next / 100 };
+  });
+}
+async function recordCharge(tenantId, customerId, body, employeeId) {
+  const cents = parsePositiveAmount(body.amount);
+  return withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, customerId);
+    const next = toCents(row.wholesale_balance) + cents;
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), customerId]);
+    const res = await cq(
+      conn,
+      `INSERT INTO wholesale_payments
+         (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
+       VALUES (?, ?, 'charge', ?, 'manual', ?, ?, ?)`,
+      [tenantId, customerId, fromCents(cents), clip(body.note, 500), employeeId, fromCents(next)]
+    );
+    return { id: Number(res.insertId), amount: cents / 100, balance: next / 100 };
+  });
+}
+async function voidLedgerEntry(tenantId, entryId) {
+  const rows = await q4(
+    `SELECT id, customer_id, kind, amount FROM wholesale_payments WHERE id = ? AND tenant_id = ? LIMIT 1`,
+    [entryId, tenantId]
+  );
+  const entry = rows[0];
+  if (!entry) throw new WholesaleError("Entry not found", 404, "NOT_FOUND");
+  if (entry.kind === "return") {
+    throw new WholesaleError("Returns are reversed from the returns screen", 409, "NOT_VOIDABLE");
+  }
+  return withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, Number(entry.customer_id));
+    const amount = toCents(entry.amount);
+    const next = toCents(row.wholesale_balance) + (entry.kind === "charge" ? -amount : amount);
+    const del = await cq(conn, `DELETE FROM wholesale_payments WHERE id = ? AND tenant_id = ?`, [entryId, tenantId]);
+    if (!del?.affectedRows) throw new WholesaleError("Entry not found", 404, "NOT_FOUND");
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), row.id]);
+    return { balance: next / 100 };
+  });
+}
+async function holdCreditForSale(tenantId, customerId, totalAmount) {
+  if (!tenantId) throw new WholesaleError("Store not identified", 401, "NO_TENANT");
+  const cid = Number(customerId);
+  if (!customerId || !Number.isInteger(cid) || cid <= 0) {
+    throw new WholesaleError("A credit sale needs a wholesale trader as the customer", 400, "CUSTOMER_REQUIRED");
+  }
+  const cents = parsePositiveAmount(totalAmount, "totalAmount");
+  await withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, cid);
+    if (row.is_active != null && !Number(row.is_active)) {
+      throw new WholesaleError("This trader account is deactivated", 409, "TRADER_INACTIVE");
+    }
+    const balance = toCents(row.wholesale_balance);
+    const next = balance + cents;
+    if (row.credit_limit != null) {
+      const limit = toCents(row.credit_limit);
+      if (next > limit) {
+        throw new WholesaleError("Credit limit exceeded", 409, "CREDIT_LIMIT", {
+          balance: balance / 100,
+          creditLimit: limit / 100,
+          available: Math.max(0, limit - balance) / 100
+        });
+      }
+    }
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), cid]);
+  });
+  return { tenantId, customerId: cid, cents };
+}
+async function releaseCreditHold(hold) {
+  try {
+    await q4(
+      `UPDATE customers SET wholesale_balance = wholesale_balance - ? WHERE id = ? AND tenant_id = ?`,
+      [fromCents(hold.cents), hold.customerId, hold.tenantId]
+    );
+  } catch (e) {
+    console.error("[wholesale] could not release credit hold", hold, e?.message || e);
+  }
+}
+async function creditSaleOfTenant(tenantId, saleId) {
+  const rows = await q4(
+    `SELECT s.id, s.customer_id, s.total_amount, s.receipt_number
+       FROM sales s JOIN customers c ON c.id = s.customer_id
+      WHERE s.id = ? AND s.payment_method = 'credit' AND c.tenant_id = ? LIMIT 1`,
+    [saleId, tenantId]
+  );
+  return rows[0] ?? null;
+}
+async function reverseCreditSale(tenantId, saleId) {
+  if (!tenantId || !Number.isInteger(saleId)) return;
+  const sale = await creditSaleOfTenant(tenantId, saleId);
+  if (!sale) return;
+  await withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, Number(sale.customer_id), false);
+    const ret = await cq(
+      conn,
+      `SELECT COALESCE(SUM(amount), 0) AS returned FROM wholesale_payments
+        WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`,
+      [saleId, tenantId]
+    );
+    const outstanding = Math.max(0, toCents(sale.total_amount) - toCents(ret?.[0]?.returned));
+    await cq(conn, `DELETE FROM wholesale_payments WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`, [saleId, tenantId]);
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [
+      fromCents(toCents(row.wholesale_balance) - outstanding),
+      row.id
+    ]);
+  });
+}
+async function creditReturnForSale(tenantId, saleId, returnId, returnTotal, employeeId) {
+  const sid = Number(saleId);
+  if (!tenantId || !Number.isInteger(sid) || sid <= 0) return;
+  const requested = Math.abs(toCents(returnTotal));
+  if (requested <= 0) return;
+  const sale = await creditSaleOfTenant(tenantId, sid);
+  if (!sale) return;
+  await withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, Number(sale.customer_id), false);
+    const ret = await cq(
+      conn,
+      `SELECT COALESCE(SUM(amount), 0) AS returned FROM wholesale_payments
+        WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`,
+      [sid, tenantId]
+    );
+    const left = Math.max(0, toCents(sale.total_amount) - toCents(ret?.[0]?.returned));
+    const cents = Math.min(requested, left);
+    if (cents <= 0) return;
+    const next = toCents(row.wholesale_balance) - cents;
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), row.id]);
+    await cq(
+      conn,
+      `INSERT INTO wholesale_payments
+         (tenant_id, customer_id, kind, amount, method, note, sale_id, return_id, employee_id, balance_after)
+       VALUES (?, ?, 'return', ?, 'return', ?, ?, ?, ?, ?)`,
+      [
+        tenantId,
+        row.id,
+        fromCents(cents),
+        `Return on ${sale.receipt_number || `#${sid}`}`,
+        sid,
+        returnId,
+        employeeId,
+        fromCents(next)
+      ]
+    );
+  });
+}
+function parseDate(v, endOfDay = false, tz = "Europe/Zurich") {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? endOfDay ? dayEnd(tz, s) : dayStart(tz, s) : new Date(s);
+  if (Number.isNaN(d.getTime())) throw new WholesaleError("Invalid date", 400, "INVALID_DATE");
+  return d;
+}
+async function getStatement(tenantId, customerId, fromRaw, toRaw) {
+  const trader = await getTrader(tenantId, customerId);
+  const tz = await storeTimeZone(tenantId);
+  const from = parseDate(fromRaw, false, tz);
+  const to = parseDate(toRaw, true, tz);
+  const saleRows = await q4(
+    `SELECT id, receipt_number, total_amount, created_at FROM sales
+      WHERE customer_id = ? AND payment_method = 'credit' ${from ? "AND created_at >= ?" : ""}
+      ORDER BY created_at ASC, id ASC`,
+    from ? [customerId, from] : [customerId]
+  );
+  const ledgerRows = await q4(
+    `SELECT id, kind, amount, method, note, sale_id, created_at FROM wholesale_payments
+      WHERE customer_id = ? AND tenant_id = ? ${from ? "AND created_at >= ?" : ""}
+      ORDER BY created_at ASC, id ASC`,
+    from ? [customerId, tenantId, from] : [customerId, tenantId]
+  );
+  const all = [
+    ...saleRows.map((s) => {
+      const cents = toCents(s.total_amount);
+      return {
+        id: `s${s.id}`,
+        at: new Date(s.created_at).getTime(),
+        date: new Date(s.created_at).toISOString(),
+        type: "sale",
+        reference: s.receipt_number ?? null,
+        method: "credit",
+        note: null,
+        debit: cents / 100,
+        credit: 0,
+        cents,
+        saleId: Number(s.id),
+        entryId: null
+      };
+    }),
+    ...ledgerRows.map((p) => {
+      const cents = toCents(p.amount);
+      const isDebit = p.kind === "charge";
+      return {
+        id: `p${p.id}`,
+        at: new Date(p.created_at).getTime(),
+        date: new Date(p.created_at).toISOString(),
+        type: ["payment", "charge", "return"].includes(p.kind) ? p.kind : "payment",
+        reference: null,
+        method: p.method ?? null,
+        note: p.note ?? null,
+        debit: isDebit ? cents / 100 : 0,
+        credit: isDebit ? 0 : cents / 100,
+        cents: isDebit ? cents : -cents,
+        saleId: p.sale_id != null ? Number(p.sale_id) : null,
+        entryId: Number(p.id)
+      };
+    })
+  ].sort((a, b) => a.at - b.at);
+  const sinceFromNet = all.reduce((s, e) => s + e.cents, 0);
+  const openingCents = toCents(trader.balance) - sinceFromNet;
+  let running = openingCents;
+  let debitCents = 0;
+  let creditCents = 0;
+  const entries = [];
+  for (const e of all) {
+    if (to && e.at > to.getTime()) break;
+    running += e.cents;
+    if (e.cents > 0) debitCents += e.cents;
+    else creditCents -= e.cents;
+    const { at: _at, cents: _c, ...rest } = e;
+    entries.push({ ...rest, balance: running / 100 });
+  }
+  return {
+    trader,
+    from: from ? from.toISOString() : null,
+    to: to ? to.toISOString() : null,
+    openingBalance: openingCents / 100,
+    totalDebit: debitCents / 100,
+    totalCredit: creditCents / 100,
+    closingBalance: running / 100,
+    entries
+  };
+}
+async function getSummary(tenantId) {
+  const [totals] = await q4(
+    `SELECT COUNT(*) AS traders,
+            COALESCE(SUM(CASE WHEN is_active = 1 OR is_active IS NULL THEN 1 ELSE 0 END), 0) AS active,
+            COALESCE(SUM(CASE WHEN wholesale_balance > 0 THEN wholesale_balance ELSE 0 END), 0) AS receivables,
+            COALESCE(SUM(CASE WHEN wholesale_balance > 0 THEN 1 ELSE 0 END), 0) AS debtors,
+            COALESCE(SUM(CASE WHEN credit_limit IS NOT NULL AND wholesale_balance > credit_limit THEN 1 ELSE 0 END), 0) AS over_limit
+       FROM customers WHERE tenant_id = ? AND customer_type = 'wholesale'`,
+    [tenantId]
+  );
+  const monthStart2 = monthStart(await storeTimeZone(tenantId));
+  const [collected] = await q4(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM wholesale_payments
+      WHERE tenant_id = ? AND kind = 'payment' AND created_at >= ?`,
+    [tenantId, monthStart2]
+  );
+  const [creditSales] = await q4(
+    `SELECT COALESCE(SUM(s.total_amount), 0) AS total, COUNT(*) AS count
+       FROM sales s JOIN customers c ON c.id = s.customer_id
+      WHERE c.tenant_id = ? AND s.payment_method = 'credit' AND s.created_at >= ?`,
+    [tenantId, monthStart2]
+  );
+  const top = await q4(
+    `SELECT ${TRADER_COLUMNS} FROM customers c
+      WHERE c.tenant_id = ? AND c.customer_type = 'wholesale' AND c.wholesale_balance > 0
+      ORDER BY c.wholesale_balance DESC LIMIT 5`,
+    [tenantId]
+  );
+  return {
+    traders: num2(totals?.traders),
+    activeTraders: num2(totals?.active),
+    totalReceivables: num2(totals?.receivables),
+    debtors: num2(totals?.debtors),
+    overLimit: num2(totals?.over_limit),
+    collectedThisMonth: num2(collected?.total),
+    creditSalesThisMonth: num2(creditSales?.total),
+    creditSalesCountThisMonth: num2(creditSales?.count),
+    monthStart: monthStart2.toISOString(),
+    topDebtors: top.map(mapTrader)
+  };
+}
+
+// server/routes.ts
+var bcrypt6 = __toESM(require("bcrypt"));
+var crypto6 = __toESM(require("crypto"));
+var import_date_fns4 = require("date-fns");
+var import_google_auth_library = require("google-auth-library");
+var TIMESTAMP_FIELDS = [
+  "createdAt",
+  "updatedAt",
+  "expiryDate",
+  "expectedDate",
+  "receivedDate",
+  "startTime",
+  "endTime",
+  "startDate",
+  "endDate",
+  "nextBillingDate",
+  "date",
+  "lastRestocked",
+  "completedAt",
+  "processedAt"
+];
+var CLEARABLE_DATE_FIELDS = /* @__PURE__ */ new Set([
+  "expiryDate",
+  "expectedDate",
+  "receivedDate",
+  "endDate",
+  "endTime",
+  "nextBillingDate",
+  "lastRestocked",
+  "completedAt",
+  "processedAt"
+]);
+function sanitizeDates(data) {
+  const result = { ...data };
+  for (const field of TIMESTAMP_FIELDS) {
+    if (field in result) {
+      if (result[field] === void 0) {
+        delete result[field];
+      } else if (result[field] === "" || result[field] === null) {
+        if (CLEARABLE_DATE_FIELDS.has(field)) result[field] = null;
+        else delete result[field];
+      } else if (typeof result[field] === "string") {
+        const d = new Date(result[field]);
+        if (isNaN(d.getTime())) delete result[field];
+        else result[field] = d;
+      }
+    }
+  }
+  return result;
+}
+function productWriteError(res, e) {
+  const msg = String(e?.message || e);
+  if (e?.code === "ER_DUP_ENTRY" || /Duplicate entry/i.test(msg)) {
+    if (/sku/i.test(msg)) {
+      return res.status(409).json({
+        error: "\u0631\u0645\u0632 SKU \u0645\u0633\u062A\u062E\u062F\u0645 \u0644\u0645\u0646\u062A\u062C \u0622\u062E\u0631 \u0641\u064A \u0645\u062A\u062C\u0631\u0643 / This SKU is already used by another product in your store",
+        code: "DUPLICATE_SKU"
+      });
+    }
+    return res.status(409).json({ error: "Duplicate value", code: "DUPLICATE" });
+  }
+  if (e?.statusCode) return res.status(e.statusCode).json({ error: e.message, code: e.code });
+  return res.status(500).json({ error: msg });
+}
+function analyticsTenant(req) {
+  const t2 = reqTenant(req);
+  if (t2) return t2;
+  const q8 = Number(req?.query?.tenantId);
+  return Number.isFinite(q8) && q8 > 0 ? q8 : void 0;
+}
+var ORDER_STATUSES = /* @__PURE__ */ new Set([
+  "pending",
+  "accepted",
+  "confirmed",
+  "preparing",
+  "ready",
+  "on_way",
+  "out_for_delivery",
+  "picked_up",
+  "delivered",
+  "completed",
+  "cancelled",
+  "rejected",
+  "refunded"
+]);
+var TERMINAL_ORDER_STATUSES = /* @__PURE__ */ new Set(["delivered", "completed", "cancelled", "rejected", "refunded"]);
+var PAYMENT_STATUSES = /* @__PURE__ */ new Set(["pending", "paid", "failed", "refunded", "partially_refunded", "unpaid"]);
+async function editableOrderFields(req, body) {
+  const out = {};
+  const str = (v, max) => v == null ? null : String(v).slice(0, max);
+  const money3 = (v) => {
+    const n = Number(asciiDigits(v).replace(/,/g, ""));
+    return Number.isFinite(n) && n >= 0 ? n.toFixed(2) : void 0;
+  };
+  if (body.status !== void 0) {
+    if (!ORDER_STATUSES.has(String(body.status))) return { error: "Invalid status", status: 400, code: "INVALID_STATUS" };
+    out.status = String(body.status);
+  }
+  if (body.paymentStatus !== void 0) {
+    if (!PAYMENT_STATUSES.has(String(body.paymentStatus))) return { error: "Invalid payment status", status: 400, code: "INVALID_PAYMENT_STATUS" };
+    out.paymentStatus = String(body.paymentStatus);
+  }
+  if (body.paymentMethod !== void 0 && body.paymentMethod !== null) out.paymentMethod = str(body.paymentMethod, 32);
+  if (body.estimatedTime !== void 0) {
+    const n = body.estimatedTime === null || body.estimatedTime === "" ? null : Math.round(Number(asciiDigits(body.estimatedTime)));
+    if (n !== null && (!Number.isFinite(n) || n < 0 || n > 24 * 60)) return { error: "Invalid estimatedTime", status: 400, code: "INVALID_TIME" };
+    out.estimatedTime = n;
+  }
+  for (const k of ["notes", "customerAddress", "customerEmail", "tableNumber", "floor", "buildingName", "addressNotes"]) {
+    if (body[k] !== void 0) out[k] = str(body[k], 2e3);
+  }
+  if (body.customerName !== void 0) {
+    const v = String(body.customerName ?? "").trim();
+    if (!v) return { error: "customerName cannot be empty", status: 400, code: "INVALID_NAME" };
+    out.customerName = v.slice(0, 200);
+  }
+  if (body.customerPhone !== void 0) {
+    const v = canonicalPhone(body.customerPhone);
+    if (!v) return { error: "customerPhone cannot be empty", status: 400, code: "INVALID_PHONE" };
+    out.customerPhone = v.slice(0, 40);
+  }
+  for (const k of ["subtotal", "totalAmount", "deliveryFee", "discountAmount", "taxAmount"]) {
+    if (body[k] !== void 0 && body[k] !== null && body[k] !== "") {
+      const m = money3(body[k]);
+      if (m === void 0) return { error: `Invalid ${k}`, status: 400, code: "INVALID_AMOUNT" };
+      out[k] = m;
+    }
+  }
+  if (body.items !== void 0) {
+    if (!Array.isArray(body.items)) return { error: "items must be a list", status: 400, code: "INVALID_ITEMS" };
+    out.items = body.items;
+  }
+  if (body.scheduledAt !== void 0) {
+    const d = body.scheduledAt ? new Date(body.scheduledAt) : null;
+    if (d && isNaN(d.getTime())) return { error: "Invalid scheduledAt", status: 400, code: "INVALID_DATE" };
+    out.scheduledAt = d;
+  }
+  if (body.driverId !== void 0) {
+    if (body.driverId === null || body.driverId === "") out.driverId = null;
+    else if (await ownedBy(req, resolvers.vehicle, Number(body.driverId))) out.driverId = Number(body.driverId);
+    else return { error: "Driver not found", status: 404, code: "NOT_FOUND" };
+  }
+  return { data: out };
+}
+async function markOnlineOrderPaid2(orderId, _method) {
+  const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+  try {
+    await pool2.query(
+      "UPDATE online_orders SET paid_at = COALESCE(paid_at, NOW()), payment_error = NULL WHERE id = ?",
+      [orderId]
+    );
+  } catch (e) {
+    console.error("[orders] paid_at not stamped:", e?.message || e);
+  }
+}
+function promoFields(body, creating) {
+  const out = {};
+  const bad = (en, ar, code) => ({ error: `${ar} / ${en}`, code });
+  const num3 = (v) => Number(asciiDigits(v).replace(/,/g, "").trim());
+  if (body.code !== void 0 || creating) {
+    const code = asciiDigits(body.code ?? "").trim().toUpperCase();
+    if (!code || code.length > 32 || /\s/.test(code)) return bad("Promo code must be 1\u201332 characters without spaces", "\u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645 \u064A\u062C\u0628 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0645\u0646 1 \u0625\u0644\u0649 32 \u062D\u0631\u0641\u0627\u064B \u0628\u062F\u0648\u0646 \u0645\u0633\u0627\u0641\u0627\u062A", "INVALID_CODE");
+    out.code = code;
+  }
+  if (body.discountType !== void 0 || creating) {
+    const t2 = String(body.discountType ?? "percent");
+    if (!["percent", "fixed", "free_delivery"].includes(t2)) return bad("Invalid discount type", "\u0646\u0648\u0639 \u0627\u0644\u062E\u0635\u0645 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D", "INVALID_TYPE");
+    out.discountType = t2;
+  }
+  if (body.discountValue !== void 0 || creating) {
+    const v = body.discountValue === void 0 || body.discountValue === "" ? out.discountType === "free_delivery" ? 0 : NaN : num3(body.discountValue);
+    if (!Number.isFinite(v) || v < 0) return bad("Invalid discount value", "\u0642\u064A\u0645\u0629 \u0627\u0644\u062E\u0635\u0645 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629", "INVALID_VALUE");
+    if ((out.discountType ?? body.discountType) === "percent" && v > 100) return bad("A percentage cannot exceed 100", "\u0627\u0644\u0646\u0633\u0628\u0629 \u0644\u0627 \u064A\u0645\u0643\u0646 \u0623\u0646 \u062A\u062A\u062C\u0627\u0648\u0632 100", "INVALID_VALUE");
+    out.discountValue = v.toFixed(2);
+  }
+  for (const k of ["minOrderAmount", "maxDiscountCap"]) {
+    if (body[k] === void 0) continue;
+    if (body[k] === null || body[k] === "") {
+      out[k] = k === "minOrderAmount" ? "0" : null;
+      continue;
+    }
+    const v = num3(body[k]);
+    if (!Number.isFinite(v) || v < 0) return bad(`Invalid ${k}`, "\u0642\u064A\u0645\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629", "INVALID_AMOUNT");
+    out[k] = v.toFixed(2);
+  }
+  for (const k of ["usageLimit", "perCustomerLimit"]) {
+    if (body[k] === void 0) continue;
+    if (body[k] === null || body[k] === "") {
+      out[k] = null;
+      continue;
+    }
+    const v = num3(body[k]);
+    if (!Number.isInteger(v) || v < 0) return bad(`Invalid ${k}`, "\u0639\u062F\u062F \u063A\u064A\u0631 \u0635\u0627\u0644\u062D", "INVALID_LIMIT");
+    out[k] = v;
+  }
+  for (const k of ["validFrom", "validUntil"]) {
+    if (body[k] === void 0) continue;
+    if (body[k] === null || body[k] === "") {
+      out[k] = null;
+      continue;
+    }
+    const d = new Date(body[k]);
+    if (isNaN(d.getTime())) return bad(`Invalid date (${k})`, "\u062A\u0627\u0631\u064A\u062E \u063A\u064A\u0631 \u0635\u0627\u0644\u062D", "INVALID_DATE");
+    out[k] = d;
+  }
+  if (out.validFrom && out.validUntil && out.validUntil < out.validFrom) {
+    return bad("The end date is before the start date", "\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621 \u0642\u0628\u0644 \u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0628\u062F\u0621", "INVALID_DATE_RANGE");
+  }
+  if (body.description !== void 0) out.description = body.description == null ? null : String(body.description).slice(0, 2e3);
+  if (body.isActive !== void 0) out.isActive = !!body.isActive;
+  if (body.applicableOrderTypes !== void 0) {
+    if (!Array.isArray(body.applicableOrderTypes)) return bad("applicableOrderTypes must be a list", "\u0642\u0627\u0626\u0645\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629", "INVALID_TYPES");
+    out.applicableOrderTypes = body.applicableOrderTypes.map((x) => String(x));
+  }
+  return { data: out };
+}
+function promoWriteError(res, e) {
+  const msg = String(e?.message || e);
+  if (e?.code === "ER_DUP_ENTRY" || /Duplicate entry/i.test(msg)) {
+    return res.status(409).json({
+      error: "\u0631\u0645\u0632 \u0627\u0644\u062E\u0635\u0645 \u0647\u0630\u0627 \u0645\u0648\u062C\u0648\u062F \u0645\u0633\u0628\u0642\u0627\u064B \u0641\u064A \u0645\u062A\u062C\u0631\u0643 / This promo code already exists in your store",
+      code: "DUPLICATE_PROMO_CODE"
+    });
+  }
+  return res.status(500).json({ error: msg });
+}
+function saleClientRef(req) {
+  const header = req.get?.("Idempotency-Key") ?? req.headers?.["idempotency-key"];
+  let ref = Array.isArray(header) ? header[0] : header;
+  if (!ref && Array.isArray(req.body?.paymentDetails)) {
+    ref = req.body.paymentDetails.find((p) => p && p.ref)?.ref;
+  }
+  const s = ref == null ? "" : String(ref).trim();
+  return s && s.length <= 100 ? s : null;
+}
+function warnInconsistentSaleTotals(saleData, items) {
+  try {
+    if (!Array.isArray(items) || !items.length) return;
+    const lines = items.reduce((sum2, it) => {
+      const t2 = Number(it?.total);
+      return sum2 + (Number.isFinite(t2) ? t2 : (Number(it?.unitPrice) || 0) * (Number(it?.quantity) || 0));
+    }, 0);
+    const subtotal = Number(saleData?.subtotal);
+    const total = Number(saleData?.totalAmount);
+    const tolerance = Math.max(1, Math.abs(lines) * 0.02);
+    if (!Number.isFinite(total) || !Number.isFinite(subtotal) || Math.abs(subtotal - lines) > tolerance) {
+      console.warn(`[sales] totals disagree with lines: branch=${saleData?.branchId} lines=${lines.toFixed(2)} subtotal=${saleData?.subtotal} total=${saleData?.totalAmount}`);
+    }
+  } catch {
+  }
+}
+var CARD_METHODS = /* @__PURE__ */ new Set(["card", "stripe", "online", "twint", "apple_pay", "google_pay"]);
+var inflightIdempotency = /* @__PURE__ */ new Set();
+function requestIdempotencyKey(req) {
+  const raw = req.get?.("Idempotency-Key") ?? req.headers?.["idempotency-key"];
+  const v = String(Array.isArray(raw) ? raw[0] : raw ?? "").trim();
+  return v && v.length <= 100 ? v : null;
+}
+async function findOrderByClientRef(tenantId, key, phone) {
+  if (!orderClientRefReady) return null;
+  try {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const [rows] = await pool2.query(
+      `SELECT id, order_number, tracking_token, total_amount FROM online_orders
+        WHERE tenant_id = ? AND client_ref = ? AND customer_phone = ?
+          AND created_at >= NOW() - INTERVAL 1 DAY
+        ORDER BY id LIMIT 1`,
+      [tenantId, key, phone]
+    );
+    return rows?.[0] || null;
+  } catch {
+    return null;
+  }
+}
+async function storeMinOrderAmount(tenantId) {
+  const [config, tenant] = await Promise.all([
+    storage.getLandingPageConfigByTenantId(tenantId).catch(() => null),
+    storage.getTenant(tenantId).catch(() => null)
+  ]);
+  const a = Number(config?.minOrderAmount) || 0;
+  const b = Number(tenant?.metadata?.minOrderAmount) || 0;
+  return Math.max(0, a, b);
+}
+async function storeBaseDeliveryFee(tenantId) {
+  try {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const [rows] = await pool2.query("SELECT delivery_fee FROM branches WHERE tenant_id = ? LIMIT 1", [tenantId]);
+    return Math.round((Number(rows?.[0]?.delivery_fee) || 0) * 100) / 100;
+  } catch {
+    return 0;
+  }
+}
+async function storeRating(tenantId) {
+  try {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const [rows] = await pool2.query(
+      `SELECT AVG(r.overall_rating) AS avg, COUNT(*) AS n
+         FROM order_ratings r JOIN online_orders o ON o.id = r.order_id
+        WHERE o.tenant_id = ?`,
+      [tenantId]
+    );
+    const n = Number(rows?.[0]?.n || 0);
+    return { rating: n ? Math.round(Number(rows[0].avg) * 10) / 10 : null, reviewCount: n };
+  } catch {
+    return { rating: null, reviewCount: 0 };
+  }
+}
+function reqTenant(req) {
+  const t2 = Number(req?.tenantId);
+  return Number.isFinite(t2) && t2 > 0 ? t2 : void 0;
+}
+async function storeBranch(req, branchId) {
+  const t2 = reqTenant(req);
+  const id = Number(branchId);
+  if (Number.isInteger(id) && id > 0) {
+    const b = await storage.getBranch(id).catch(() => void 0);
+    if (b && (!t2 || Number(b.tenantId) === t2)) return id;
+  }
+  if (!t2) return Number.isInteger(id) && id > 0 ? id : void 0;
+  const list = await storage.getBranchesByTenant(t2).catch(() => []);
+  const main = list.find((b) => b.isMain) || list[0];
+  return main?.id ?? (Number.isInteger(id) && id > 0 ? id : void 0);
+}
+function withTenant(req, data) {
+  const t2 = reqTenant(req);
+  return t2 ? { ...data, tenantId: t2 } : data;
+}
+function withoutTenant(data) {
+  const { tenantId: _t, id: _id, ...rest } = data;
+  return rest;
+}
+var GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com";
+var googleClient = new import_google_auth_library.OAuth2Client(GOOGLE_WEB_CLIENT_ID);
+async function registerRoutes(app2) {
+  app2.get("/api/store/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const config = await storage.getLandingPageConfigBySlug(slug);
+      if (!config) {
+        return res.status(404).send("<h1>Store not found</h1>");
+      }
+      const tenant = await storage.getTenant(config.tenantId);
+      if (!tenant) {
+        return res.status(404).send("<h1>Store not found</h1>");
+      }
+      const storePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
+      let html = import_node_fs.default.readFileSync(storePath, "utf-8");
+      const storeName = String(tenant.businessName || "Kassenta Store").replace(/[<>"]/g, "");
+      const storeLogo = String(config.logoUrl || tenant.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
+      html = html.replace(/\{\{SLUG\}\}/g, slug);
+      html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
+      html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
+      html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
+      html = html.replace(/\{\{CURRENCY\}\}/g, tenant.currency || "CHF");
+      html = html.replace(/\{\{LANGUAGE\}\}/g, config.language || "en");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    } catch (err) {
+      console.error("[store/:slug] Error:", err);
+      return res.status(500).send("<h1>Server error</h1>");
+    }
+  });
+  app2.post("/api/admin/seed-pizza-lemon", async (_req, res) => {
+    try {
+      const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));
+      await seedPizzaLemon2();
+      res.json({ success: true, message: "Pizza Lemon store seeded (or already existed)." });
+    } catch (e) {
+      console.error("[SEED API] Error:", e);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+  app2.post("/api/admin/seed-zurich-restaurants", async (_req, res) => {
+    try {
+      const { seedZurichRestaurants: seedZurichRestaurants2 } = await Promise.resolve().then(() => (init_seedZurichRestaurants(), seedZurichRestaurants_exports));
+      await seedZurichRestaurants2();
+      res.json({ success: true, message: "Z\xFCrich restaurants seeded (idempotent)." });
+    } catch (e) {
+      console.error("[SEED ZURICH] Error:", e);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+  app2.get("/api/admin/check-pizza-lemon", async (_req, res) => {
+    try {
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { tenants: tenants2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10 } = await import("drizzle-orm");
+      const [tenant] = await db2.select().from(tenants2).where(eq10(tenants2.ownerEmail, "admin@pizzalemon.ch"));
+      if (!tenant) return res.json({ found: false, message: "Pizza Lemon not found in this database." });
+      const licenses = await db2.select().from(licenseKeys2).where(eq10(licenseKeys2.tenantId, tenant.id));
+      res.json({ found: true, tenantId: tenant.id, status: tenant.status, licenses: licenses.map((l) => ({ key: l.licenseKey, status: l.status })) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/health", async (_req, res) => {
+    try {
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      await pool2.query("SELECT 1");
+      res.json({
+        ok: true,
+        status: "healthy",
+        database: "mysql",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } catch (e) {
+      res.status(500).json({
+        ok: false,
+        status: "unhealthy",
+        database: "mysql",
+        error: e.message
+      });
+    }
+  });
+  app2.post("/api/landing/subscribe", async (req, res) => {
+    try {
+      const {
+        businessName,
+        ownerName,
+        ownerEmail,
+        ownerPhone,
+        planType,
+        // monthly | yearly
+        planName,
+        // basic | advanced
+        paymentMethodId,
+        // Stripe PaymentMethod ID (preferred)
+        stripeToken,
+        // fallback: legacy token
+        lang
+      } = req.body;
+      if (!businessName || !ownerName || !ownerEmail) {
+        return res.status(400).json({ error: "Required fields are missing" });
+      }
+      const existing = await storage.getTenantByEmail(ownerEmail);
+      if (existing) {
+        return res.status(400).json({ error: "A store with this email already exists" });
+      }
+      let stripeChargeId = null;
+      const isAdvanced = planName === "advanced";
+      const isYearly = planType === "yearly";
+      const priceChf = isYearly ? isAdvanced ? 4999 : 1999 : isAdvanced ? 499 : 199;
+      const amountCents = priceChf * 100;
+      if (paymentMethodId || stripeToken) {
+        try {
+          const stripeClient = await getUncachableStripeClient();
+          if (paymentMethodId) {
+            const pi = await stripeClient.paymentIntents.create({
+              amount: amountCents,
+              currency: "chf",
+              payment_method: paymentMethodId,
+              confirm: true,
+              automatic_payment_methods: { enabled: true, allow_redirects: "never" },
+              receipt_email: ownerEmail,
+              description: `Kassenta ${planName} ${planType} \u2014 ${businessName}`,
+              metadata: { businessName, ownerEmail, planName, planType }
+            });
+            if (pi.status === "requires_action") {
+              return res.json({ requiresAction: true, clientSecret: pi.client_secret, paymentIntentId: pi.id });
+            }
+            if (pi.status !== "succeeded") {
+              return res.status(402).json({ error: "Payment was not completed. Please try again." });
+            }
+            stripeChargeId = pi.id;
+          } else if (stripeToken) {
+            const charge = await stripeClient.charges.create({
+              amount: amountCents,
+              currency: "chf",
+              source: stripeToken,
+              receipt_email: ownerEmail,
+              description: `Kassenta ${planName} ${planType} \u2014 ${businessName}`,
+              metadata: { businessName, ownerEmail, planName, planType }
+            });
+            if (charge.status !== "succeeded") {
+              return res.status(402).json({ error: "Payment failed. Please try again." });
+            }
+            stripeChargeId = charge.id;
+          }
+        } catch (stripeErr) {
+          console.error("[SUBSCRIBE] Stripe error:", stripeErr.message);
+          return res.status(402).json({ error: stripeErr.message || "Payment processing failed" });
+        }
+      }
+      const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
+      const passwordHash = await bcrypt6.hash(tempPassword, 10);
+      const tenant = await storage.createTenant({
+        businessName,
+        ownerName,
+        ownerEmail,
+        ownerPhone: ownerPhone || null,
+        passwordHash,
+        status: "active",
+        maxBranches: isAdvanced ? 10 : 1,
+        maxEmployees: isAdvanced ? 999 : 5,
+        metadata: {
+          signupDate: (/* @__PURE__ */ new Date()).toISOString(),
+          paymentMethod: paymentMethodId || stripeToken ? "stripe" : "bank",
+          stripeChargeId
+        }
+      });
+      const startDate = /* @__PURE__ */ new Date();
+      let endDate = /* @__PURE__ */ new Date();
+      if (isYearly) {
+        endDate = (0, import_date_fns4.addYears)(startDate, 1);
+      } else {
+        endDate = (0, import_date_fns4.addMonths)(startDate, 1);
+      }
+      const subscription = await storage.createTenantSubscription({
+        tenantId: tenant.id,
+        planType,
+        planName: planName || "basic",
+        price: String(priceChf) + ".00",
+        status: "active",
+        startDate,
+        endDate,
+        autoRenew: true,
+        paymentMethod: stripeChargeId ? "stripe" : "bank"
+      });
+      const randomSegments = Array.from(
+        { length: 4 },
+        () => crypto6.randomBytes(2).toString("hex").toUpperCase()
+      );
+      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
+      await storage.createLicenseKey({
+        licenseKey,
+        tenantId: tenant.id,
+        subscriptionId: subscription.id,
+        status: "active",
+        maxActivations: isAdvanced ? 10 : 3,
+        expiresAt: endDate,
+        notes: `Landing page subscription: ${planName} ${planType}`
+      });
+      await storage.createTenantNotification({
+        tenantId: tenant.id,
+        type: "info",
+        title: "Welcome to Kassenta!",
+        message: `Your account for ${businessName} is ready. Open the app and enter your license key to activate.`,
+        priority: "normal"
+      });
+      sendLicenseKeyEmail({
+        to: ownerEmail,
+        ownerName,
+        businessName,
+        licenseKey,
+        planName,
+        planType,
+        tempPassword,
+        expiresAt: endDate
+      }).then(() => {
+        console.log(`[SUBSCRIBE] Email sent to ${ownerEmail}`);
+      }).catch((emailErr) => {
+        console.error("[SUBSCRIBE] Email send failed (non-fatal):", emailErr.message);
+      });
+      console.log(`[SUBSCRIBE] Tenant created: ${businessName} (ID: ${tenant.id}) | Stripe: ${stripeChargeId || "none"}`);
+      res.json({
+        success: true,
+        tenantId: tenant.id,
+        licenseKey,
+        requiresAction: false
+      });
+    } catch (e) {
+      console.error("[SUBSCRIBE] Error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/landing/confirm-subscription", async (req, res) => {
+    try {
+      const { paymentIntentId, businessName, ownerName, ownerEmail, ownerPhone, planType, planName } = req.body;
+      if (!paymentIntentId) return res.status(400).json({ error: "paymentIntentId required" });
+      const stripeClient = await getUncachableStripeClient();
+      const pi = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+      if (pi.status !== "succeeded") {
+        return res.status(402).json({ error: "Payment not completed" });
+      }
+      const existingTenant = await storage.getTenantByEmail(ownerEmail);
+      if (existingTenant) {
+        const licenses = await storage.getLicenseKeys(existingTenant.id);
+        const key = licenses[0]?.licenseKey || "";
+        return res.json({ success: true, tenantId: existingTenant.id, licenseKey: key, requiresAction: false });
+      }
+      const isAdvanced = planName === "advanced";
+      const isYearly = planType === "yearly";
+      const priceChf = isYearly ? isAdvanced ? 4999 : 1999 : isAdvanced ? 499 : 199;
+      const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
+      const passwordHash = await bcrypt6.hash(tempPassword, 10);
+      const tenant = await storage.createTenant({
+        businessName,
+        ownerName,
+        ownerEmail,
+        ownerPhone: ownerPhone || null,
+        passwordHash,
+        status: "active",
+        maxBranches: isAdvanced ? 10 : 1,
+        maxEmployees: isAdvanced ? 999 : 5,
+        metadata: { stripeChargeId: paymentIntentId }
+      });
+      const startDate = /* @__PURE__ */ new Date();
+      const endDate = isYearly ? (0, import_date_fns4.addYears)(startDate, 1) : (0, import_date_fns4.addMonths)(startDate, 1);
+      const subscription = await storage.createTenantSubscription({
+        tenantId: tenant.id,
+        planType,
+        planName: planName || "basic",
+        price: String(priceChf) + ".00",
+        status: "active",
+        startDate,
+        endDate,
+        autoRenew: true,
+        paymentMethod: "stripe"
+      });
+      const randomSegments = Array.from({ length: 4 }, () => crypto6.randomBytes(2).toString("hex").toUpperCase());
+      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
+      await storage.createLicenseKey({
+        licenseKey,
+        tenantId: tenant.id,
+        subscriptionId: subscription.id,
+        status: "active",
+        maxActivations: isAdvanced ? 10 : 3,
+        expiresAt: endDate
+      });
+      sendLicenseKeyEmail({ to: ownerEmail, ownerName, businessName, licenseKey, planName, planType, tempPassword, expiresAt: endDate }).catch(() => {
+      });
+      res.json({ success: true, tenantId: tenant.id, licenseKey, requiresAction: false });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/auth/google", async (req, res) => {
+    try {
+      const { idToken, accessToken, deviceId } = req.body;
+      if (!idToken && !accessToken) return res.status(400).json({ error: "idToken is required" });
+      let payload;
+      if (idToken) {
+        const ticket = await googleClient.verifyIdToken({
+          idToken,
+          audience: GOOGLE_WEB_CLIENT_ID
+        }).catch(() => null);
+        payload = ticket?.getPayload();
+      } else {
+        const info = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(String(accessToken))}`);
+        const tokenInfo = info.ok ? await info.json() : null;
+        if (!tokenInfo || tokenInfo.aud !== GOOGLE_WEB_CLIENT_ID && tokenInfo.azp !== GOOGLE_WEB_CLIENT_ID) {
+          return res.status(401).json({ error: "Invalid Google token" });
+        }
+        const ui = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${accessToken}` } });
+        const u = ui.ok ? await ui.json() : null;
+        if (!u?.email || u.email_verified === false) return res.status(401).json({ error: "Invalid Google token" });
+        payload = { email: u.email, name: u.name };
+      }
+      if (!payload || !payload.email) {
+        return res.status(401).json({ error: "Invalid Google token" });
+      }
+      const email = payload.email.toLowerCase();
+      const name = payload.name || "Store Owner";
+      let tenant = await storage.getTenantByEmail(email);
+      let isNew = false;
+      if (!tenant) {
+        isNew = true;
+        const tempPassword = "GAuth-" + crypto6.randomBytes(4).toString("hex");
+        const passwordHash = await bcrypt6.hash(tempPassword, 10);
+        tenant = await storage.createTenant({
+          businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
+          ownerName: name,
+          ownerEmail: email,
+          passwordHash,
+          status: "active",
+          maxBranches: 1,
+          maxEmployees: 5,
+          metadata: { signupMethod: "google", signupDate: (/* @__PURE__ */ new Date()).toISOString() }
+        });
+        const startDate = /* @__PURE__ */ new Date();
+        const endDate = (0, import_date_fns4.addDays)(startDate, 14);
+        const sub = await storage.createTenantSubscription({
+          tenantId: tenant.id,
+          planType: "trial",
+          planName: "14-Day Free Trial",
+          price: "0",
+          status: "active",
+          startDate,
+          endDate,
+          autoRenew: false
+        });
+        const randomSegments = Array.from(
+          { length: 4 },
+          () => crypto6.randomBytes(2).toString("hex").toUpperCase()
+        );
+        const licenseKey = `TRIAL-${randomSegments.join("-")}`;
+        await storage.createLicenseKey({
+          licenseKey,
+          tenantId: tenant.id,
+          subscriptionId: sub.id,
+          status: "active",
+          maxActivations: 3,
+          expiresAt: endDate,
+          notes: "Auto-generated Google Trial"
+        });
+        await storage.ensureTenantData(tenant.id);
+      }
+      const licenses = await storage.getLicenseKeys(tenant.id);
+      const activeLicense = licenses.find((l) => l.status === "active" && (!l.expiresAt || new Date(l.expiresAt) > /* @__PURE__ */ new Date()));
+      if (!activeLicense) {
+        return res.status(403).json({ error: "No active license found for this account. Your trial may have expired." });
+      }
+      const employees2 = await storage.getEmployeesByTenant(tenant.id);
+      const adminEmployee = employees2.find((e) => e.role === "admin" || e.email === email);
+      res.json({
+        success: true,
+        licenseKey: activeLicense.licenseKey,
+        isNew,
+        tenant: {
+          id: tenant.id,
+          name: tenant.businessName,
+          email: tenant.ownerEmail,
+          setupCompleted: tenant.setupCompleted
+        },
+        employee: adminEmployee ? {
+          id: adminEmployee.id,
+          name: adminEmployee.name,
+          role: adminEmployee.role,
+          permissions: adminEmployee.permissions
+        } : null
+      });
+    } catch (e) {
+      console.error("[GOOGLE AUTH] Error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/tenant/onboarding-status", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const status = await storage.getOnboardingStatus(tenantId);
+      res.json(status);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/tenant/onboarding-complete", async (req, res) => {
+    try {
+      const { ownerPhone, storeType, logo } = req.body || {};
+      const tenantId = reqTenant(req) ?? (req.isSuperAdmin ? Number(req.body?.tenantId) || void 0 : void 0);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const businessName = String(req.body?.businessName ?? "").trim();
+      if (!businessName) return res.status(400).json({ error: "businessName is required", code: "BUSINESS_NAME_REQUIRED" });
+      await storage.updateTenant(tenantId, {
+        businessName,
+        ownerPhone,
+        storeType,
+        logo,
+        setupCompleted: true
+      });
+      const config = await storage.getLandingPageConfig(tenantId);
+      if (!config) {
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        await db2.insert(landingConfig).values({
+          tenantId,
+          slug: businessName.toLowerCase().replace(/\s+/g, "-") || `store-${tenantId}`,
+          heroTitle: businessName,
+          phone: ownerPhone,
+          socialWhatsapp: ownerPhone
+        });
+      } else {
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const { eq: eq10 } = await import("drizzle-orm");
+        await db2.update(landingConfig).set({
+          heroTitle: businessName,
+          phone: ownerPhone,
+          socialWhatsapp: ownerPhone
+        }).where(eq10(landingConfig.tenantId, tenantId));
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post(
+    "/api/license/validate",
+    // Generous: a store's tablets and Syrian carrier-NAT users share one IP.
+    rateLimit({ name: "license-ip", max: 300, windowMs: 10 * 60 * 1e3 }),
+    async (req, res) => {
+      try {
+        const { licenseKey, email, password, deviceId } = req.body;
+        if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] Incoming request details:", { licenseKey, email: email ? email.substring(0, 2) + "***" : void 0, deviceId });
+        if (!licenseKey) {
+          return res.json({ isValid: false, reason: "License key is required" });
+        }
+        const license = await storage.getLicenseByKey(licenseKey);
+        if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] getLicenseByKey result for", licenseKey, ":", !!license);
+        if (!license) {
+          return res.json({ isValid: false, reason: "Invalid license key" });
+        }
+        if (license.status !== "active") {
+          return res.json({ isValid: false, reason: `License is ${license.status}` });
+        }
+        if (license.expiresAt && new Date(license.expiresAt) < /* @__PURE__ */ new Date()) {
+          return res.json({ isValid: false, reason: "License has expired" });
+        }
+        const tenant = await storage.getTenant(license.tenantId);
+        if (!tenant) {
+          return res.json({ isValid: false, reason: "Tenant not found" });
+        }
+        if (tenant.status !== "active") {
+          return res.json({ isValid: false, reason: `Store account is ${tenant.status}` });
+        }
+        if (email) {
+          if (tenant.ownerEmail.toLowerCase() !== email.toLowerCase()) {
+            return res.json({ isValid: false, reason: "Email does not match this license" });
+          }
+          if (password) {
+            if (!tenant.passwordHash) {
+              return res.json({ isValid: false, reason: "Account credentials not configured" });
+            }
+            const passwordValid = await bcrypt6.compare(password, tenant.passwordHash);
+            if (!passwordValid) {
+              return res.json({ isValid: false, reason: "Invalid password" });
+            }
+          }
+        }
+        const isNewActivation = !!email;
+        if (isNewActivation) {
+          const currentCount = license.currentActivations || 0;
+          const maxCount = license.maxActivations || 3;
+          if (currentCount >= maxCount) {
+            return res.json({ isValid: false, reason: `Maximum activations reached (${maxCount}). Contact support to add more.` });
+          }
+        }
+        const subs = await storage.getTenantSubscriptions(tenant.id);
+        const activeSub = subs.find((s) => s.status === "active");
+        await storage.updateLicenseKey(license.id, {
+          lastValidatedAt: /* @__PURE__ */ new Date(),
+          deviceInfo: deviceId || license.deviceInfo,
+          currentActivations: (license.currentActivations || 0) + (isNewActivation ? 1 : 0)
+        });
+        const subInfo = activeSub ? {
+          active: true,
+          plan: activeSub.planName,
+          daysRemaining: activeSub.endDate ? Math.max(0, Math.ceil((new Date(activeSub.endDate).getTime() - Date.now()) / (1e3 * 60 * 60 * 24))) : 365,
+          requiresUpgrade: false
+        } : {
+          active: false,
+          plan: "No active plan",
+          daysRemaining: 0,
+          requiresUpgrade: true
+        };
+        res.json({
+          isValid: true,
+          tenant: {
+            id: tenant.id,
+            name: tenant.businessName,
+            logo: tenant.logo,
+            storeType: tenant.storeType
+          },
+          subscription: subInfo
+        });
+      } catch (e) {
+        console.error("License validation error:", e);
+        res.status(500).json({ isValid: false, reason: "Server error during validation" });
+      }
+    }
+  );
+  app2.get("/api/dashboard", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const stats = await storage.getDashboardStats(tenantId);
+      res.json(stats);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/dashboard/multi-branch", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const allBranches = await storage.getBranchesByTenant(tenantId);
+      const allEmployees = await storage.getEmployeesByTenant(tenantId);
+      const allInventory = await storage.getInventory(void 0, tenantId);
+      const allSales = await storage.getSales({ tenantId });
+      const allShifts = await storage.getShifts(tenantId);
+      const allProducts = await storage.getProductsByTenant(tenantId);
+      const allCategories = await storage.getCategories(tenantId);
+      const allCustomers = await storage.getCustomers(void 0, tenantId);
+      const todayStart = /* @__PURE__ */ new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const weekStart = /* @__PURE__ */ new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      weekStart.setHours(0, 0, 0, 0);
+      const monthStart2 = /* @__PURE__ */ new Date();
+      monthStart2.setDate(1);
+      monthStart2.setHours(0, 0, 0, 0);
+      const branchStats = allBranches.map((branch) => {
+        const branchSales = allSales.filter((s) => s.branchId === branch.id);
+        const branchEmployees = allEmployees.filter((e) => e.branchId === branch.id);
+        const branchInventory = allInventory.filter((i) => i.branchId === branch.id);
+        const activeShifts = allShifts.filter((s) => s.branchId === branch.id && s.status === "open");
+        const todaySales = branchSales.filter((s) => s.createdAt && new Date(s.createdAt) >= todayStart);
+        const weekSales = branchSales.filter((s) => s.createdAt && new Date(s.createdAt) >= weekStart);
+        const monthSales = branchSales.filter((s) => s.createdAt && new Date(s.createdAt) >= monthStart2);
+        const todayRevenue = todaySales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
+        const weekRevenue = weekSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
+        const monthRevenue = monthSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
+        const totalRevenue2 = branchSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
+        const lowStockItems = branchInventory.filter((i) => (i.quantity || 0) <= (i.lowStockThreshold || 10));
+        const outOfStockItems = branchInventory.filter((i) => (i.quantity || 0) === 0);
+        const paymentBreakdown = {};
+        branchSales.forEach((s) => {
+          const method = s.paymentMethod || "cash";
+          if (!paymentBreakdown[method]) paymentBreakdown[method] = { count: 0, total: 0 };
+          paymentBreakdown[method].count++;
+          paymentBreakdown[method].total += Number(s.totalAmount || 0);
+        });
+        return {
+          id: branch.id,
+          name: branch.name,
+          address: branch.address,
+          phone: branch.phone,
+          isMain: branch.isMain,
+          isActive: branch.isActive,
+          currency: branch.currency || "USD",
+          todayRevenue,
+          weekRevenue,
+          monthRevenue,
+          totalRevenue: totalRevenue2,
+          todaySalesCount: todaySales.length,
+          totalSalesCount: branchSales.length,
+          employeeCount: branchEmployees.length,
+          activeEmployees: branchEmployees.filter((e) => e.isActive).length,
+          activeShifts: activeShifts.length,
+          inventoryCount: branchInventory.length,
+          lowStockCount: lowStockItems.length,
+          outOfStockCount: outOfStockItems.length,
+          paymentBreakdown
+        };
+      });
+      const totalRevenue = allSales.reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
+      const todayTotalRevenue = allSales.filter((s) => s.createdAt && new Date(s.createdAt) >= todayStart).reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
+      const monthTotalRevenue = allSales.filter((s) => s.createdAt && new Date(s.createdAt) >= monthStart2).reduce((sum2, s) => sum2 + Number(s.totalAmount || 0), 0);
+      res.json({
+        summary: {
+          totalBranches: allBranches.length,
+          activeBranches: allBranches.filter((b) => b.isActive).length,
+          totalEmployees: allEmployees.length,
+          totalProducts: allProducts.length,
+          totalCategories: allCategories.length,
+          totalCustomers: allCustomers.length,
+          totalSales: allSales.length,
+          totalRevenue,
+          todayRevenue: todayTotalRevenue,
+          monthRevenue: monthTotalRevenue,
+          activeShifts: allShifts.filter((s) => s.status === "open").length
+        },
+        branches: branchStats
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/dashboard/subscriptions", requireSuperAdmin, async (_req, res) => {
+    try {
+      const tenantSubs = await storage.getTenantSubscriptions();
+      const tenants2 = await storage.getTenants();
+      const licenses = await storage.getLicenseKeys();
+      const subsWithTenant = tenantSubs.map((sub) => {
+        const tenant = tenants2.find((t2) => t2.id === sub.tenantId);
+        const tenantLicenses = licenses.filter((l) => l.tenantId === sub.tenantId);
+        return {
+          ...sub,
+          tenantName: tenant?.businessName || "Unknown",
+          tenantEmail: tenant?.ownerEmail || "",
+          tenantStatus: tenant?.status || "unknown",
+          licenseCount: tenantLicenses.length,
+          activeLicenses: tenantLicenses.filter((l) => l.status === "active").length
+        };
+      });
+      res.json({
+        subscriptions: subsWithTenant,
+        summary: {
+          total: tenantSubs.length,
+          active: tenantSubs.filter((s) => s.status === "active").length,
+          trial: tenantSubs.filter((s) => s.planType === "trial").length,
+          monthly: tenantSubs.filter((s) => s.planType === "monthly").length,
+          yearly: tenantSubs.filter((s) => s.planType === "yearly").length,
+          expiringSoon: tenantSubs.filter((s) => {
+            if (!s.endDate) return false;
+            const daysLeft = Math.ceil((new Date(s.endDate).getTime() - Date.now()) / (1e3 * 60 * 60 * 24));
+            return daysLeft > 0 && daysLeft <= 7;
+          }).length,
+          totalMRR: tenantSubs.filter((s) => s.status === "active" && s.planType === "monthly").reduce((sum2, s) => sum2 + Number(s.price || 0), 0)
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/branches", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      res.json(await storage.getBranchesByTenant(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/branches", async (req, res) => {
+    try {
+      res.json(await storage.createBranch(withTenant(req, sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/branches/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateBranch(Number(req.params.id), withoutTenant(sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/branches/:id", async (req, res) => {
+    try {
+      await storage.deleteBranch(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/employees", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const emps = await storage.getEmployeesByTenant(tenantId);
+      res.json(emps.map(({ pin, ...rest }) => ({ ...rest, hasPin: !!pin })));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/employees/:id", async (req, res) => {
+    try {
+      const emp = await storage.getEmployee(Number(req.params.id));
+      if (!emp) return res.status(404).json({ error: "Employee not found" });
+      const { pin, ...safe } = emp;
+      res.json({ ...safe, hasPin: !!pin });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/employees", requireAdmin, async (req, res) => {
+    try {
+      const data = withTenant(req, sanitizeDates(req.body));
+      if (data.pin) data.pin = await hashPin(String(data.pin));
+      const created = await storage.createEmployee(data);
+      const { pin, ...safe } = created ?? {};
+      res.json(safe);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/employees/:id", requireAdmin, async (req, res) => {
+    try {
+      const data = withoutTenant(sanitizeDates(req.body));
+      if (data.pin) data.pin = await hashPin(String(data.pin));
+      else delete data.pin;
+      const updated = await storage.updateEmployee(Number(req.params.id), data);
+      const { pin, ...safe } = updated ?? {};
+      res.json(safe);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/employees/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteEmployee(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post(
+    "/api/employees/login",
+    rateLimit({ name: "pin-ip", max: 20, windowMs: 10 * 60 * 1e3, message: "Too many attempts. Wait a moment and try again." }),
+    rateLimit({
+      name: "pin-tenant",
+      max: 40,
+      windowMs: 10 * 60 * 1e3,
+      keyFn: (req) => String(req.tenantId ?? req.header("x-license-key") ?? "unknown"),
+      message: "Too many attempts. Wait a moment and try again."
+    }),
+    async (req, res) => {
+      try {
+        const pin = String(req.body?.pin ?? "");
+        if (!pin) return res.status(400).json({ error: "PIN is required" });
+        const tenantId = req.tenantId;
+        let emp;
+        if (req.body.employeeId) {
+          emp = await storage.getEmployee(Number(req.body.employeeId));
+          if (!emp) return res.status(401).json({ error: "Invalid PIN for this employee" });
+          if (tenantId && emp.tenantId && emp.tenantId !== tenantId) {
+            return res.status(401).json({ error: "Invalid PIN for this employee" });
+          }
+          if (!await verifyPin(pin, emp.pin)) {
+            return res.status(401).json({ error: "Invalid PIN for this employee" });
+          }
+        } else if (tenantId) {
+          const staff = await storage.getEmployeesByTenant(tenantId);
+          emp = null;
+          for (const candidate of staff) {
+            if (await verifyPin(pin, candidate.pin)) {
+              emp = candidate;
+              break;
+            }
+          }
+          if (!emp) return res.status(401).json({ error: "Invalid PIN" });
+        } else {
+          emp = await storage.getEmployeeByPin(pin);
+          if (!emp) return res.status(401).json({ error: "Invalid PIN" });
+        }
+        if (!emp.isActive) return res.status(401).json({ error: "Account deactivated" });
+        if (!isHashedPin(emp.pin)) {
+          try {
+            await storage.updateEmployee(emp.id, { pin: await hashPin(pin) });
+          } catch (err) {
+            console.error("[employeeAuth] PIN re-hash failed for employee", emp.id, err);
+          }
+        }
+        await storage.createActivityLog({
+          employeeId: emp.id,
+          action: "login",
+          entityType: "employee",
+          entityId: emp.id,
+          details: `${emp.name} logged in`
+        });
+        const token = generateEmployeeToken({
+          employeeId: emp.id,
+          tenantId: emp.tenantId ?? tenantId ?? null,
+          branchId: emp.branchId ?? null,
+          role: emp.role,
+          name: emp.name,
+          permissions: Array.isArray(emp.permissions) ? emp.permissions : []
+        });
+        const { pin: _pin, ...safeEmp } = emp;
+        res.json({ ...safeEmp, token });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+  app2.get("/api/categories", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const categories2 = await storage.getCategories(tenantId);
+      res.json(sortCategoriesByPriority(categories2));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/categories", async (req, res) => {
+    try {
+      const c = await storage.createCategory(withTenant(req, sanitizeDates(req.body)));
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
+      res.json(c);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/categories/:id", async (req, res) => {
+    try {
+      const c = await storage.updateCategory(Number(req.params.id), withoutTenant(sanitizeDates(req.body)));
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
+      res.json(c);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/categories/:id", async (req, res) => {
+    try {
+      const c = await storage.getCategory(Number(req.params.id));
+      await storage.deleteCategory(Number(req.params.id));
+      if (c) await storage.detachProductsFromCategory(c.id);
+      if (c) callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/products", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const search = req.query.search;
+      const applyMarkup = req.query.applyMarkup === "true";
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      let products2 = await storage.getProductsByTenant(tenantId, search);
+      if (applyMarkup) {
+        const commissionRate = await storage.getCommissionRate();
+        if (commissionRate > 0) {
+          const factor = 1 + commissionRate / 100;
+          products2 = products2.map((p) => {
+            const rawPrice = parseFloat(p.price) * factor;
+            const rounded = Math.round(rawPrice * 2) / 2;
+            return { ...p, price: rounded.toFixed(2) };
+          });
+        }
+      }
+      res.json(products2);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/products/template", (req, res) => {
+    const templateData = [
+      { Name: "Sample Product 1", Price: "9.99", CostPrice: "5.00", SKU: "SKU001", Barcode: "1234567890", Unit: "piece", NameArabic: "\u0645\u0646\u062A\u062C 1" },
+      { Name: "Sample Product 2", Price: "15.50", CostPrice: "8.00", SKU: "SKU002", Barcode: "0987654321", Unit: "kg", NameArabic: "\u0645\u0646\u062A\u062C 2" }
+    ];
+    const ws = xlsx.utils.json_to_sheet(templateData);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "Products");
+    const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=products_template.xlsx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buf);
+  });
+  app2.post("/api/products/import", async (req, res) => {
+    try {
+      const { fileBase64, branchId } = req.body;
+      const tenantId = reqTenant(req) ?? Number(req.body.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      if (!fileBase64) return res.status(400).json({ error: "fileBase64 is required" });
+      const buffer = Buffer.from(fileBase64, "base64");
+      const workbook = xlsx.read(buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = xlsx.utils.sheet_to_json(sheet);
+      const productsToInsert = data.map((item) => ({
+        tenantId: Number(tenantId),
+        name: item.Name || item.name,
+        nameAr: item.NameArabic || item.name_ar,
+        sku: item.SKU || item.sku || void 0,
+        barcode: String(item.Barcode || item.barcode || ""),
+        price: String(item.Price || item.price || "0"),
+        costPrice: String(item.CostPrice || item.cost_price || "0"),
+        unit: item.Unit || item.unit || "piece",
+        isActive: true
+      }));
+      const results = await storage.bulkCreateProducts(productsToInsert);
+      if (branchId) {
+        for (const prod of results) {
+          await storage.upsertInventory({
+            productId: prod.id,
+            branchId: Number(branchId),
+            quantity: 0
+          });
+        }
+      }
+      res.json({ success: true, count: results.length });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/products/:id", async (req, res) => {
+    try {
+      const prod = await storage.getProduct(Number(req.params.id));
+      if (!prod) return res.status(404).json({ error: "Product not found" });
+      res.json(prod);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/products/barcode/:barcode", async (req, res) => {
+    try {
+      const tenantId = Number(req.tenantId) || 0;
+      if (!tenantId) return res.status(401).json({ error: "Store not identified" });
+      const prod = await storage.getProductByBarcode(String(req.params.barcode), tenantId);
+      if (!prod) return res.status(404).json({ error: "Product not found" });
+      res.json(prod);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/products", async (req, res) => {
+    try {
+      const body = normalizeWholesaleProductFields(withTenant(req, sanitizeDates(req.body)));
+      if (body.isAddon) body.price = "0";
+      const p = await storage.createProduct(body);
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
+      res.json(p);
+    } catch (e) {
+      productWriteError(res, e);
+    }
+  });
+  app2.put("/api/products/:id", async (req, res) => {
+    try {
+      const body = normalizeWholesaleProductFields(withoutTenant(sanitizeDates(req.body)));
+      if (body.isAddon) body.price = "0";
+      const p = await storage.updateProduct(Number(req.params.id), body);
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
+      res.json(p);
+    } catch (e) {
+      productWriteError(res, e);
+    }
+  });
+  app2.delete("/api/products/:id", async (req, res) => {
+    try {
+      const p = await storage.getProduct(Number(req.params.id));
+      await storage.deleteProduct(Number(req.params.id));
+      if (p) callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/inventory", async (req, res) => {
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
+      if (!tenantId && !branchId) return res.status(400).json({ error: "tenantId is required" });
+      res.json(await storage.getInventory(branchId, tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/inventory", async (req, res) => {
+    try {
+      res.json(await storage.upsertInventory(sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/inventory/adjust", async (req, res) => {
+    try {
+      const { productId, branchId, adjustment } = req.body;
+      res.json(await storage.adjustInventory(productId, branchId, adjustment));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/inventory/low-stock", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      if (!tenantId && !branchId) return res.status(400).json({ error: "tenantId or branchId is required" });
+      if (branchId) {
+        res.json(await storage.getLowStockItems(branchId));
+      } else if (tenantId) {
+        const tenantBranches = await storage.getBranchesByTenant(tenantId);
+        const allLowStock = [];
+        for (const branch of tenantBranches) {
+          const items = await storage.getLowStockItems(branch.id);
+          allLowStock.push(...items);
+        }
+        res.json(allLowStock);
+      }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/customers", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const limit = req.query.limit ? Math.min(Number(req.query.limit), 200) : 50;
+      const offset = req.query.offset ? Number(req.query.offset) : 0;
+      res.json(await storage.getCustomers(req.query.search, tenantId, limit, offset));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/customers/count", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const search = req.query.search;
+      res.json({ count: await storage.getCustomerCount(search, tenantId) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/downloads/link", async (req, res) => {
+    try {
+      const tenantId = reqTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const raw = String(req.body?.path || "");
+      let u;
+      try {
+        u = new URL(raw, "http://x");
+      } catch {
+        return res.status(400).json({ error: "Invalid path" });
+      }
+      if (u.origin !== "http://x" || !DOWNLOADABLE_PATHS.some((re) => re.test(u.pathname))) {
+        return res.status(400).json({ error: "This path cannot be downloaded by link", code: "NOT_DOWNLOADABLE" });
+      }
+      u.searchParams.delete("dl");
+      u.searchParams.delete("tenantId");
+      u.searchParams.set("dl", signDownloadToken(tenantId, u.pathname, req.employee));
+      res.json({ url: `${u.pathname}?${u.searchParams.toString()}`, expiresIn: DOWNLOAD_TTL_SECONDS });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/customers/template", (req, res) => {
+    const templateData = [
+      { Name: "John Doe", Phone: "+41791234567", Email: "john@example.com", Address: "123 Main St" },
+      { Name: "Jane Smith", Phone: "+41799876543", Email: "jane@example.com", Address: "456 Elm Ave" }
+    ];
+    const ws = xlsx.utils.json_to_sheet(templateData);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "Customers");
+    const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=customers_template.xlsx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buf);
+  });
+  app2.get("/api/customers/export", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const customers2 = await storage.getCustomers(void 0, tenantId);
+      const exportData = customers2.map((c) => ({
+        Nr: c.customerNr || "",
+        Anrede: c.salutation || "",
+        Namen: c.lastName || "",
+        Vorname: c.firstName || "",
+        Name: c.name || "",
+        Firma: c.company || "",
+        Phone: c.phone || "",
+        Email: c.email || "",
+        Strasse: c.street || "",
+        StrassNr: c.streetNr || "",
+        HausNr: c.houseNr || "",
+        PLZ: c.postalCode || "",
+        Ort: c.city || "",
+        Address: c.address || "",
+        HowToGo: c.howToGo || "",
+        ZHD: c.zhd || "",
+        ScreenInfo: c.screenInfo || "",
+        LoyaltyPoints: c.loyaltyPoints || 0,
+        TotalSpent: c.totalSpent || "0",
+        OrderCount: c.orderCount || 0,
+        AvgOrderValue: c.averageOrderValue || "0",
+        FirstOrder: c.firstOrderDate || "",
+        LastOrder: c.lastOrderDate || "",
+        Source: c.source || "",
+        Notes: c.notes || "",
+        Quadrat: c.quadrat || "",
+        LegacyRef: c.legacyRef || "",
+        LegacyTotalSpent: c.legacyTotalSpent || "0",
+        R1: c.r1 || "",
+        R3: c.r3 || "",
+        R4: c.r4 || "",
+        R5: c.r5 || "",
+        R8: c.r8 || "",
+        R9: c.r9 || "",
+        R10: c.r10 || "",
+        R14: c.r14 || "",
+        R15: c.r15 || "",
+        R16: c.r16 ? "TRUE" : "FALSE",
+        R17: c.r17 ? "TRUE" : "FALSE",
+        R18: c.r18 ? "TRUE" : "FALSE",
+        R19: c.r19 ? "TRUE" : "FALSE",
+        R20: c.r20 ? "TRUE" : "FALSE",
+        CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ""
+      }));
+      const ws = xlsx.utils.json_to_sheet(exportData);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, "Customers");
+      const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+      res.setHeader("Content-Disposition", "attachment; filename=customers_export.xlsx");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.send(buf);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/customers/phone-lookup", async (req, res) => {
+    try {
+      const phone = req.query.phone;
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!phone) return res.status(400).json({ error: "phone is required" });
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const results = await storage.findCustomerByPhone(phone, tenantId);
+      res.json(results);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/customers/import", async (req, res) => {
+    try {
+      const { fileBase64 } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : void 0);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      if (!fileBase64) return res.status(400).json({ error: "fileBase64 is required" });
+      const buffer = Buffer.from(fileBase64, "base64");
+      const workbook = xlsx.read(buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = xlsx.utils.sheet_to_json(sheet);
+      const customersToInsert = data.map((item) => ({
+        name: item.Name || item.name || "",
+        email: item.Email || item.email || void 0,
+        // Same spelling as storefront logins and orders (0944… → +963944…),
+        // so an imported customer is recognised when they order online.
+        phone: canonicalPhone(item.Phone || item.phone || ""),
+        address: item.Address || item.address || void 0,
+        tenantId,
+        isActive: true
+      })).filter((c) => c.name);
+      const results = await storage.bulkCreateCustomers(customersToInsert);
+      res.json({ success: true, count: results.length });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/customers/import-csv", requireSuperAdmin, async (req, res) => {
+    try {
+      const tenantId = req.body.tenantId ? Number(req.body.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const csvPath = require("path").resolve(process.cwd(), "KUNDEN_ALL_fixed.csv");
+      if (!require("fs").existsSync(csvPath)) {
+        return res.status(404).json({ error: "CSV file not found on server" });
+      }
+      const csvContent = require("fs").readFileSync(csvPath, "utf-8");
+      const lines = csvContent.split("\n");
+      const headers = lines[0].replace(/\r$/, "").split(",");
+      let imported = 0;
+      let skipped = 0;
+      const batchSize = 100;
+      let batch = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].replace(/\r$/, "").trim();
+        if (!line) {
+          skipped++;
+          continue;
+        }
+        const values = [];
+        let current = "";
+        let inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (ch === '"') {
+            inQuotes = !inQuotes;
+            continue;
+          }
+          if (ch === "," && !inQuotes) {
+            values.push(current.trim());
+            current = "";
+            continue;
+          }
+          current += ch;
+        }
+        values.push(current.trim());
+        const nr = values[0] || "";
+        const anrede = values[1] || "";
+        const namen = values[2] || "";
+        const vorname = values[3] || "";
+        const strasse = values[4] || "";
+        const howToGo = values[5] || "";
+        const firma = values[6] || "";
+        const zhd = values[7] || "";
+        const ort = values[8] || "";
+        const plz = values[9] || "";
+        const tel1 = values[10] || "";
+        const strassNr = values[11] || "";
+        const hausNr = values[12] || "";
+        const quadrat = values[13] || "";
+        const screenInfo = values[14] || "";
+        const r1 = values[15] || "";
+        const r6 = values[20] || "";
+        const r7 = values[21] || "";
+        const r10 = values[24] || "";
+        const r11 = values[25] || "";
+        const r12 = values[26] || "";
+        const _source = values[values.length - 1] || "";
+        const fullName = [namen, vorname].filter((s) => s && s.trim()).join(", ").trim() || tel1 || "Unknown";
+        const addressParts = [strasse, strassNr, hausNr].filter((s) => s && s.trim()).join(" ").trim();
+        const cityParts = [plz, ort].filter((s) => s && s.trim()).join(" ").trim();
+        const address = [addressParts, cityParts].filter((s) => s).join(", ");
+        const noteParts = [];
+        if (screenInfo) noteParts.push(screenInfo);
+        if (howToGo) noteParts.push(`Directions: ${howToGo}`);
+        if (quadrat) noteParts.push(`Quadrat: ${quadrat}`);
+        const notes = noteParts.join(" | ") || void 0;
+        const customerData = {
+          tenantId,
+          name: fullName,
+          phone: tel1 || void 0,
+          address: address || void 0,
+          notes,
+          isActive: true,
+          customerNr: nr ? parseInt(nr) || void 0 : void 0,
+          salutation: anrede || void 0,
+          firstName: vorname || void 0,
+          lastName: namen || void 0,
+          street: strasse || void 0,
+          streetNr: strassNr || void 0,
+          houseNr: hausNr || void 0,
+          city: ort || void 0,
+          postalCode: plz || void 0,
+          company: firma || void 0,
+          zhd: zhd || void 0,
+          howToGo: howToGo || void 0,
+          screenInfo: screenInfo || void 0,
+          source: _source || void 0,
+          firstOrderDate: r6 || void 0,
+          lastOrderDate: r7 || void 0,
+          legacyTotalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
+          averageOrderValue: r11 ? String(parseFloat(r11) || 0) : "0",
+          orderCount: r12 ? parseInt(r12) || 0 : 0,
+          legacyRef: r1 || void 0,
+          totalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
+          visitCount: r12 ? parseInt(r12) || 0 : 0
+        };
+        batch.push(customerData);
+        if (batch.length >= batchSize) {
+          const results = await storage.bulkCreateCustomers(batch);
+          imported += results.length;
+          batch = [];
+        }
+      }
+      if (batch.length > 0) {
+        const results = await storage.bulkCreateCustomers(batch);
+        imported += results.length;
+      }
+      res.json({ success: true, imported, skipped, total: lines.length - 1 });
+    } catch (e) {
+      console.error("[CSV Import Error]", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/customers/:id", async (req, res) => {
+    try {
+      const cust = await storage.getCustomer(Number(req.params.id));
+      if (!cust) return res.status(404).json({ error: "Customer not found" });
+      res.json(cust);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/customers", async (req, res) => {
+    try {
+      const data = withTenant(req, stripProtectedCustomerFields(sanitizeDates(req.body)));
+      if (data.phone) data.phone = canonicalPhone(data.phone);
+      res.json(await storage.createCustomer(data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/customers/:id", async (req, res) => {
+    try {
+      const data = withoutTenant(stripProtectedCustomerFields(sanitizeDates(req.body)));
+      if (data.phone) data.phone = canonicalPhone(data.phone);
+      res.json(await storage.updateCustomer(Number(req.params.id), data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/customers/:id", async (req, res) => {
+    try {
+      const cust = await storage.getCustomer(Number(req.params.id));
+      if (!cust) return res.status(404).json({ error: "Customer not found" });
+      if (cust.customerType === "wholesale") {
+        return res.status(409).json({
+          error: "\u0647\u0630\u0627 \u062A\u0627\u062C\u0631 \u062C\u0645\u0644\u0629 \u2014 \u0623\u0648\u0642\u0641\u0647 \u0645\u0646 \u0634\u0627\u0634\u0629 \u0627\u0644\u062C\u0645\u0644\u0629 / This is a wholesale trader \u2014 deactivate them from the Wholesale screen",
+          code: "WHOLESALE_TRADER"
+        });
+      }
+      await storage.deleteCustomer(cust.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/customers/:id/loyalty", async (req, res) => {
+    try {
+      const points = Number(asciiDigits(req.body?.points).trim());
+      if (!Number.isInteger(points) || points === 0 || Math.abs(points) > 1e7) {
+        return res.status(400).json({ error: "points must be a whole number / \u064A\u062C\u0628 \u0623\u0646 \u062A\u0643\u0648\u0646 \u0627\u0644\u0646\u0642\u0627\u0637 \u0639\u062F\u062F\u0627\u064B \u0635\u062D\u064A\u062D\u0627\u064B", code: "INVALID_POINTS" });
+      }
+      const cust = await storage.getCustomer(Number(req.params.id));
+      if (!cust) return res.status(404).json({ error: "Customer not found" });
+      if ((cust.loyaltyPoints || 0) + points < 0) {
+        return res.status(400).json({ error: "Not enough points / \u0627\u0644\u0646\u0642\u0627\u0637 \u063A\u064A\u0631 \u0643\u0627\u0641\u064A\u0629", code: "INSUFFICIENT_POINTS" });
+      }
+      res.json(await storage.addLoyaltyPoints(cust.id, points));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/customers/:id/sales", async (req, res) => {
+    try {
+      res.json(await storage.getCustomerSales(Number(req.params.id)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/calls", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const limit = req.query.limit ? Number(req.query.limit) : 500;
+      const calls2 = await storage.getCalls(tenantId, limit);
+      res.json(calls2);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/sales", async (req, res) => {
+    try {
+      const asked = Number(req.query.limit);
+      const limit = Number.isFinite(asked) && asked > 0 ? Math.min(Math.floor(asked), 5e3) : 500;
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      if (!tenantId && !req.isSuperAdmin) return res.status(400).json({ error: "tenantId is required" });
+      res.json(await storage.getSales({ limit, tenantId, branchId }));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/sales/:id", async (req, res) => {
+    try {
+      const sale = await storage.getSale(Number(req.params.id));
+      if (!sale) return res.status(404).json({ error: "Sale not found" });
+      const items = await storage.getSaleItems(sale.id);
+      res.json({ ...sale, items });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/sales", async (req, res) => {
+    try {
+      const { items, loyaltyPointsRedeemed, ...saleData } = sanitizeDates(req.body);
+      if (reqTenant(req)) saleData.branchId = await storeBranch(req, saleData.branchId);
+      const loyaltyTenantId = req.tenantId ?? (saleData.customerId ? (await storage.getCustomer(saleData.customerId))?.tenantId ?? void 0 : void 0);
+      const clientRef = saleClientRef(req);
+      const saleTenant2 = reqTenant(req) ?? loyaltyTenantId ?? (saleData.branchId ? (await storage.getBranch(Number(saleData.branchId)))?.tenantId ?? void 0 : void 0);
+      if (clientRef && salesClientRefReady) {
+        const existing = await storage.findSaleByClientRef(clientRef, saleTenant2).catch(() => void 0);
+        if (existing) return res.status(200).json(existing);
+      }
+      const redeemPoints = Math.max(0, Math.floor(Number(loyaltyPointsRedeemed) || 0));
+      if (redeemPoints > 0) {
+        const refusal = saleData.customerId && loyaltyTenantId ? await checkLoyaltyRedemption(Number(saleData.customerId), loyaltyTenantId, redeemPoints) : "A customer is required to redeem points";
+        if (refusal) return res.status(400).json({ error: refusal });
+      }
+      const rcpTz = saleData.branchId ? timeZoneForCurrency(await branchCurrency(saleData.branchId)) : await storeTimeZone(loyaltyTenantId);
+      const swissDateRcp = compactDate(rcpTz);
+      const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`, rcpTz);
+      const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
+      let creditHold = null;
+      if (saleData.paymentMethod === "credit") {
+        try {
+          creditHold = await holdCreditForSale(req.tenantId, saleData.customerId, saleData.totalAmount);
+        } catch (err) {
+          return res.status(err?.statusCode || 400).json({ error: err?.message, code: err?.code, ...err?.details || {} });
+        }
+        saleData.customerId = creditHold.customerId;
+        saleData.totalAmount = (creditHold.cents / 100).toFixed(2);
+        saleData.paymentStatus = "pending";
+      }
+      warnInconsistentSaleTotals(saleData, items);
+      let sale;
+      try {
+        sale = await storage.createSaleWithItems(
+          { ...saleData, receiptNumber },
+          Array.isArray(items) ? items : [],
+          { clientRef: clientRef && salesClientRefReady ? clientRef : null, employeeId: saleData.employeeId }
+        );
+      } catch (err) {
+        if (creditHold) await releaseCreditHold(creditHold);
+        if (clientRef && err?.code === "ER_DUP_ENTRY" && /client_ref/i.test(String(err?.message))) {
+          const existing = await storage.findSaleByClientRef(clientRef, saleTenant2).catch(() => void 0);
+          if (existing) return res.status(200).json(existing);
+        }
+        throw err;
+      }
+      if (saleData.customerId) {
+        const existingCustomer = await storage.getCustomer(saleData.customerId);
+        if (loyaltyTenantId && existingCustomer && (existingCustomer.tenantId == null || existingCustomer.tenantId === loyaltyTenantId)) {
+          try {
+            await settlePosSaleLoyalty({
+              customerId: existingCustomer.id,
+              tenantId: loyaltyTenantId,
+              receiptNumber: sale.receiptNumber,
+              amountPaid: Number(saleData.totalAmount),
+              redeemPoints
+            });
+          } catch (e) {
+            console.error("[loyalty] POS sale", sale.id, e?.message || e);
+          }
+        }
+        if (existingCustomer) {
+          await storage.updateCustomer(saleData.customerId, {
+            visitCount: (existingCustomer.visitCount || 0) + 1,
+            totalSpent: String(Number(existingCustomer.totalSpent || 0) + Number(saleData.totalAmount))
+          });
+        }
+      }
+      if (req.body.callId) {
+        await storage.updateCall(Number(req.body.callId), { saleId: sale.id, status: "answered" });
+      }
+      const saleCur = saleData.branchId ? await branchCurrency(saleData.branchId) : await storeCurrency(loyaltyTenantId);
+      await storage.createActivityLog({
+        employeeId: saleData.employeeId,
+        action: "sale_created",
+        entityType: "sale",
+        entityId: sale.id,
+        details: `Sale ${sale.receiptNumber} completed for ${formatMoney(saleData.totalAmount, saleCur)}`
+      });
+      if (saleData.employeeId) {
+        const emp = await storage.getEmployee(saleData.employeeId);
+        if (emp && Number(emp.commissionRate || 0) > 0) {
+          const commRate = Number(emp.commissionRate);
+          const commAmount = Number(saleData.totalAmount) * (commRate / 100);
+          await storage.createEmployeeCommission({
+            employeeId: saleData.employeeId,
+            saleId: sale.id,
+            commissionRate: String(commRate),
+            commissionAmount: String(commAmount.toFixed(2))
+          });
+        }
+      }
+      const saleEmp = await storage.getEmployee(saleData.employeeId);
+      await storage.notifyAdmins(
+        saleData.employeeId,
+        "sale_completed",
+        "New Sale",
+        `${saleEmp?.name || "Employee"} completed sale ${sale.receiptNumber} for ${formatMoney(saleData.totalAmount, saleCur)} (${saleData.paymentMethod || "cash"})`,
+        "sale",
+        sale.id
+      );
+      if (saleData.vehicleId) {
+        try {
+          const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const { onlineOrders: onlineOrders2, customers: customers2, branches: branches2, vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+          const { eq: eq10 } = await import("drizzle-orm");
+          let resolvedTenantId = reqTenant(req) ?? saleData.tenantId;
+          if (!resolvedTenantId && saleData.branchId) {
+            const [br] = await db2.select({ tenantId: branches2.tenantId }).from(branches2).where(eq10(branches2.id, saleData.branchId)).limit(1);
+            resolvedTenantId = br?.tenantId ?? void 0;
+          }
+          if (!resolvedTenantId) {
+            const [veh] = await db2.select({ tenantId: vehicles2.tenantId }).from(vehicles2).where(eq10(vehicles2.id, saleData.vehicleId)).limit(1);
+            resolvedTenantId = veh?.tenantId ?? void 0;
+          }
+          if (!resolvedTenantId) throw new Error("cannot resolve the store of this sale");
+          const [cust] = saleData.customerId ? await db2.select().from(customers2).where(eq10(customers2.id, saleData.customerId)).limit(1) : [null];
+          const customerName = cust?.name || saleData.customerName || "Walk-in";
+          const customerPhone = cust?.phone || "";
+          const customerAddress = cust?.address || [cust?.street, cust?.streetNr || cust?.houseNr, cust?.postalCode, cust?.city].filter(Boolean).join(" ") || "";
+          const onlineItems = (items || []).map((it) => ({
+            productId: it.productId,
+            name: it.productName || it.name,
+            quantity: it.quantity,
+            unitPrice: Number(it.unitPrice),
+            total: Number(it.total),
+            notes: it.notes || void 0
+          }));
+          const trackingToken = require("crypto").randomBytes(24).toString("hex");
+          const orderNumber = sale.receiptNumber || `POS-${sale.id}`;
+          const [inserted] = await db2.insert(onlineOrders2).values({
+            tenantId: resolvedTenantId,
+            orderNumber,
+            customerName,
+            customerPhone: customerPhone || "\u2014",
+            customerAddress: customerAddress || null,
+            customerEmail: cust?.email || null,
+            items: onlineItems,
+            subtotal: String(saleData.subtotal || 0),
+            taxAmount: String(saleData.taxAmount || 0),
+            deliveryFee: "0",
+            totalAmount: String(saleData.totalAmount || 0),
+            paymentMethod: saleData.paymentMethod || "cash",
+            paymentStatus: saleData.paymentStatus === "completed" ? "paid" : "pending",
+            status: "accepted",
+            // POS already confirmed it
+            orderType: "delivery",
+            notes: saleData.notes || null,
+            driverId: saleData.vehicleId,
+            sourceChannel: "pos",
+            trackingToken
+          }).$returningId();
+          try {
+            const { callerIdService: callerIdService2 } = await Promise.resolve().then(() => (init_callerIdService(), callerIdService_exports));
+            callerIdService2.broadcast({
+              type: "delivery_status_change",
+              orderId: inserted.id,
+              vehicleId: saleData.vehicleId,
+              status: "accepted",
+              orderNumber,
+              customerName
+            }, resolvedTenantId);
+          } catch {
+          }
+        } catch (mirrorErr) {
+          console.error("[/api/sales] online_orders mirror failed:", mirrorErr);
+        }
+      }
+      res.json(sale);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/sales/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { items, ...saleData } = req.body;
+      const { id: _id, receiptNumber: _r, branchId: _b, tenantId: _t, ...editable } = saleData || {};
+      const sale = await storage.updateSaleWithItems(id, sanitizeDates(editable), Array.isArray(items) ? items : void 0);
+      res.json(sale);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/sales/:id", async (req, res) => {
+    try {
+      await reverseCreditSale(req.tenantId, Number(req.params.id));
+      await storage.deleteSale(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/suppliers", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getSuppliers(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/suppliers/:id", async (req, res) => {
+    try {
+      const sup = await storage.getSupplier(Number(req.params.id));
+      if (!sup) return res.status(404).json({ error: "Supplier not found" });
+      res.json(sup);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/suppliers", async (req, res) => {
+    try {
+      res.json(await storage.createSupplier(withTenant(req, sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/suppliers/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateSupplier(Number(req.params.id), withoutTenant(sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/purchase-orders", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getPurchaseOrders(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/purchase-orders", async (req, res) => {
+    try {
+      const data = withoutTenant(sanitizeDates(req.body));
+      const wanted = typeof data.orderNumber === "string" ? data.orderNumber.trim().slice(0, 64) : "";
+      if (!wanted || await storage.purchaseOrderNumberExists(wanted)) {
+        const tz = await storeTimeZone(reqTenant(req));
+        let candidate = "";
+        for (let i = 0; i < 5; i++) {
+          candidate = `PO-${compactDate(tz)}-${crypto6.randomInt(1e4, 99999)}`;
+          if (!await storage.purchaseOrderNumberExists(candidate)) break;
+        }
+        data.orderNumber = candidate;
+      } else {
+        data.orderNumber = wanted;
+      }
+      res.json(await storage.createPurchaseOrder(data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      res.json(await storage.updatePurchaseOrder(Number(req.params.id), withoutTenant(sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/shifts", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getShifts(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/shifts/stats", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      res.json(await storage.getShiftStats(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/shifts/active", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      res.json(await storage.getAllActiveShifts(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/shifts", async (req, res) => {
+    try {
+      const shiftData = sanitizeDates(req.body);
+      if (reqTenant(req)) shiftData.branchId = await storeBranch(req, shiftData.branchId);
+      const shift = await storage.createShift(shiftData);
+      const emp = await storage.getEmployee(shift.employeeId);
+      const cur = shift.branchId ? await branchCurrency(shift.branchId) : await storeCurrency(reqTenant(req));
+      await storage.createActivityLog({
+        employeeId: shift.employeeId,
+        action: "shift_started",
+        entityType: "shift",
+        entityId: shift.id,
+        details: `Shift started by ${emp?.name || "Unknown"} with ${formatMoney(shift.openingCash || 0, cur)} opening cash`
+      });
+      await storage.notifyAdmins(
+        shift.employeeId,
+        "shift_started",
+        "Shift Started",
+        `${emp?.name || "Employee"} has started a new shift with ${formatMoney(shift.openingCash || 0, cur)} opening cash`,
+        "shift",
+        shift.id,
+        "normal"
+      );
+      res.json(shift);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/shifts/:id", async (req, res) => {
+    try {
+      const shift = await storage.updateShift(Number(req.params.id), sanitizeDates(req.body));
+      res.json(shift);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/shifts/:id/close", async (req, res) => {
+    try {
+      const shift = await storage.closeShift(Number(req.params.id), sanitizeDates(req.body));
+      const emp = await storage.getEmployee(shift.employeeId);
+      const cur = shift.branchId ? await branchCurrency(shift.branchId) : await storeCurrency(reqTenant(req));
+      await storage.createActivityLog({
+        employeeId: shift.employeeId,
+        action: "shift_closed",
+        entityType: "shift",
+        entityId: shift.id,
+        details: `Shift closed with ${shift.totalTransactions || 0} transactions and ${formatMoney(shift.closingCash || 0, cur)} closing cash`
+      });
+      await storage.notifyAdmins(
+        shift.employeeId,
+        "shift_ended",
+        "Shift Ended",
+        `${emp?.name || "Employee"} has ended their shift. Transactions: ${shift.totalTransactions || 0}, Sales: ${formatMoney(shift.totalSales || 0, cur)}`,
+        "shift",
+        shift.id,
+        "normal"
+      );
+      res.json(shift);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/notifications/:employeeId", async (req, res) => {
+    try {
+      res.json(await storage.getNotifications(Number(req.params.employeeId)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/notifications/:employeeId/unread-count", async (req, res) => {
+    try {
+      res.json({ count: await storage.getUnreadNotificationCount(Number(req.params.employeeId)) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/notifications", async (req, res) => {
+    try {
+      const data = sanitizeDates(req.body);
+      if (data.recipientId && !await ownedBy(req, resolvers.employee, Number(data.recipientId))) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      res.json(await storage.createNotification(data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/notifications/:id/read", async (req, res) => {
+    try {
+      res.json(await storage.markNotificationRead(Number(req.params.id)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/notifications/:employeeId/read-all", async (req, res) => {
+    try {
+      await storage.markAllNotificationsRead(Number(req.params.employeeId));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/expenses", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getExpenses(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/expenses", async (req, res) => {
+    try {
+      const data = withTenant(req, sanitizeDates(req.body));
+      if ((data.category == null || data.category === "") && data.categoryId != null && data.categoryId !== "") {
+        data.category = String(data.categoryId);
+      }
+      delete data.categoryId;
+      if (!data.category) return res.status(400).json({ error: "category is required" });
+      if (data.amount != null) data.amount = asciiDigits(data.amount).replace(/,/g, "");
+      res.json(await storage.createExpense(data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/tables", async (req, res) => {
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
+      if (!branchId && !tenantId) return res.status(400).json({ error: "tenantId or branchId is required" });
+      res.json(await storage.getTables(branchId, tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/tables", async (req, res) => {
+    try {
+      const data = withoutTenant(sanitizeDates(req.body));
+      if (!data.branchId) {
+        const tenantId = reqTenant(req);
+        if (!tenantId) return res.status(400).json({ error: "branchId is required" });
+        const brs = await storage.getBranchesByTenant(tenantId);
+        const main = brs.find((b) => b.isMain) || brs[0];
+        if (!main) return res.status(400).json({ error: "branchId is required" });
+        data.branchId = main.id;
+      }
+      res.json(await storage.createTable(data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/tables/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateTable(Number(req.params.id), withoutTenant(sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/tables/:id", async (req, res) => {
+    try {
+      const table = await storage.getTable(Number(req.params.id));
+      if (!table) return res.status(404).json({ error: "Table not found" });
+      await storage.deleteTable(table.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/table-qr-codes", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      res.json(await storage.getTableQrCodes(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/table-qr-codes", async (req, res) => {
+    try {
+      const { tableId, branchId, tableName } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : void 0);
+      if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
+      if (!await ownedBy(req, resolvers.table, Number(tableId))) return res.status(404).json({ error: "Table not found" });
+      const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
+      const qr = await storage.createTableQrCode({
+        tenantId: Number(tenantId),
+        tableId: Number(tableId),
+        branchId: branchId ? Number(branchId) : null,
+        qrToken,
+        tableName,
+        isActive: true
+      });
+      res.status(201).json(qr);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/table-qr-codes/generate-all", async (req, res) => {
+    try {
+      const { branchId } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : void 0);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const allTables = await storage.getTables(branchId ? Number(branchId) : void 0, Number(tenantId));
+      const existing = await storage.getTableQrCodes(Number(tenantId));
+      const existingTableIds = new Set(existing.map((q8) => q8.tableId));
+      const created = [];
+      for (const table of allTables) {
+        if (existingTableIds.has(table.id)) continue;
+        const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
+        const qr = await storage.createTableQrCode({
+          tenantId: Number(tenantId),
+          tableId: table.id,
+          branchId: table.branchId ?? null,
+          qrToken,
+          tableName: table.name,
+          isActive: true
+        });
+        created.push(qr);
+      }
+      res.json({ created: created.length, qrCodes: created });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/table-qr-codes/:id", async (req, res) => {
+    try {
+      const { tableName, isActive } = req.body || {};
+      const data = {};
+      if (typeof tableName === "string" && tableName.trim()) data.tableName = tableName.trim().slice(0, 100);
+      if (typeof isActive === "boolean") data.isActive = isActive;
+      if (req.body?.tableId != null) {
+        if (!await ownedBy(req, resolvers.table, Number(req.body.tableId))) return res.status(404).json({ error: "Table not found" });
+        data.tableId = Number(req.body.tableId);
+      }
+      if (!Object.keys(data).length) return res.status(400).json({ error: "Nothing to update" });
+      res.json(await storage.updateTableQrCode(Number(req.params.id), data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/table-qr-codes/:id", async (req, res) => {
+    try {
+      await storage.deleteTableQrCode(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/dine-in/validate/:token", async (req, res) => {
+    try {
+      const qr = await storage.getTableQrCodeByToken(req.params.token);
+      if (!qr || !qr.isActive) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      const viewedTenant = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      if (viewedTenant && viewedTenant !== qr.tenantId) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      if (typeof req.query.slug === "string" && req.query.slug) {
+        const cfg = await storage.getLandingPageConfigBySlug(req.query.slug);
+        if (cfg && cfg.tenantId !== qr.tenantId) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      }
+      await storage.incrementQrScanCount(req.params.token);
+      const config = await storage.getLandingPageConfigByTenantId(qr.tenantId);
+      res.json({
+        valid: true,
+        tableId: qr.tableId,
+        tableName: qr.tableName,
+        branchId: qr.branchId,
+        tenantId: qr.tenantId,
+        slug: config?.slug || null
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/kitchen-orders", async (req, res) => {
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
+      if (!branchId && !tenantId) return res.status(400).json({ error: "tenantId or branchId is required" });
+      res.json(await storage.getKitchenOrders(branchId, tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/kitchen-orders", async (req, res) => {
+    try {
+      const data = sanitizeDates(req.body);
+      if (data.saleId && !await ownedBy(req, resolvers.sale, Number(data.saleId))) return res.status(404).json({ error: "Sale not found" });
+      res.json(await storage.createKitchenOrder(data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/kitchen-orders/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateKitchenOrder(Number(req.params.id), sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/subscription-plans", async (_req, res) => {
+    try {
+      res.json(await storage.getSubscriptionPlans());
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/subscription-plans", requireSuperAdmin, async (req, res) => {
+    try {
+      res.json(await storage.createSubscriptionPlan(sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/subscriptions", async (req, res) => {
+    try {
+      res.json(await storage.getSubscriptions(reqTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/subscriptions", async (req, res) => {
+    try {
+      res.json(await storage.createSubscription(sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/expenses/:id", async (req, res) => {
+    try {
+      await storage.deleteExpense(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const po = await storage.getPurchaseOrder(Number(req.params.id));
+      if (!po) return res.status(404).json({ error: "Purchase order not found" });
+      const items = await storage.getPurchaseOrderItems(po.id);
+      res.json({ ...po, items });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/purchase-orders/:id/items", async (req, res) => {
+    try {
+      const item = await storage.createPurchaseOrderItem({ ...sanitizeDates(req.body), purchaseOrderId: Number(req.params.id) });
+      res.json(item);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/purchase-orders/:id/receive", async (req, res) => {
+    try {
+      const result = await storage.receivePurchaseOrder(Number(req.params.id), req.body.items);
+      if (!result) return res.status(404).json({ error: "Purchase order not found" });
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/employees/:id/shifts", async (req, res) => {
+    try {
+      res.json(await storage.getEmployeeAttendance(Number(req.params.id)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/top-products", async (req, res) => {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : void 0;
+      res.json(await storage.getTopProducts(limit, analyticsTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/sales-by-payment", async (req, res) => {
+    try {
+      res.json(await storage.getSalesByPaymentMethod(analyticsTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/sales-range", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      const tz = await storeTimeZone(tenantId);
+      const parse = (v, end, fallback) => {
+        const s = String(v ?? "").trim();
+        if (!s) return fallback;
+        const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? end ? dayEnd(tz, s) : dayStart(tz, s) : new Date(s);
+        return isNaN(d.getTime()) ? fallback : d;
+      };
+      const startDate = parse(req.query.startDate, false, /* @__PURE__ */ new Date(0));
+      const endDate = parse(req.query.endDate, true, /* @__PURE__ */ new Date());
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getSalesByDateRange(startDate, endDate, tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/seed", async (_req, res) => {
+    try {
+      const seeded = await storage.seedInitialData();
+      if (!seeded) return res.json({ message: "Data already seeded" });
+      res.json({ message: "Seed data created successfully" });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/fix-schema-and-seed", async (_req, res) => {
+    try {
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { sql: sql8 } = await import("drizzle-orm");
+      console.log("[API-SEED] Fixing schema...");
+      const tables2 = ["branches", "products", "employees", "sales", "inventory", "customers", "suppliers"];
+      for (const table of tables2) {
+        try {
+          await db2.execute(sql8.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
+          console.log(`[API-SEED] Table ${table} fixed`);
+        } catch (e) {
+          console.log(`[API-SEED] Table ${table} skip: ${e.message}`);
+        }
+      }
+      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
+      await seedAllDemoData2();
+      res.json({ success: true, message: "Schema fixed and comprehensive demo data seeded." });
+    } catch (e) {
+      console.error("Manual fix & seed error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/force-full-seed", async (_req, res) => {
+    try {
+      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
+      await seedAllDemoData2();
+      res.json({ success: true, message: "Comprehensive demo data seeded successfully" });
+    } catch (e) {
+      console.error("Manual seed error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/activity-log", async (req, res) => {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : void 0;
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getActivityLog(limit, tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/returns", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getReturns(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/returns/:id", async (req, res) => {
+    try {
+      const ret = await storage.getReturn(Number(req.params.id));
+      if (!ret) return res.status(404).json({ error: "Return not found" });
+      const items = await storage.getReturnItems(ret.id);
+      res.json({ ...ret, items });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/returns", async (req, res) => {
+    try {
+      const { items, ...returnData } = sanitizeDates(req.body);
+      if (returnData.originalSaleId && !await ownedBy(req, resolvers.sale, Number(returnData.originalSaleId))) {
+        return res.status(404).json({ error: "Sale not found" });
+      }
+      const ret = await storage.createReturn(returnData);
+      if (items && items.length > 0) {
+        for (const item of items) {
+          await storage.createReturnItem({ ...item, returnId: ret.id });
+          if (returnData.branchId) {
+            await storage.adjustInventory(item.productId, returnData.branchId, item.quantity);
+            await storage.createInventoryMovement({
+              productId: item.productId,
+              branchId: returnData.branchId,
+              type: "return",
+              quantity: item.quantity,
+              referenceType: "return",
+              referenceId: ret.id,
+              employeeId: returnData.employeeId
+            });
+          }
+        }
+      }
+      if (returnData.originalSaleId) {
+        await storage.updateSale(returnData.originalSaleId, { status: "refunded" });
+        try {
+          await creditReturnForSale(req.tenantId, returnData.originalSaleId, ret.id, returnData.totalAmount, returnData.employeeId ?? null);
+        } catch (err) {
+          console.error("[/api/returns] wholesale balance not reduced:", err?.message || err);
+        }
+      }
+      const retCur = returnData.branchId ? await branchCurrency(returnData.branchId) : await storeCurrency(reqTenant(req));
+      await storage.createActivityLog({
+        employeeId: returnData.employeeId,
+        action: "return_created",
+        entityType: "return",
+        entityId: ret.id,
+        details: `Return/refund processed for sale #${returnData.originalSaleId}, amount: ${formatMoney(returnData.totalAmount, retCur)}`
+      });
+      const retEmp = await storage.getEmployee(returnData.employeeId);
+      await storage.notifyAdmins(
+        returnData.employeeId,
+        "return_processed",
+        "Return Processed",
+        `${retEmp?.name || "Employee"} processed a ${returnData.type || "refund"} for ${formatMoney(returnData.totalAmount, retCur)}`,
+        "return",
+        ret.id,
+        "high"
+      );
+      res.json(ret);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/cash-drawer/:shiftId", async (req, res) => {
+    try {
+      res.json(await storage.getCashDrawerOperations(Number(req.params.shiftId)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/cash-drawer", async (req, res) => {
+    try {
+      if (req.body?.shiftId && !await ownedBy(req, resolvers.shift, Number(req.body.shiftId))) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+      const op = await storage.createCashDrawerOperation(sanitizeDates(req.body));
+      const cdCur = await storeCurrency(reqTenant(req));
+      await storage.createActivityLog({ employeeId: req.body.employeeId, action: "cash_drawer_" + req.body.type, entityType: "cash_drawer", entityId: op.id, details: `Cash drawer ${req.body.type}: ${formatMoney(req.body.amount, cdCur)}` });
+      const cdEmp = await storage.getEmployee(req.body.employeeId);
+      await storage.notifyAdmins(
+        req.body.employeeId,
+        "cash_drawer",
+        `Cash Drawer: ${req.body.type}`,
+        `${cdEmp?.name || "Employee"} performed ${req.body.type} of ${formatMoney(req.body.amount, cdCur)}${req.body.reason ? ` - ${req.body.reason}` : ""}`,
+        "cash_drawer",
+        op.id,
+        req.body.type === "withdrawal" ? "high" : "normal"
+      );
+      res.json(op);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/warehouses", async (req, res) => {
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getWarehouses(branchId, tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/warehouses", async (req, res) => {
+    try {
+      res.json(await storage.createWarehouse(sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/warehouses/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateWarehouse(Number(req.params.id), withoutTenant(sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/warehouse-transfers", async (req, res) => {
+    try {
+      res.json(await storage.getWarehouseTransfers(reqTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/warehouse-transfers", async (req, res) => {
+    try {
+      for (const key of ["fromWarehouseId", "toWarehouseId"]) {
+        const wid = Number(req.body?.[key]);
+        if (!wid || !await ownedBy(req, resolvers.warehouse, wid)) return res.status(404).json({ error: "Warehouse not found" });
+      }
+      const transfer = await storage.createWarehouseTransfer(sanitizeDates(req.body));
+      await storage.createInventoryMovement({ productId: req.body.productId, branchId: null, type: "transfer", quantity: req.body.quantity, referenceType: "transfer", referenceId: transfer.id, employeeId: req.body.employeeId, notes: `Transfer from warehouse ${req.body.fromWarehouseId} to ${req.body.toWarehouseId}` });
+      res.json(transfer);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/product-batches", async (req, res) => {
+    try {
+      const productId = req.query.productId ? Number(req.query.productId) : void 0;
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      res.json(await storage.getProductBatches(productId, tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/product-batches", async (req, res) => {
+    try {
+      res.json(await storage.createProductBatch(sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/product-batches/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateProductBatch(Number(req.params.id), withoutTenant(sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/product-batches/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateProductBatch(Number(req.params.id), { isActive: false }));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/inventory-movements", async (req, res) => {
+    try {
+      const productId = req.query.productId ? Number(req.query.productId) : void 0;
+      const limit = req.query.limit ? Number(req.query.limit) : void 0;
+      res.json(await storage.getInventoryMovements(productId, limit, analyticsTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/stock-counts", async (req, res) => {
+    try {
+      res.json(await storage.getStockCounts(reqTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/stock-counts/:id", async (req, res) => {
+    try {
+      const sc = await storage.getStockCount(Number(req.params.id));
+      if (!sc) return res.status(404).json({ error: "Stock count not found" });
+      const items = await storage.getStockCountItems(sc.id);
+      res.json({ ...sc, items });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/stock-counts", async (req, res) => {
+    try {
+      const { items, ...countData } = sanitizeDates(req.body);
+      const sc = await storage.createStockCount(countData);
+      if (items && items.length > 0) {
+        for (const item of items) {
+          await storage.createStockCountItem({ ...item, stockCountId: sc.id });
+        }
+      }
+      res.json(sc);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/stock-counts/:id/approve", async (req, res) => {
+    try {
+      const sc = await storage.updateStockCount(Number(req.params.id), { status: "approved", approvedBy: req.body.approvedBy });
+      const items = await storage.getStockCountItems(sc.id);
+      for (const item of items) {
+        if (item.actualQuantity !== null && item.difference !== null && item.difference !== 0) {
+          await storage.adjustInventory(item.productId, sc.branchId, item.difference);
+          await storage.createInventoryMovement({ productId: item.productId, branchId: sc.branchId, type: "count", quantity: item.difference, referenceType: "manual", referenceId: sc.id, notes: `Stock count adjustment: system ${item.systemQuantity} \u2192 actual ${item.actualQuantity}` });
+        }
+      }
+      await storage.createActivityLog({ employeeId: req.body.approvedBy, action: "stock_count_approved", entityType: "stock_count", entityId: sc.id, details: `Stock count #${sc.id} approved with ${sc.discrepancies || 0} discrepancies` });
+      res.json(sc);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/supplier-contracts", async (req, res) => {
+    try {
+      res.json(await storage.getSupplierContracts(req.query.supplierId ? Number(req.query.supplierId) : void 0, reqTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/supplier-contracts", async (req, res) => {
+    try {
+      res.json(await storage.createSupplierContract(sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/supplier-contracts/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateSupplierContract(Number(req.params.id), withoutTenant(sanitizeDates(req.body))));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/employee-commissions", async (req, res) => {
+    try {
+      res.json(await storage.getEmployeeCommissions(req.query.employeeId ? Number(req.query.employeeId) : void 0, reqTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/employee-commissions", async (req, res) => {
+    try {
+      if (req.body?.saleId && !await ownedBy(req, resolvers.sale, Number(req.body.saleId))) return res.status(404).json({ error: "Sale not found" });
+      res.json(await storage.createEmployeeCommission(sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/employee-sales/:id", async (req, res) => {
+    try {
+      res.json(await storage.getEmployeeSalesReport(Number(req.params.id)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/slow-moving", async (req, res) => {
+    try {
+      res.json(await storage.getSlowMovingProducts(req.query.days ? Number(req.query.days) : 30, analyticsTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/profit-by-product", async (req, res) => {
+    try {
+      res.json(await storage.getProfitByProduct(analyticsTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/cashier-performance", async (req, res) => {
+    try {
+      res.json(await storage.getCashierPerformance(analyticsTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/returns-report", async (req, res) => {
+    try {
+      res.json(await storage.getReturnsReport(analyticsTenant(req)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/reports/daily-sales-report", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const tz = await storeTimeZone(tenantId);
+      const raw = String(req.query.date || "").trim();
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localDateString(tz);
+      const salesData = await storage.getSalesWithCustomerByDateRange(dayStart(tz, date), dayEnd(tz, date), tenantId);
+      res.json(salesData);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/reports/sales-export", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const tz = await storeTimeZone(tenantId);
+      const startDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.startDate || "")) ? String(req.query.startDate) : "2000-01-01";
+      const endDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.endDate || "")) ? String(req.query.endDate) : "2099-12-31";
+      const salesData = await storage.getSalesByDateRange(dayStart(tz, startDate), dayEnd(tz, endDate), tenantId);
+      const headers = ["Receipt #", "Date", "Total", "Payment Method", "Status", "Employee ID", "Customer ID"];
+      const rows = salesData.map((s) => [
+        s.receiptNumber || `#${s.id}`,
+        new Date(s.createdAt).toLocaleString(),
+        Number(s.totalAmount).toFixed(2),
+        s.paymentMethod,
+        s.status,
+        s.employeeId,
+        s.customerId || "Walk-in"
+      ]);
+      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename=sales-report-${startDate}-to-${endDate}.csv`);
+      res.send(csv);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/reports/inventory-export", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const allProducts = await storage.getProductsByTenant(tenantId);
+      const headers = ["ID", "Name", "Category", "Barcode", "Price", "Cost Price", "Stock Qty", "Low Stock Threshold", "Status"];
+      const rows = allProducts.map((p) => [
+        p.id,
+        `"${p.name}"`,
+        p.categoryId,
+        p.barcode || "N/A",
+        Number(p.price).toFixed(2),
+        Number(p.costPrice || 0).toFixed(2),
+        p.stockQuantity || 0,
+        p.lowStockThreshold || 10,
+        p.isActive ? "Active" : "Inactive"
+      ]);
+      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=inventory-report.csv");
+      res.send(csv);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/reports/profit-export", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const profitData = await storage.getProfitByProduct(tenantId);
+      const headers = ["Product", "Total Sold", "Revenue", "Total Cost", "Profit", "Cost Price"];
+      const rows = profitData.map((p) => [
+        `"${p.productName}"`,
+        p.totalSold,
+        Number(p.totalRevenue).toFixed(2),
+        Number(p.totalCost).toFixed(2),
+        Number(p.profit).toFixed(2),
+        Number(p.costPrice).toFixed(2)
+      ]);
+      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=profit-report.csv");
+      res.send(csv);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/reports/employee-performance-export", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const perfData = await storage.getCashierPerformance(tenantId);
+      const headers = ["Employee", "Role", "Sales Count", "Total Revenue", "Avg Sale Value"];
+      const rows = perfData.map((p) => [
+        `"${p.employeeName}"`,
+        p.role,
+        p.salesCount,
+        Number(p.totalRevenue).toFixed(2),
+        Number(p.avgSaleValue).toFixed(2)
+      ]);
+      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=employee-performance-report.csv");
+      res.send(csv);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/analytics/predictions", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const stats = await storage.getDashboardStats(tenantId);
+      const topProducts = stats.topProducts || [];
+      const slowMoving = await storage.getSlowMovingProducts(30, tenantId);
+      const allProds = await storage.getProductsByTenant(tenantId);
+      const lowStockData = [];
+      const tenantBranches = await storage.getBranchesByTenant(tenantId);
+      for (const branch of tenantBranches) {
+        const items = await storage.getLowStockItems(branch.id);
+        lowStockData.push(...items);
+      }
+      const predCur = await storeCurrency(tenantId);
+      const avgDailyRevenue = Number(stats.monthRevenue || 0) / 30;
+      const projectedMonthly = avgDailyRevenue * 30;
+      const projectedYearly = avgDailyRevenue * 365;
+      const stockAlerts = lowStockData.map((item) => {
+        const prod = allProds.find((p) => p.id === item.productId);
+        return {
+          productId: item.productId,
+          productName: prod?.name || `Product #${item.productId}`,
+          currentStock: item.quantity || 0,
+          threshold: item.lowStockThreshold || 10,
+          urgency: (item.quantity || 0) <= 5 ? "critical" : "warning",
+          recommendation: `Reorder ${Math.max(50 - (item.quantity || 0), 20)} units`
+        };
+      });
+      const categoryPerf = topProducts.reduce((acc, p) => {
+        const prod = allProds.find((pr) => pr.id === p.productId);
+        const catId = prod?.categoryId || 0;
+        if (!acc[catId]) acc[catId] = { revenue: 0, count: 0 };
+        acc[catId].revenue += Number(p.revenue || 0);
+        acc[catId].count += Number(p.totalSold || 0);
+        return acc;
+      }, {});
+      res.json({
+        projectedMonthlyRevenue: projectedMonthly,
+        projectedYearlyRevenue: projectedYearly,
+        avgDailyRevenue,
+        totalActiveProducts: allProds.filter((p) => p.isActive).length,
+        slowMovingCount: slowMoving.length,
+        topSellingProducts: topProducts.slice(0, 5).map((p) => ({
+          name: p.name,
+          revenue: Number(p.revenue || 0),
+          soldCount: Number(p.totalSold || 0)
+        })),
+        stockAlerts,
+        categoryPerformance: Object.entries(categoryPerf).map(([catId, data]) => ({
+          categoryId: Number(catId),
+          revenue: data.revenue,
+          itemsSold: data.count
+        })),
+        insights: [
+          avgDailyRevenue > 0 ? `Average daily revenue: ${formatMoney(avgDailyRevenue, predCur)}` : "No sales data yet for predictions",
+          slowMoving.length > 0 ? `${slowMoving.length} products with low sales in the last 30 days - consider promotions` : "All products are selling well",
+          stockAlerts.filter((a) => a.urgency === "critical").length > 0 ? `${stockAlerts.filter((a) => a.urgency === "critical").length} products critically low on stock - reorder immediately` : "Stock levels are healthy"
+        ]
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/public-objects/*filePath", async (req, res) => {
+    const filePath = req.params.filePath;
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const file = await objectStorageService.searchPublicObject(filePath);
+      if (!file) return res.status(404).json({ error: "File not found" });
+      objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error("Error serving public object:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  app2.get("/objects/*objectPath", async (req, res) => {
+    const uploadsDir = import_node_path.default.resolve(process.cwd(), "uploads");
+    const filename = req.path.replace(/^\/objects\//, "");
+    const localPath = import_node_path.default.join(uploadsDir, filename);
+    if (import_node_fs.default.existsSync(localPath)) {
+      return res.sendFile(localPath);
+    }
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      return res.sendStatus(404);
+    }
+  });
+  app2.post("/api/objects/upload", async (req, res) => {
+    try {
+      const { imageData, contentType = "image/jpeg" } = req.body;
+      if (!imageData) {
+        return res.status(400).json({ error: "imageData is required" });
+      }
+      const uploadsDir = import_node_path.default.resolve(process.cwd(), "uploads");
+      if (!import_node_fs.default.existsSync(uploadsDir)) import_node_fs.default.mkdirSync(uploadsDir, { recursive: true });
+      const ext = (contentType.split("/")[1] || "jpg").split(";")[0];
+      const filename = `${(0, import_node_crypto.randomUUID)()}.${ext}`;
+      const filePath = import_node_path.default.join(uploadsDir, filename);
+      const buffer = Buffer.from(imageData, "base64");
+      import_node_fs.default.writeFileSync(filePath, buffer);
+      const objectPath = `/objects/${filename}`;
+      res.json({ objectPath });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  app2.put("/api/images/save", async (req, res) => {
+    const { imageURL } = req.body;
+    if (!imageURL) {
+      return res.status(400).json({ error: "imageURL is required" });
+    }
+    res.status(200).json({ objectPath: imageURL });
+  });
+  app2.post("/api/products-with-stock", async (req, res) => {
+    try {
+      const { initialStock, branchId, ...productData } = normalizeWholesaleProductFields(withTenant(req, sanitizeDates(req.body)));
+      const product = await storage.createProduct(productData);
+      if (initialStock && initialStock > 0 && branchId) {
+        await storage.upsertInventory({ productId: product.id, branchId: Number(branchId), quantity: Number(initialStock) });
+        await storage.createInventoryMovement({
+          productId: product.id,
+          branchId: Number(branchId),
+          type: "purchase",
+          quantity: Number(initialStock),
+          referenceType: "manual",
+          notes: "Initial stock on product creation"
+        });
+      }
+      res.json(product);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/shifts/active/:employeeId", async (req, res) => {
+    try {
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
+      const shifts2 = await storage.getShifts(tenantId);
+      const active = shifts2.find((s) => s.employeeId === Number(req.params.employeeId) && s.status === "open");
+      res.json(active || null);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/store-settings", async (req, res) => {
+    try {
+      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
+      let branches2 = [];
+      if (tenantId) {
+        branches2 = await storage.getBranchesByTenant(tenantId);
+      } else {
+        branches2 = await storage.getBranches();
+      }
+      const mainBranch = branches2.find((b) => b.isMain) || branches2[0];
+      if (!mainBranch) return res.status(404).json({ error: "No branch found" });
+      const tenant = mainBranch.tenantId ? await storage.getTenant(mainBranch.tenantId) : null;
+      res.json({
+        ...mainBranch,
+        storeType: tenant?.storeType || "supermarket",
+        commissionRate: 0,
+        // commission is baked into product prices via applyMarkup
+        whatsappAdminPhone: tenant?.metadata?.whatsappAdminPhone || "",
+        whatsappVerified: !!verifiedStorePhone(tenant?.metadata),
+        // BIZ-01: opt-in minimum-order top-up, delivery only. 0 = disabled.
+        minOrderAmount: Number(tenant?.metadata?.minOrderAmount) || 0
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/store-settings", async (req, res) => {
+    try {
+      const { storeType, tenantId: bodyTenantId, ...branchData } = sanitizeDates(req.body);
+      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : bodyTenantId ? Number(bodyTenantId) : void 0);
+      let branches2 = [];
+      if (tenantId) {
+        branches2 = await storage.getBranchesByTenant(tenantId);
+      } else {
+        branches2 = await storage.getBranches();
+      }
+      const mainBranch = branches2.find((b) => b.isMain) || branches2[0];
+      if (!mainBranch) return res.status(404).json({ error: "No branch found" });
+      const { whatsappAdminPhone, minOrderAmount, ...cleanBranchData } = branchData;
+      const updatedBranch = await storage.updateBranch(mainBranch.id, cleanBranchData);
+      if (mainBranch.tenantId) {
+        const tenantUpdates = {};
+        if (storeType) tenantUpdates.storeType = storeType;
+        if (whatsappAdminPhone !== void 0 || minOrderAmount !== void 0) {
+          const existingTenant = await storage.getTenant(mainBranch.tenantId);
+          const metadata = { ...existingTenant?.metadata || {} };
+          if (whatsappAdminPhone !== void 0 && !String(whatsappAdminPhone).replace(/\D/g, "")) {
+            metadata.whatsappAdminPhone = "";
+            metadata.whatsappVerifiedAt = null;
+          }
+          if (minOrderAmount !== void 0) metadata.minOrderAmount = Math.max(0, Number(minOrderAmount) || 0);
+          tenantUpdates.metadata = metadata;
+        }
+        if (Object.keys(tenantUpdates).length > 0) {
+          await storage.updateTenant(mainBranch.tenantId, tenantUpdates);
+        }
+      }
+      res.json({
+        ...updatedBranch,
+        storeType,
+        whatsappAdminPhone: mainBranch.tenantId ? verifiedStorePhone((await storage.getTenant(mainBranch.tenantId))?.metadata) : "",
+        minOrderAmount: Math.max(0, Number(minOrderAmount) || 0)
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/system-language", async (req, res) => {
+    try {
+      const { language } = req.body;
+      if (!["en", "ar", "de"].includes(language)) {
+        return res.status(400).json({ error: "Invalid language. Must be en, ar, or de" });
+      }
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
+      await storage.upsertLandingPageConfig(tenantId, { language });
+      res.json({ success: true, language });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/caller-id/simulate", async (req, res) => {
+    const { phoneNumber, tenantId: bodyTenantId } = req.body;
+    const tenantId = bodyTenantId || req.tenantId;
+    await callerIdService.handleIncomingCall(phoneNumber || "0551234567", void 0, tenantId ? Number(tenantId) : void 0);
+    res.json({ success: true });
+  });
+  app2.get("/api/caller-id/incoming", (_req, res) => {
+    res.send(`<!DOCTYPE html><html><head><title>Caller ID Test</title>
+<style>body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:20px}
+input,button{display:block;width:100%;margin:8px 0;padding:10px;font-size:16px;box-sizing:border-box}
+button{background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer}
+#result{margin-top:16px;padding:12px;border-radius:6px;display:none}
+.ok{background:#d1fae5;color:#065f46}.err{background:#fee2e2;color:#991b1b}</style></head>
+<body><h2>Caller ID Test</h2>
+<input id="phone" placeholder="Phone number" value="01012345678"/>
+<input id="secret" placeholder="Bridge secret" value="fritzbridge-secret-change-me"/>
+<button onclick="test()">Simulate Incoming Call</button>
+<div id="result"></div>
+<script>
+async function test(){
+  const r=document.getElementById('result');
+  r.style.display='block';r.className='';r.textContent='Sending...';
+  try{
+    const res=await fetch('/api/caller-id/incoming',{method:'POST',
+      headers:{'Content-Type':'application/json','x-bridge-secret':document.getElementById('secret').value},
+      body:JSON.stringify({phoneNumber:document.getElementById('phone').value,tenantId:1,slot:1})});
+    const d=await res.json();
+    r.className=res.ok?'ok':'err';
+    r.textContent=res.ok?'\u2713 Success! Check POS for popup.':'\u2717 '+JSON.stringify(d);
+  }catch(e){r.className='err';r.textContent='\u2717 '+e.message;}
+}
+</script></body></html>`);
+  });
+  app2.get("/api/caller-id/active-calls", (req, res) => {
+    const tenantId = req.tenantId || Number(req.query.tenantId);
+    if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+    const calls2 = callerIdService.getActiveCallsForTenant(Number(tenantId));
+    res.json({ calls: calls2 });
+  });
+  app2.get("/api/events", (req, res) => {
+    const tenantIdRaw = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+    const tenantId = tenantIdRaw && !isNaN(tenantIdRaw) ? tenantIdRaw : void 0;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-store, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+    res.write(`: connected ${(/* @__PURE__ */ new Date()).toISOString()}
+
+`);
+    res.write(`data: ${JSON.stringify({ type: "sse_connected", tenantId: tenantId ?? null })}
+
+`);
+    const teardown = callerIdService.addSseClient(res, tenantId);
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: hb ${Date.now()}
+
+`);
+      } catch {
+      }
+    }, 25e3);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      teardown();
+    });
+  });
+  app2.post("/api/caller-id/incoming", async (req, res) => {
+    try {
+      const secret = req.headers["x-bridge-secret"] || req.body.secret;
+      const expectedSecret = process.env.CALLER_ID_BRIDGE_SECRET;
+      if (!expectedSecret || secret !== expectedSecret) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { phoneNumber, slot } = req.body;
+      const tenantId = req.body.tenantId || req.tenantId;
+      const callInfo = await callerIdService.handleIncomingCall(
+        phoneNumber || "0123456789",
+        slot ? Number(slot) : void 0,
+        tenantId ? Number(tenantId) : void 0
+      );
+      const customerName = callInfo?.customer?.name;
+      const customerAddress = callInfo?.customer?.address;
+      pushService.notifyIncomingCall(phoneNumber || "0123456789", tenantId ? Number(tenantId) : void 0, customerName, customerAddress).catch(() => {
+      });
+      res.json({ success: true });
+    } catch (e) {
+      console.error("[CallerID] Error handling incoming call:", e);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  app2.get("/api/push/vapid-public-key", (_req, res) => {
+    res.json({ publicKey: pushService.publicKey });
+  });
+  app2.post("/api/push/subscribe", (req, res) => {
+    const sub = req.body;
+    if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
+    const rawTenantId = req.tenantId ?? req.body?.tenantId;
+    const tenantId = Number(rawTenantId);
+    if (!Number.isFinite(tenantId) || tenantId <= 0) {
+      return res.status(401).json({ error: "Tenant identification required" });
+    }
+    pushService.subscribe(sub, tenantId);
+    res.json({ success: true });
+  });
+  app2.post("/api/push/unsubscribe", (req, res) => {
+    const { endpoint } = req.body;
+    if (endpoint) pushService.unsubscribe(endpoint);
+    res.json({ success: true });
+  });
+  function sortCategoriesByPriority(cats) {
+    const getPriority = (name) => {
+      const n = name.toLowerCase();
+      if (/pizza|بيتزا|calzone|pide|lahmacun|burger|burg|sandwich|wrap|grill|shawarma|شاورما/.test(n)) return 1;
+      if (/pasta|meal|main|plate|chicken|meat|fish|teller|nuggets|schnitzel|kebab|دجاج|لحم|سمك/.test(n)) return 2;
+      if (/appetizer|starter|finger|snack|مقبلات|فاتح/.test(n)) return 3;
+      if (/salad|سلطة/.test(n)) return 6;
+      if (/dessert|sweet|حلوى|حلويات|baklava|tiramisu/.test(n)) return 7;
+      if (/drink|beverage|juice|water|coke|cola|bier|beer|wine|alcohol|عصير|مشروب/.test(n)) return 8;
+      if (/tabak|tobacco|cigarette/.test(n)) return 9;
+      return 5;
+    };
+    return [...cats].sort((a, b) => {
+      const aOrder = a.sortOrder || 0;
+      const bOrder = b.sortOrder || 0;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return getPriority(a.name) - getPriority(b.name);
+    });
+  }
+  app2.get("/api/store/:tenantId/menu", async (req, res) => {
+    try {
+      const tenantId = Number(req.params.tenantId);
+      if (!tenantId || isNaN(tenantId)) {
+        return res.status(400).json({ error: "Valid tenantId is required" });
+      }
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ error: "Store not found" });
+      }
+      const categories2 = sortCategoriesByPriority(await storage.getCategories(tenantId));
+      const products2 = await storage.getProductsByTenant(tenantId);
+      const categoryOrder = categories2.map((c) => c.id);
+      products2.sort((a, b) => categoryOrder.indexOf(a.categoryId) - categoryOrder.indexOf(b.categoryId));
+      const config = await storage.getLandingPageConfig(tenantId);
+      res.json({
+        store: {
+          id: tenant.id,
+          name: tenant.businessName,
+          logo: tenant.logo,
+          storeType: tenant.storeType
+        },
+        config: config || null,
+        products: products2,
+        categories: categories2
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/store-public/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const config = await storage.getLandingPageConfigBySlug(slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      if (!config.isPublished) return res.status(404).json({ error: "Store is currently unavailable" });
+      const tenant = await storage.getTenant(config.tenantId);
+      let products2 = await storage.getProductsByTenant(config.tenantId);
+      const commissionRate = await storage.getCommissionRate();
+      if (commissionRate > 0) {
+        const factor = 1 + commissionRate / 100;
+        products2 = products2.map((p) => {
+          const rawPrice = parseFloat(p.price) * factor;
+          const rounded = Math.round(rawPrice * 2) / 2;
+          return { ...p, price: rounded.toFixed(2) };
+        });
+      }
+      const categories2 = sortCategoriesByPriority(await storage.getCategories(config.tenantId));
+      const categoryOrder = categories2.map((c) => c.id);
+      products2.sort((a, b) => categoryOrder.indexOf(a.categoryId) - categoryOrder.indexOf(b.categoryId));
+      const publicTenant = tenant ? {
+        id: tenant.id,
+        businessName: tenant.businessName,
+        name: tenant.businessName,
+        logo: tenant.logo,
+        storeType: tenant.storeType,
+        currency: tenant.currency,
+        address: tenant.address,
+        city: tenant.city,
+        country: tenant.country,
+        phone: tenant.businessPhone ?? tenant.phone ?? null
+      } : null;
+      res.json({ config, tenant: publicTenant, products: products2, categories: categories2 });
+    } catch (e) {
+      console.error(`[API] Public store error for ${req.params.slug}:`, e);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  app2.post("/api/online-orders/public", async (req, res) => {
+    try {
+      const { slug, tenantId: bodyTenantId, ...orderData } = req.body;
+      if (orderData.customerPhone) orderData.customerPhone = canonicalPhone(orderData.customerPhone);
+      let resolvedTenantId;
+      if (slug) {
+        const config = await storage.getLandingPageConfigBySlug(slug);
+        if (config) resolvedTenantId = config.tenantId;
+      }
+      if (!resolvedTenantId && bodyTenantId) {
+        resolvedTenantId = Number(bodyTenantId);
+      }
+      if (!resolvedTenantId) return res.status(404).json({ error: "Store not found" });
+      const onlTz = await storeTimeZone(resolvedTenantId);
+      const swissDateOnl = compactDate(onlTz);
+      const dailySeqOnl = await storage.getNextSequenceNumber(`tenant-${resolvedTenantId}`, onlTz);
+      const orderNumber = `${resolvedTenantId}-${swissDateOnl}-${dailySeqOnl}`;
+      const order = await storage.createOnlineOrder({
+        ...orderData,
+        tenantId: resolvedTenantId,
+        orderNumber,
+        paymentStatus: orderData.paymentMethod === "cash" ? "pending" : "pending",
+        status: "pending"
+      });
+      try {
+        const { customerName, customerPhone, customerEmail, customerAddress } = orderData;
+        if (customerName) {
+          let existing = [];
+          if (customerPhone) {
+            existing = await storage.findCustomerByPhone(customerPhone, resolvedTenantId);
+          }
+          if (existing.length === 0) {
+            await storage.createCustomer({
+              tenantId: resolvedTenantId,
+              name: customerName,
+              phone: customerPhone || null,
+              email: customerEmail || null,
+              address: customerAddress || null
+            });
+          }
+        }
+      } catch (autoErr) {
+        console.error("[AutoCustomer] Failed to auto-save customer from online order:", autoErr);
+      }
+      try {
+        const commissionRate = await storage.getCommissionRate();
+        const saleTotal = parseFloat(orderData.totalAmount || "0");
+        const commissionAmount = saleTotal * commissionRate / (100 + commissionRate);
+        if (commissionAmount > 0) {
+          await storage.createPlatformCommission({
+            tenantId: resolvedTenantId,
+            orderId: order.id,
+            saleTotal: String(saleTotal.toFixed(2)),
+            commissionRate: String(commissionRate),
+            commissionAmount: String(commissionAmount.toFixed(2)),
+            status: "pending"
+          });
+        }
+      } catch (commErr) {
+        console.error("[Commission] Failed to track commission:", commErr);
+      }
+      callerIdService.broadcast({
+        type: "new_online_order",
+        order
+      }, resolvedTenantId);
+      pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => {
+      });
+      try {
+        const tenant = await storage.getTenant(resolvedTenantId);
+        const adminPhone = verifiedStorePhone(tenant?.metadata) || void 0;
+        await whatsappService.orderPlaced(order, resolvedTenantId, adminPhone);
+      } catch (waErr) {
+        console.error("[WhatsApp] Failed to send order notifications:", waErr);
+      }
+      res.json(order);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/online-orders", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const status = req.query.status;
+      const orders = await storage.getOnlineOrders(tenantId, status);
+      res.json(orders);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/online-orders/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const before = await storage.getOnlineOrder(id);
+      if (!before) return res.status(404).json({ error: "Order not found" });
+      const parsed = await editableOrderFields(req, req.body || {});
+      if ("error" in parsed) return res.status(parsed.status).json({ error: parsed.error, code: parsed.code });
+      const update = parsed.data;
+      if (!Object.keys(update).length) return res.status(400).json({ error: "Nothing to update", code: "NO_FIELDS" });
+      const order = await storage.updateOnlineOrder(id, update);
+      if (update.paymentStatus === "paid" && before.paymentStatus !== "paid") {
+        await markOnlineOrderPaid2(id, null);
+      }
+      if (update.status && TERMINAL_ORDER_STATUSES.has(update.status) && order?.driverId) {
+        try {
+          await storage.releaseDriverFromOrder(Number(order.driverId), id);
+        } catch (e) {
+          console.error("[orders] driver release failed:", e);
+        }
+      }
+      if (order?.tenantId) callerIdService.broadcast({ type: "online_order_updated", order }, Number(order.tenantId));
+      if (app2._broadcastOrderStatus) {
+        app2._broadcastOrderStatus(id, { type: "status_update", order });
+      }
+      if (req.body.status && order.customerPhone) {
+        try {
+          if (order.tenantId) {
+            await whatsappService.orderStatusChanged(order, req.body.status, order.tenantId);
+          }
+        } catch (waErr) {
+          console.error("[WhatsApp] Failed to send status update:", waErr);
+        }
+      }
+      res.json(order);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/online-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.getOnlineOrder(Number(req.params.id));
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (order.driverId) {
+        try {
+          await storage.releaseDriverFromOrder(Number(order.driverId), order.id);
+        } catch {
+        }
+      }
+      await storage.deleteOnlineOrder(order.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/online-orders/:id/confirm-shamcash", requireManager, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const order = await storage.getOnlineOrder(id);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      const tranId = typeof req.body?.tranId === "string" ? asciiDigits(req.body.tranId).trim().slice(0, 64) || null : null;
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      await pool2.query(
+        `UPDATE online_orders
+            SET payment_status = 'paid', payment_method = 'shamcash',
+                paid_at = COALESCE(paid_at, NOW()), payment_error = NULL, updated_at = NOW()
+          WHERE id = ?`,
+        [id]
+      );
+      let invoice = null;
+      try {
+        const [rows] = await pool2.query(
+          "SELECT id FROM shamcash_invoices WHERE online_order_id = ? AND tenant_id = ? ORDER BY (status = 'pending') DESC, id DESC LIMIT 1",
+          [id, order.tenantId]
+        );
+        if (rows?.[0]) {
+          await pool2.query(
+            "UPDATE shamcash_invoices SET status = 'paid', tran_id = COALESCE(?, tran_id), paid_at = COALESCE(paid_at, NOW()) WHERE id = ?",
+            [tranId, rows[0].id]
+          );
+          invoice = { id: rows[0].id, status: "paid" };
+        }
+      } catch (e) {
+        if (!/doesn't exist/i.test(String(e?.message))) throw e;
+      }
+      const fresh = await storage.getOnlineOrder(id);
+      callerIdService.broadcast({ type: "online_order_updated", order: fresh }, Number(order.tenantId));
+      if (app2._broadcastOrderStatus) app2._broadcastOrderStatus(id, { type: "status_update", order: fresh });
+      res.json({ success: true, order: fresh, invoice });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/super-admin/whatsapp/status", requireSuperAdmin, async (_req, res) => {
+    res.json(whatsappService.getStatus());
+  });
+  app2.post("/api/super-admin/whatsapp/connect", requireSuperAdmin, async (_req, res) => {
+    try {
+      const result = await whatsappService.connect();
+      const qr = whatsappService.getQrCode();
+      res.json({ ...result, qrCode: qr });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/super-admin/whatsapp/disconnect", requireSuperAdmin, async (_req, res) => {
+    await whatsappService.disconnect();
+    res.json({ success: true });
+  });
+  app2.get("/api/super-admin/whatsapp/qr", requireSuperAdmin, async (_req, res) => {
+    const qr = whatsappService.getQrCode();
+    res.json({ qrCode: qr });
+  });
+  app2.get("/api/super-admin/whatsapp/session-info", requireSuperAdmin, async (_req, res) => {
+    res.json({ hasSession: whatsappService.hasSession(), sessionModified: whatsappService.sessionModified() });
+  });
+  app2.post("/api/super-admin/whatsapp/test", requireSuperAdmin, async (req, res) => {
+    const globalPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
+    const targetPhone = (req.body?.phone || globalPhone || "").replace(/\D/g, "");
+    if (!targetPhone) return res.status(400).json({ error: "No phone number specified and no global admin phone configured" });
+    const sent = await whatsappService.sendText(
+      targetPhone,
+      "\u{1F9EA} *Test Message*\n\nThis is a test from Kassenta POS WhatsApp integration.\n\n\u2705 If you receive this, the connection is working!"
+    );
+    res.json({ success: sent, phone: targetPhone });
+  });
+  app2.get("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin, async (_req, res) => {
+    try {
+      const phone = await storage.getPlatformSetting("whatsapp_admin_phone");
+      res.json({ phone: phone || "" });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin, async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (phone === void 0) return res.status(400).json({ error: "phone required" });
+      await storage.setPlatformSetting("whatsapp_admin_phone", phone.replace(/\D/g, ""));
+      res.json({ success: true, phone: phone.replace(/\D/g, "") });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin, async (req, res) => {
+    try {
+      const tenant = await storage.getTenant(Number(req.params.tenantId));
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      const phone = tenant.metadata?.whatsappAdminPhone || "";
+      res.json({ phone });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin, async (req, res) => {
+    try {
+      const tenant = await storage.getTenant(Number(req.params.tenantId));
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      const phone = (req.body?.phone || "").replace(/\D/g, "");
+      const metadata = {
+        ...tenant.metadata || {},
+        whatsappAdminPhone: phone,
+        whatsappVerifiedAt: phone ? (/* @__PURE__ */ new Date()).toISOString() : null
+      };
+      await storage.updateTenant(Number(req.params.tenantId), { metadata });
+      res.json({ success: true, phone });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/landing-page-config", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const config = await storage.getLandingPageConfig(tenantId);
+      res.json(config || null);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/landing-page-config", requireSuperAdmin, async (req, res) => {
+    try {
+      const { tenantId, ...data } = req.body;
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const config = await storage.upsertLandingPageConfig(Number(tenantId), data);
+      res.json(config);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/tenant/landing-config", async (req, res) => {
+    try {
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "License authentication required" });
+      const { tenantId: _t, id: _i, createdAt: _c, updatedAt: _u, ...data } = req.body;
+      const config = await storage.upsertLandingPageConfig(Number(tenantId), data);
+      res.json(config);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/store-public/commission-rate", async (_req, res) => {
+    try {
+      const rate = await storage.getCommissionRate();
+      res.json({ rate });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/create-payment-intent", async (req, res) => {
+    try {
+      const { amount, currency, tenantId } = req.body;
+      const stripe = await getUncachableStripeClient();
+      const amountInCents = Math.round(parseFloat(amount) * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: (currency || "chf").toLowerCase(),
+        metadata: { tenantId: String(tenantId || ""), source: "online_order" }
+      });
+      res.json({ clientSecret: paymentIntent.client_secret, publishableKey: await getStripePublishableKey() });
+    } catch (e) {
+      console.error("[Stripe] PaymentIntent error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  const orderSseClients = /* @__PURE__ */ new Map();
+  app2._orderSseClients = orderSseClients;
+  app2.get("/api/online-orders/:id/status-stream", async (req, res) => {
+    const orderId = Number(req.params.id);
+    const order = Number.isFinite(orderId) ? await storage.getOnlineOrder(orderId).catch(() => null) : null;
+    const token = String(req.query.token || req.query.trackingToken || "");
+    if (!order || !order.trackingToken || token !== order.trackingToken) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+    if (!orderSseClients.has(orderId)) orderSseClients.set(orderId, /* @__PURE__ */ new Set());
+    orderSseClients.get(orderId).add(res);
+    res.write(`data: ${JSON.stringify({ type: "connected" })}
+
+`);
+    const keepAlive = setInterval(() => res.write(`: ping
+
+`), 25e3);
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      orderSseClients.get(orderId)?.delete(res);
+    });
+  });
+  app2._broadcastOrderStatus = (orderId, data) => {
+    const clients = orderSseClients.get(orderId);
+    if (clients) {
+      const msg = `data: ${JSON.stringify(data)}
+
+`;
+      clients.forEach((c) => {
+        try {
+          c.write(msg);
+        } catch {
+        }
+      });
+    }
+  };
+  app2.get("/store/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const config = await storage.getLandingPageConfigBySlug(slug);
+      if (!config || !config.isPublished) {
+        return res.status(404).send("<h1>Store not found</h1>");
+      }
+      const templatePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
+      let html = import_node_fs.default.readFileSync(templatePath, "utf8");
+      const branches2 = await storage.getBranchesByTenant(config.tenantId);
+      const currency = branches2?.[0]?.currency || "CHF";
+      const storeTenant = await storage.getTenant(config.tenantId);
+      const storeName = String(storeTenant?.businessName || config.businessName || "Kassenta Store").replace(/[<>"]/g, "");
+      const storeLogo = String(config.logoUrl || storeTenant?.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
+      html = html.replace(/\{\{SLUG\}\}/g, slug);
+      html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
+      html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
+      html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
+      html = html.replace(/\{\{CURRENCY\}\}/g, currency);
+      html = html.replace(/\{\{LANGUAGE\}\}/g, config.language || "en");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(html);
+    } catch (e) {
+      console.error("[store/:slug] Error:", e);
+      res.status(500).send("<h1>Server error</h1>");
+    }
+  });
+  const TENANT_BACKUP_DIR = import_node_path.default.resolve(process.cwd(), "backups");
+  if (!import_node_fs.default.existsSync(TENANT_BACKUP_DIR)) import_node_fs.default.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
+  app2.get("/api/backup/list", async (req, res) => {
+    try {
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
+      const files = import_node_fs.default.readdirSync(TENANT_BACKUP_DIR).filter((f) => f.startsWith(`backup_tenant_${tenantId}_`) && f.endsWith(".json")).map((f) => {
+        const stat = import_node_fs.default.statSync(import_node_path.default.join(TENANT_BACKUP_DIR, f));
+        return { filename: f, size: stat.size, createdAt: stat.mtime.toISOString() };
+      }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(files);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/backup/create", async (req, res) => {
+    try {
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      const [branches2, employees2, products2, categories2, customers2] = await Promise.all([
+        storage.getBranchesByTenant(tenantId),
+        storage.getEmployeesByTenant(tenantId),
+        storage.getProductsByTenant(tenantId),
+        storage.getCategories(tenantId),
+        storage.getCustomers(void 0, tenantId)
+      ]);
+      let inventory2 = [];
+      let expenses2 = [];
+      for (const b of branches2) {
+        try {
+          const inv = await storage.getInventory(b.id, tenantId);
+          inventory2.push(...inv);
+        } catch {
+        }
+      }
+      try {
+        expenses2 = await storage.getExpenses(tenantId);
+      } catch {
+      }
+      const sales2 = await storage.getSales({ tenantId, limit: 1e4 });
+      const snapshot = {
+        version: "2.0",
+        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        tenantId,
+        tenant: { ...tenant, passwordHash: "[REDACTED]" },
+        branches: branches2,
+        employees: employees2.map((e) => ({ ...e, pin: "[REDACTED]", passwordHash: "[REDACTED]" })),
+        categories: categories2,
+        products: products2,
+        inventory: inventory2,
+        customers: customers2,
+        expenses: expenses2,
+        sales: sales2.slice(0, 5e3)
+      };
+      const filename = `backup_tenant_${tenantId}_${Date.now()}.json`;
+      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
+      import_node_fs.default.writeFileSync(filepath, JSON.stringify(snapshot));
+      const stat = import_node_fs.default.statSync(filepath);
+      console.log(`[BACKUP] Manual by tenant ${tenantId}: ${filename} (${Math.round(stat.size / 1024)}KB)`);
+      res.json({ success: true, filename, size: stat.size, createdAt: stat.mtime.toISOString() });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/backup/restore/:filename", async (req, res) => {
+    try {
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
+      const filename = import_node_path.default.basename(req.params.filename);
+      if (!filename.startsWith(`backup_tenant_${tenantId}_`)) {
+        return res.status(403).json({ error: "Not authorized to restore this backup" });
+      }
+      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
+      if (!import_node_fs.default.existsSync(filepath)) return res.status(404).json({ error: "Backup not found" });
+      const snapshot = JSON.parse(import_node_fs.default.readFileSync(filepath, "utf-8"));
+      const restored = { branches: 0, categories: 0, products: 0, customers: 0, expenses: 0 };
+      if (snapshot.categories?.length) {
+        const existingCats = await storage.getCategories(tenantId);
+        for (const c of snapshot.categories) {
+          try {
+            if (!existingCats.find((ec) => ec.name === c.name)) {
+              await storage.createCategory({ ...c, id: void 0, tenantId });
+              restored.categories++;
+            }
+          } catch {
+          }
+        }
+      }
+      if (snapshot.products?.length) {
+        const existingProducts = await storage.getProductsByTenant(tenantId);
+        const freshCats = await storage.getCategories(tenantId);
+        const catMap = new Map(freshCats.map((c) => [c.name, c.id]));
+        const origCatMap = new Map((snapshot.categories || []).map((c) => [c.id, c.name]));
+        for (const p of snapshot.products) {
+          try {
+            let newCatId = p.categoryId;
+            if (p.categoryId && origCatMap.has(p.categoryId)) {
+              newCatId = catMap.get(origCatMap.get(p.categoryId)) ?? p.categoryId;
+            }
+            const match = p.barcode ? existingProducts.find((ep) => ep.barcode === p.barcode) : existingProducts.find((ep) => ep.name === p.name);
+            if (match) {
+              await storage.updateProduct(match.id, { name: p.name, price: p.price, costPrice: p.costPrice, description: p.description, isActive: p.isActive, categoryId: newCatId });
+            } else {
+              await storage.createProduct({ ...p, id: void 0, tenantId, categoryId: newCatId });
+            }
+            restored.products++;
+          } catch {
+          }
+        }
+      }
+      if (snapshot.customers?.length) {
+        const existingCustomers = await storage.getCustomers(void 0, tenantId);
+        const existingEmails = new Set(existingCustomers.filter((c) => c.email).map((c) => c.email?.toLowerCase()));
+        for (const c of snapshot.customers) {
+          try {
+            if (!c.email || !existingEmails.has(c.email.toLowerCase())) {
+              await storage.createCustomer({ ...c, id: void 0, tenantId });
+              restored.customers++;
+            }
+          } catch {
+          }
+        }
+      }
+      res.json({ success: true, tenantId, restored });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/backup/:filename", async (req, res) => {
+    try {
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
+      const filename = import_node_path.default.basename(req.params.filename);
+      if (!filename.startsWith(`backup_tenant_${tenantId}_`)) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
+      if (import_node_fs.default.existsSync(filepath)) import_node_fs.default.unlinkSync(filepath);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/vehicles", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getVehicles(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/vehicles", async (req, res) => {
+    try {
+      res.json(await storage.createVehicle(withTenant(req, req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/vehicles/:id", async (req, res) => {
+    try {
+      const { driverAccessToken: _tok, ...data } = withoutTenant(req.body || {});
+      res.json(await storage.updateVehicle(Number(req.params.id), data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/vehicles/:id", async (req, res) => {
+    try {
+      await storage.deleteVehicle(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/printer-configs", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getPrinterConfigs(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/printer-configs", async (req, res) => {
+    try {
+      const data = withTenant(req, req.body || {});
+      if (!data.tenantId) return res.status(400).json({ error: "tenantId is required" });
+      res.json(await storage.upsertPrinterConfig(data));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/daily-closings", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getDailyClosings(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/daily-closings", async (req, res) => {
+    try {
+      const { branchId, closingDate } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : void 0);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const tz = await storeTimeZone(tenantId);
+      const today = /^\d{4}-\d{2}-\d{2}$/.test(String(closingDate || "")) ? String(closingDate) : localDateString(tz);
+      const startOfDay = dayStart(tz, today);
+      const endOfDay = dayEnd(tz, today);
+      const daySales = await storage.getSalesByDateRange(startOfDay, endOfDay, tenantId, branchId ? Number(branchId) : void 0);
+      const totalSales = daySales.reduce((s, sale) => s + Number(sale.totalAmount || 0), 0);
+      const totalCash = daySales.filter((s) => s.paymentMethod === "cash").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalCard = daySales.filter((s) => s.paymentMethod === "card").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalMobile = daySales.filter((s) => s.paymentMethod === "mobile").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalDiscounts = daySales.reduce((s, sale) => s + Number(sale.discountAmount || 0), 0);
+      const dc = await storage.createDailyClosing({
+        tenantId,
+        branchId: branchId || null,
+        employeeId: req.body.employeeId || null,
+        closingDate: today,
+        totalSales: String(totalSales),
+        totalCash: String(totalCash),
+        totalCard: String(totalCard),
+        totalMobile: String(totalMobile),
+        totalTransactions: daySales.length,
+        totalReturns: "0",
+        totalDiscounts: String(totalDiscounts),
+        openingCash: String(req.body.openingCash || 0),
+        closingCash: String(req.body.closingCash || 0),
+        notes: req.body.notes || null,
+        status: "closed"
+      });
+      res.json(dc);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/monthly-closings", async (req, res) => {
+    try {
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getMonthlyClosings(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/monthly-closings", async (req, res) => {
+    try {
+      const { branchId, closingMonth } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : void 0);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const tz = await storeTimeZone(tenantId);
+      const month = /^\d{4}-\d{2}$/.test(String(closingMonth || "")) ? String(closingMonth) : localMonthString(tz);
+      const [startOfMonth, endOfMonth] = monthRange(tz, month);
+      const monthSales = await storage.getSalesByDateRange(startOfMonth, endOfMonth, tenantId, branchId ? Number(branchId) : void 0);
+      const totalSales = monthSales.reduce((s, sale) => s + Number(sale.totalAmount || 0), 0);
+      const totalCash = monthSales.filter((s) => s.paymentMethod === "cash").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalCard = monthSales.filter((s) => s.paymentMethod === "card").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalMobile = monthSales.filter((s) => s.paymentMethod === "mobile").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalDiscounts = monthSales.reduce((s, sale) => s + Number(sale.discountAmount || 0), 0);
+      const expenses2 = await storage.getExpensesByDateRange(startOfMonth, endOfMonth, tenantId);
+      const totalExpenses = expenses2.reduce((s, e) => s + Number(e.amount || 0), 0);
+      const mc = await storage.createMonthlyClosing({
+        tenantId,
+        branchId: branchId || null,
+        employeeId: req.body.employeeId || null,
+        closingMonth: month,
+        totalSales: String(totalSales),
+        totalCash: String(totalCash),
+        totalCard: String(totalCard),
+        totalMobile: String(totalMobile),
+        totalTransactions: monthSales.length,
+        totalReturns: "0",
+        totalDiscounts: String(totalDiscounts),
+        totalExpenses: String(totalExpenses),
+        netRevenue: String(totalSales - totalExpenses),
+        notes: req.body.notes || null,
+        status: "closed"
+      });
+      res.json(mc);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/maintenance/fix-tenant-ids", requireSuperAdmin, async (req, res) => {
+    const secret = req.headers["x-maintenance-secret"] || req.query.secret;
+    if (!process.env.MAINTENANCE_SECRET || secret !== process.env.MAINTENANCE_SECRET) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { sql: sql8 } = await import("drizzle-orm");
+      const firstTenant = (await storage.getTenants())[0];
+      if (!firstTenant) {
+        return res.status(404).json({ error: "No tenants found" });
+      }
+      const tid = firstTenant.id;
+      const tables2 = [
+        "products",
+        "categories",
+        "employees",
+        "customers",
+        "branches",
+        "inventory",
+        "sales",
+        "sale_items",
+        "expenses",
+        "shifts",
+        "notifications",
+        "calls",
+        "purchase_orders",
+        "purchase_order_items",
+        "suppliers",
+        "tables",
+        "kitchen_orders",
+        "returns",
+        "return_items",
+        "cash_drawer_operations",
+        "warehouses",
+        "warehouse_transfers",
+        "product_batches",
+        "inventory_movements",
+        "stock_counts",
+        "stock_count_items",
+        "employee_commissions",
+        "daily_closings",
+        "monthly_closings"
+      ];
+      const results = {};
+      for (const table of tables2) {
+        try {
+          const r = await db2.execute(
+            sql8.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
+          );
+          results[table] = r[0]?.affectedRows ?? 0;
+        } catch (e) {
+          results[table] = -1;
+        }
+      }
+      res.json({
+        success: true,
+        tenant: { id: tid, name: firstTenant.businessName },
+        updates: results
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post(
+    "/api/delivery/auth/request-otp",
+    rateLimit({
+      name: "customer-otp",
+      max: 5,
+      windowMs: 15 * 60 * 1e3,
+      keyFn: (req) => `${req.body?.tenantId}:${canonicalPhone(req.body?.phone).replace(/\D/g, "")}`,
+      message: "\u0645\u062D\u0627\u0648\u0644\u0627\u062A \u0643\u062B\u064A\u0631\u0629\u060C \u0627\u0646\u062A\u0638\u0631 \u0642\u0644\u064A\u0644\u0627\u064B \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629. / Too many attempts, try again shortly."
+    }),
+    async (req, res) => {
+      try {
+        const { tenantId } = req.body;
+        const phone = canonicalPhone(req.body?.phone);
+        if (!phone || !tenantId) return res.status(400).json({ error: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u0645\u062A\u062C\u0631 \u0645\u0637\u0644\u0648\u0628\u0627\u0646 / phone and tenantId required" });
+        if (String(phone).replace(/\D/g, "").length < 8) return res.status(400).json({ error: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u2014 \u0627\u0643\u062A\u0628\u0647 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629 / Invalid phone number \u2014 include the country code" });
+        const otp = await createOtp(phone, Number(tenantId));
+        if (process.env.NODE_ENV === "development") {
+          return res.json({ success: true, otp });
+        }
+        const tenant = await storage.getTenant(Number(tenantId));
+        const sent = await whatsappService.sendMessage(
+          phone,
+          `\u{1F510} \u0631\u0645\u0632 \u0627\u0644\u062F\u062E\u0648\u0644 \u0625\u0644\u0649 ${tenant?.businessName || "\u0627\u0644\u0645\u062A\u062C\u0631"}: *${otp}*
+Your login code: *${otp}*
+
+\u0635\u0627\u0644\u062D \u0644\u0645\u062F\u0629 10 \u062F\u0642\u0627\u0626\u0642. \u0644\u0627 \u062A\u0634\u0627\u0631\u0643\u0647 \u0645\u0639 \u0623\u062D\u062F.`
+        );
+        if (!sent) {
+          return res.status(503).json({ error: "\u062A\u0639\u0630\u0651\u0631 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632 \u0639\u0628\u0631 \u0648\u0627\u062A\u0633\u0627\u0628. \u062A\u0623\u0643\u062F \u0623\u0646 \u0627\u0644\u0631\u0642\u0645 \u0645\u0633\u062C\u0651\u0644 \u0639\u0644\u0649 \u0648\u0627\u062A\u0633\u0627\u0628 \u0648\u0645\u0643\u062A\u0648\u0628 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629\u060C \u0623\u0648 \u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0628\u0640 Google. / Could not send the code via WhatsApp. Check the number is on WhatsApp and includes the country code, or sign in with Google." });
+        }
+        res.json({ success: true, channel: "whatsapp" });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+  app2.post("/api/delivery/auth/verify-otp", async (req, res) => {
+    try {
+      const { tenantId } = req.body;
+      const phone = canonicalPhone(req.body?.phone);
+      const otp = String(req.body?.otp ?? "").replace(/\D/g, "");
+      if (!phone || !tenantId || !otp) return res.status(400).json({ error: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u0631\u0645\u0632 \u0645\u0637\u0644\u0648\u0628\u0627\u0646 / phone, tenantId, otp required" });
+      const result = await verifyOtp(phone, Number(tenantId), otp);
+      if (!result.success) return res.status(400).json({ error: result.error });
+      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
+      await claimCustomerAfterPhoneProof(customer);
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({
+        success: true,
+        token,
+        // 15-minute proof of this phone, accepted by /api/delivery/auth/register.
+        phoneToken: signPhoneProof(phone, Number(tenantId)),
+        customer: { id: customer.id, name: customer.name, phone: customer.phone, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance }
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post(
+    "/api/delivery/auth/login",
+    rateLimit({ name: "cust-login-ip", max: 15, windowMs: 15 * 60 * 1e3 }),
+    rateLimit({
+      name: "cust-login-email",
+      max: 6,
+      windowMs: 15 * 60 * 1e3,
+      keyFn: (req) => String(req.body?.email || "").toLowerCase().slice(0, 160)
+    }),
+    async (req, res) => {
+      try {
+        const { email, password, tenantId } = req.body;
+        if (!email || !password || !tenantId) return res.status(400).json({ error: "email, password, tenantId required" });
+        const customer = await findCustomerByEmail(email, Number(tenantId));
+        if (!customer) return res.status(401).json({ error: "Invalid credentials" });
+        const valid = await verifyCustomerPassword(customer, password);
+        if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+        const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+        res.json({ success: true, token, customer: { id: customer.id, name: customer.name, email: customer.email, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+  app2.post("/api/delivery/auth/register", async (req, res) => {
+    try {
+      const { name, password, tenantId } = req.body || {};
+      const phone = canonicalPhone(req.body?.phone);
+      const email = req.body?.email ? String(req.body.email).trim().toLowerCase() : "";
+      if (!phone || !tenantId) return res.status(400).json({ error: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u0645\u062A\u062C\u0631 \u0645\u0637\u0644\u0648\u0628\u0627\u0646 / phone and tenantId required" });
+      const tid = Number(tenantId);
+      const existing = await storage.findCustomerByPhoneExact(phone, tid);
+      const phoneProven = verifyPhoneProof(req.body?.phoneToken, phone, tid);
+      if (existing) {
+        const session = await getAuthenticatedCustomer(req.headers.authorization);
+        const proven = phoneProven || session?.id === existing.id;
+        if (!proven) {
+          return res.status(409).json({
+            error: "\u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645 \u0645\u0633\u062C\u0651\u0644 \u0645\u0633\u0628\u0642\u0627\u064B \u2014 \u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0628\u0631\u0645\u0632 \u0648\u0627\u062A\u0633\u0627\u0628 / This phone number is already registered \u2014 log in with the WhatsApp code",
+            code: "PHONE_VERIFICATION_REQUIRED"
+          });
+        }
+      }
+      if (email && await emailTakenByOther(email, tid, existing?.id)) {
+        return res.status(409).json({
+          error: "\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0645\u0633\u062A\u062E\u062F\u0645 \u0644\u062D\u0633\u0627\u0628 \u0622\u062E\u0631 / This e-mail is already used by another account",
+          code: "EMAIL_IN_USE"
+        });
+      }
+      const customer = existing ?? await findOrCreateCustomerByPhone(phone, tid);
+      if (phoneProven) await claimCustomerAfterPhoneProof(customer);
+      const updates = { name: name || customer.name, hasAccount: true, isActive: true };
+      if (email) updates.email = email;
+      if (password) {
+        await setCustomerPassword(customer.id, String(password));
+      }
+      await storage.updateCustomer(customer.id, updates);
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({ success: true, token, customer: { id: customer.id, name: updates.name, phone } });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/auth/google", async (req, res) => {
+    try {
+      const { credential, accessToken, profile, tenantId } = req.body || {};
+      const tid = Number(tenantId) || 24;
+      const allowedAud = new Set(
+        [
+          ...String(process.env.GOOGLE_CLIENT_ID || "").split(","),
+          GOOGLE_WEB_CLIENT_ID,
+          "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com"
+        ].map((s) => s.trim()).filter(Boolean)
+      );
+      let payload = null;
+      if (credential) {
+        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+        if (!verifyRes.ok) return res.status(401).json({ error: "Invalid Google credential" });
+        payload = await verifyRes.json();
+        if (!allowedAud.has(String(payload.aud || ""))) {
+          return res.status(401).json({ error: "Token audience mismatch" });
+        }
+      } else if (accessToken) {
+        const info = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(String(accessToken))}`);
+        if (!info.ok) return res.status(401).json({ error: "Invalid Google access token" });
+        const tokenInfo = await info.json();
+        if (!allowedAud.has(String(tokenInfo.aud || "")) && !allowedAud.has(String(tokenInfo.azp || ""))) {
+          return res.status(401).json({ error: "Token audience mismatch" });
+        }
+        const ui = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!ui.ok) return res.status(401).json({ error: "Invalid Google access token" });
+        payload = await ui.json();
+      } else if (profile && profile.email) {
+        return res.status(400).json({ error: "credential or accessToken required" });
+      } else {
+        return res.status(400).json({ error: "credential or accessToken required" });
+      }
+      if (!payload || !payload.email) return res.status(400).json({ error: "Email not present in token" });
+      if (payload.email_verified === false || payload.email_verified === "false") {
+        return res.status(401).json({ error: "Google e-mail is not verified" });
+      }
+      const email = String(payload.email).toLowerCase();
+      const name = payload.name || payload.given_name || email.split("@")[0];
+      const picture = payload.picture || null;
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customers: customers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10 } = await import("drizzle-orm");
+      let customer = await findCustomerByEmail(email, tid);
+      if (!customer) {
+        const [inserted] = await db2.insert(customers2).values({
+          tenantId: tid,
+          name,
+          email,
+          hasAccount: true,
+          loyaltyPoints: 0,
+          loyaltyTier: "bronze"
+        }).$returningId();
+        const [created] = await db2.select().from(customers2).where(eq10(customers2.id, inserted.id)).limit(1);
+        customer = created;
+      } else if (!customer.name || customer.name === customer.email) {
+        await storage.updateCustomer(customer.id, { name });
+      }
+      const token = await createCustomerSession(customer.id, tid, req.headers["user-agent"]);
+      res.json({
+        success: true,
+        token,
+        customer: {
+          id: customer.id,
+          name: customer.name || name,
+          email: customer.email,
+          picture,
+          loyaltyPoints: customer.loyaltyPoints,
+          loyaltyTier: customer.loyaltyTier,
+          walletBalance: customer.walletBalance
+        }
+      });
+    } catch (e) {
+      console.error("[google-auth]", e);
+      res.status(500).json({ error: e.message || "Google sign-in failed" });
+    }
+  });
+  app2.post("/api/delivery/auth/logout", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        await deleteCustomerSession(authHeader.split(" ")[1]);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/auth/me", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      res.json({ customer });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/auth/me", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { name, dateOfBirth, gender, preferredLanguage } = req.body || {};
+      const email = req.body?.email ? String(req.body.email).trim().toLowerCase() : "";
+      const updates = {};
+      if (name) updates.name = name;
+      if (email && email !== String(customer.email || "").toLowerCase()) {
+        if (customer.tenantId && await emailTakenByOther(email, customer.tenantId, customer.id)) {
+          return res.status(409).json({ error: "\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0645\u0633\u062A\u062E\u062F\u0645 \u0644\u062D\u0633\u0627\u0628 \u0622\u062E\u0631 / This e-mail is already used by another account", code: "EMAIL_IN_USE" });
+        }
+        updates.email = email;
+      }
+      if (dateOfBirth) updates.dateOfBirth = dateOfBirth;
+      if (gender) updates.gender = gender;
+      if (preferredLanguage) updates.preferredLanguage = preferredLanguage;
+      await storage.updateCustomer(customer.id, updates);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/addresses", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const addresses = await storage.getCustomerAddresses(customer.id);
+      res.json(addresses);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/addresses", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const address = await storage.createCustomerAddress({ ...req.body, customerId: customer.id, tenantId: customer.tenantId });
+      res.status(201).json(address);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/addresses/:id", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const existing = await storage.getCustomerAddress(Number(req.params.id));
+      if (!existing || existing.customerId !== customer.id) return res.status(404).json({ error: "Address not found" });
+      const { id: _id, customerId: _c, tenantId: _t, ...changes } = req.body || {};
+      const address = await storage.updateCustomerAddress(existing.id, { ...changes, customerId: customer.id });
+      res.json(address);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/addresses/:id", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const existing = await storage.getCustomerAddress(Number(req.params.id));
+      if (!existing || existing.customerId !== customer.id) return res.status(404).json({ error: "Address not found" });
+      await storage.deleteCustomerAddress(existing.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/addresses/:id/default", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const existing = await storage.getCustomerAddress(Number(req.params.id));
+      if (!existing || existing.customerId !== customer.id) return res.status(404).json({ error: "Address not found" });
+      await storage.setDefaultAddress(existing.id, customer.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/restaurants", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId;
+      const configs = await storage.getAllLandingPageConfigs(tenantId);
+      const restaurants = (configs || []).map((c) => ({
+        id: c.tenantId,
+        slug: c.slug,
+        name: c.storeName || c.restaurantName || "Restaurant",
+        logo: c.logo || c.logomark || null,
+        coverImage: c.coverImage || c.headerBgImage || null,
+        cuisine: c.cuisineType || c.cuisine || "",
+        rating: null,
+        reviewCount: 0,
+        deliveryTime: c.minDeliveryTime || 25,
+        deliveryFee: 0,
+        minOrder: 0,
+        isOpen: c.isOpen !== false,
+        primaryColor: c.primaryColor || "#FF5722"
+      }));
+      for (const r of restaurants) {
+        if (r.name === "Restaurant" && r.slug) {
+          r.name = r.slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        }
+        try {
+          Object.assign(r, await storeRating(r.id));
+          r.deliveryFee = await storeBaseDeliveryFee(r.id);
+          r.minOrder = await storeMinOrderAmount(r.id);
+        } catch {
+        }
+        if (!r.cuisine) {
+          try {
+            const cats = await storage.getCategories(r.id);
+            if (cats.length > 0) {
+              const catNames = cats.filter((c) => c.isActive !== false).map((c) => c.name).slice(0, 3);
+              r.cuisine = catNames.join(", ");
+            }
+          } catch {
+          }
+        }
+      }
+      res.json(restaurants);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  async function mainBranchCurrency(tenantId) {
+    if (!tenantId) return null;
+    try {
+      const brs = await storage.getBranchesByTenant(Number(tenantId));
+      const main = brs.find((b) => b.isMain) || brs[0];
+      return main?.currency || null;
+    } catch {
+      return null;
+    }
+  }
+  async function resolveSlugConfig(slug) {
+    if (slug === "barmagly") {
+      const config = await storage.getLandingPageConfigBySlug("pizza-lemon");
+      if (config) {
+        config.storeName = "Kassenta";
+        config.heroTitle = "Kassenta Delivery";
+      }
+      return config;
+    }
+    return storage.getLandingPageConfigBySlug(slug);
+  }
+  app2.get("/api/delivery/store/:slug", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const tenant = await storage.getTenant(config.tenantId).catch(() => null);
+      const currency = await mainBranchCurrency(config.tenantId) || config.currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.json({
+        slug: config.slug,
+        tenantId: config.tenantId,
+        storeName: config.storeName || config.heroTitle || tenant?.businessName || "Store",
+        name: config.storeName || config.heroTitle || tenant?.businessName || "Store",
+        primaryColor: config.primaryColor || "#FF5722",
+        accentColor: config.accentColor || "#2FD3C6",
+        currency,
+        phone: config.phone,
+        address: config.address,
+        openingHours: config.openingHours,
+        // What checkout actually enforces / charges by default.
+        minOrderAmount: await storeMinOrderAmount(config.tenantId),
+        deliveryFee: await storeBaseDeliveryFee(config.tenantId),
+        estimatedDeliveryTime: config.estimatedDeliveryTime,
+        enableDelivery: config.enableDelivery !== false,
+        enablePickup: config.enablePickup !== false,
+        enableLoyalty: config.enableLoyalty ?? true,
+        enableWallet: config.enableWallet ?? false,
+        enableScheduledOrders: config.enableScheduledOrders ?? true,
+        enablePromos: config.enablePromos ?? true,
+        minDeliveryTime: config.minDeliveryTime ?? 20,
+        maxDeliveryTime: config.maxDeliveryTime ?? 45,
+        bannerImages: config.bannerImages ?? [],
+        promoText: config.promoText,
+        logo: config.heroImage || config.logo,
+        coverImage: config.coverImage || config.headerBgImage,
+        socialWhatsapp: config.socialWhatsapp,
+        supportPhone: config.supportPhone || config.phone || "",
+        ...await storeRating(config.tenantId),
+        cuisine: config.cuisineType || config.cuisine || ""
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/menu", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const [cats, prods] = await Promise.all([
+        storage.getCategories(config.tenantId),
+        storage.getProductsByTenant(config.tenantId)
+      ]);
+      const activeProds = prods.filter((p) => p.isActive !== false).map((p) => ({ ...p, imageUrl: p.imageUrl || p.image || null }));
+      const menu = cats.filter((c) => c.isActive !== false).map((cat) => ({
+        ...cat,
+        items: activeProds.filter((p) => p.categoryId === cat.id)
+      })).filter((cat) => cat.items.length > 0);
+      res.setHeader("Cache-Control", "public, max-age=300").json({ categories: menu, allProducts: activeProds });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/product/:id", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const product = await storage.getProduct(Number(req.params.id));
+      if (!product || product.tenantId !== config.tenantId) return res.status(404).json({ error: "Product not found" });
+      res.json({ ...product, imageUrl: product.imageUrl || product.image || null });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/promos", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const now = /* @__PURE__ */ new Date();
+      const codes = await storage.getPromoCodes ? await storage.getPromoCodes(config.tenantId) : [];
+      const active = codes.filter((c) => c.isActive && (!c.validFrom || new Date(c.validFrom) <= now) && (!c.validUntil || new Date(c.validUntil) >= now));
+      res.json({ promos: active, bannerImages: config.bannerImages ?? [], promoText: config.promoText });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/promo/validate", async (req, res) => {
+    try {
+      const { tenantId, code, orderTotal, orderType, customerId } = req.body;
+      if (!tenantId || !code || orderTotal === void 0) return res.status(400).json({ error: "tenantId, code, orderTotal required" });
+      const result = await validatePromoCode(Number(tenantId), code, Number(orderTotal), orderType || "delivery", customerId ? Number(customerId) : void 0);
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/zones", async (req, res) => {
+    try {
+      const { tenantId } = req.query;
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const zones = await storage.getDeliveryZones(Number(tenantId));
+      res.json(zones);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/orders", async (req, res) => {
+    try {
+      const {
+        tenantId,
+        customerName,
+        customerPhone: rawCustomerPhone,
+        customerEmail,
+        customerAddress,
+        items,
+        subtotal,
+        deliveryFee,
+        totalAmount,
+        paymentMethod,
+        orderType,
+        notes,
+        promoCode,
+        promoCodeId,
+        discountAmount,
+        customerLat,
+        customerLng,
+        floor,
+        buildingName,
+        addressNotes,
+        scheduledAt,
+        loyaltyPointsUsed,
+        walletAmountUsed,
+        savedAddressId,
+        tableQrToken,
+        tableNumber
+      } = req.body;
+      const customerPhone = rawCustomerPhone ? canonicalPhone(rawCustomerPhone) : rawCustomerPhone;
+      if (!tenantId || !customerPhone || !items?.length) {
+        return res.status(400).json({ error: "tenantId, customerPhone, items required" });
+      }
+      const tid = Number(tenantId);
+      const type = orderType || "delivery";
+      const currency = await storeCurrency(tid);
+      const bi = (ar, en) => currency === "SYP" ? `${ar} / ${en}` : en;
+      const idemKey = requestIdempotencyKey(req);
+      if (idemKey) {
+        const prior = await findOrderByClientRef(tid, idemKey, customerPhone);
+        if (prior) {
+          return res.status(200).json({ success: true, orderId: prior.id, orderNumber: prior.order_number, trackingToken: prior.tracking_token, totalAmount: Number(prior.total_amount), duplicate: true });
+        }
+        const lockKey = `order:${tid}:${idemKey}`;
+        if (inflightIdempotency.has(lockKey)) {
+          return res.status(409).json({ error: bi("\u0627\u0644\u0637\u0644\u0628 \u0642\u064A\u062F \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629", "This order is already being placed"), code: "ORDER_IN_PROGRESS" });
+        }
+        inflightIdempotency.add(lockKey);
+        const release = () => inflightIdempotency.delete(lockKey);
+        res.on("finish", release);
+        res.on("close", release);
+      }
+      if (CARD_METHODS.has(String(paymentMethod || "").toLowerCase()) && !cardSupported(currency)) {
+        return res.status(400).json({
+          error: bi("\u0627\u0644\u062F\u0641\u0639 \u0628\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u062A\u062C\u0631 \u2014 \u0627\u062E\u062A\u0631 \u0637\u0631\u064A\u0642\u0629 \u062F\u0641\u0639 \u0623\u062E\u0631\u0649", "Card payment is not available for this store \u2014 choose another payment method"),
+          code: "CARD_NOT_SUPPORTED"
+        });
+      }
+      const trackingToken = generateTrackingToken();
+      const isDineIn = orderType === "dine_in" && tableQrToken;
+      const orderNumber = isDineIn ? `DIN-${Date.now()}` : `DEL-${Date.now()}`;
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      let base;
+      try {
+        base = await repriceOrder({ tenantId: tid, items, clientDeliveryFee: deliveryFee, orderType: type });
+      } catch (e) {
+        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+      if (type === "delivery") {
+        const min = await storeMinOrderAmount(tid);
+        if (min > 0 && base.subtotal < min) {
+          return res.status(400).json({
+            error: bi(`\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0644\u0644\u0637\u0644\u0628 \u0647\u0648 ${formatMoney(min, currency)}`, `The minimum order is ${formatMoney(min, currency)}`),
+            code: "MIN_ORDER_NOT_MET",
+            minOrderAmount: min
+          });
+        }
+      }
+      let finalDiscount = 0;
+      let resolvedPromoId = null;
+      if (promoCode || promoCodeId) {
+        let code = promoCode ? String(promoCode) : "";
+        if (!code && promoCodeId) {
+          const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const [rows] = await pool2.query("SELECT code FROM promo_codes WHERE id = ? AND tenant_id = ? LIMIT 1", [Number(promoCodeId), tid]);
+          code = rows?.[0]?.code || "";
+        }
+        const promo = code ? await validatePromoCode(tid, code, base.subtotal, type, customer?.id) : { valid: false, error: "Invalid promo code" };
+        if (!promo.valid || !promo.promoCode) {
+          return res.status(400).json({ error: promo.error || "Invalid promo code", code: "PROMO_INVALID" });
+        }
+        finalDiscount = promo.promoCode.discountType === "free_delivery" ? base.deliveryFee : Number(promo.discountAmount ?? 0);
+        resolvedPromoId = promo.promoCode.id;
+      } else if (Number(discountAmount) > 0) {
+        console.warn(`[delivery/orders] tenant ${tid}: ignored client discountAmount ${discountAmount} without a promo code`);
+      }
+      let loyaltyPoints = 0;
+      let loyaltyValue = 0;
+      const wantPoints = Math.floor(Number(loyaltyPointsUsed) || 0);
+      if (wantPoints > 0) {
+        const refusal = customer ? await checkLoyaltyRedemption(customer.id, tid, wantPoints) : "Log in to redeem points";
+        if (refusal) return res.status(400).json({ error: refusal, code: "LOYALTY_REFUSED" });
+        const cfg = await getLoyaltyConfig(tid);
+        loyaltyPoints = wantPoints;
+        loyaltyValue = roundMoney(wantPoints * cfg.redemptionRate, currency);
+      }
+      const discountTotal = Math.min(base.subtotal, roundMoney(finalDiscount + loyaltyValue, currency));
+      const gross = Math.max(0, base.subtotal - discountTotal + base.deliveryFee);
+      const walletUsed = customer ? roundMoney(Math.min(Math.max(0, Number(walletAmountUsed ?? 0) || 0), gross), currency) : 0;
+      let pricing2;
+      try {
+        pricing2 = await repriceOrder({
+          tenantId: tid,
+          items,
+          clientSubtotal: subtotal,
+          clientDeliveryFee: deliveryFee,
+          clientTotal: totalAmount,
+          discountAmount: discountTotal,
+          walletUsed,
+          orderType: type
+        });
+      } catch (e) {
+        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+      if (walletUsed > 0 && customer) {
+        const walletResult = await deductWallet(customer.id, tid, walletUsed);
+        if (!walletResult.success) {
+          return res.status(400).json({ error: walletResult.error });
+        }
+      }
+      const order = await storage.createOnlineOrder({
+        tenantId: Number(tenantId),
+        orderNumber,
+        customerName: customerName || customerPhone,
+        customerPhone,
+        customerEmail: customerEmail ?? null,
+        customerAddress: customerAddress ?? null,
+        items: pricing2.items,
+        subtotal: pricing2.subtotal.toFixed(2),
+        taxAmount: "0",
+        deliveryFee: pricing2.deliveryFee.toFixed(2),
+        totalAmount: pricing2.totalAmount.toFixed(2),
+        paymentMethod: paymentMethod || "cash",
+        paymentStatus: "pending",
+        status: "pending",
+        orderType: orderType || "delivery",
+        notes: notes ?? null,
+        estimatedTime: 35,
+        // Syrian stores' customers get Arabic messages unless they chose.
+        language: req.body.language || (currency === "SYP" ? "ar" : "en"),
+        trackingToken,
+        sourceChannel: isDineIn ? "dine_in_qr" : "web",
+        tableNumber: tableNumber ?? null,
+        tableQrToken: tableQrToken ?? null,
+        promoCodeId: resolvedPromoId ?? void 0,
+        discountAmount: discountTotal.toFixed(2),
+        customerLat: customerLat ? String(customerLat) : null,
+        customerLng: customerLng ? String(customerLng) : null,
+        floor: floor ?? null,
+        buildingName: buildingName ?? null,
+        addressNotes: addressNotes ?? null,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        walletAmountUsed: walletUsed.toFixed(2),
+        loyaltyPointsUsed: loyaltyPoints,
+        savedAddressId: savedAddressId ? Number(savedAddressId) : null
+      }).catch(async (err) => {
+        if (walletUsed > 0 && customer) await creditWallet(customer.id, tid, walletUsed, "refund").catch(() => {
+        });
+        throw err;
+      });
+      if (idemKey && orderClientRefReady) {
+        const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        await pool2.query("UPDATE online_orders SET client_ref = ? WHERE id = ?", [idemKey, order.id]).catch(() => {
+        });
+      }
+      if (loyaltyPoints > 0 && customer) {
+        await redeemPointsForOrder(customer.id, tid, loyaltyPoints, order.id, loyaltyValue).catch((e) => console.error("[loyalty] order", order.id, e?.message || e));
+      }
+      if (resolvedPromoId && finalDiscount > 0) {
+        await recordPromoUsage(resolvedPromoId, customer?.id, order.id, finalDiscount);
+      }
+      try {
+        const tenantRow = await storage.getTenant(Number(tenantId));
+        const config = await storage.getLandingPageConfigByTenantId(Number(tenantId));
+        const adminPhone = verifiedStorePhone(tenantRow?.metadata) || config?.socialWhatsapp || void 0;
+        whatsappService.orderPlaced(order, Number(tenantId), adminPhone).catch(() => {
+        });
+      } catch (_) {
+      }
+      try {
+        callerIdService.broadcast({
+          type: "new_online_order",
+          order: { id: order.id, orderNumber, customerName, totalAmount: order.totalAmount, orderType }
+        }, tid);
+      } catch (_) {
+      }
+      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken, totalAmount: Number(order.totalAmount) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/orders/track/:token", async (req, res) => {
+    try {
+      const order = await storage.getOnlineOrderByTrackingToken(req.params.token);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (typeof order.items === "string") {
+        try {
+          order.items = JSON.parse(order.items);
+        } catch {
+          order.items = [];
+        }
+      }
+      if (!Array.isArray(order.items)) order.items = [];
+      let driver = null;
+      if (order.driverId) {
+        driver = await storage.getDriverLocation(order.driverId);
+      }
+      let store = null;
+      try {
+        if (order.tenantId) {
+          const cfg = await storage.getLandingPageConfigByTenantId(Number(order.tenantId));
+          if (cfg) {
+            store = {
+              name: cfg.storeName || cfg.name,
+              primaryColor: cfg.primaryColor || "#FF5722",
+              currency: await mainBranchCurrency(Number(order.tenantId)) || cfg.currency || process.env.DEFAULT_CURRENCY || "CHF",
+              logo: cfg.logo,
+              supportPhone: cfg.supportPhone,
+              slug: cfg.slug
+            };
+          }
+        }
+      } catch (_) {
+      }
+      res.json({ order, driver, store });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/orders/history", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const orders = await storage.getCustomerOrderHistory(customer.id, customer.tenantId);
+      res.json(orders);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/orders/:id/rate", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      const { overallRating, foodRating, deliveryRating, comment } = req.body;
+      if (!overallRating) return res.status(400).json({ error: "overallRating required" });
+      const orderId = Number(req.params.id);
+      const order = await storage.getOnlineOrder(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      const token = String(req.body?.trackingToken || req.query.token || "");
+      const byToken = !!order.trackingToken && token === order.trackingToken;
+      const byCustomer = !!customer && customer.tenantId === order.tenantId && !!customer.phone && canonicalPhone(customer.phone) === canonicalPhone(order.customerPhone);
+      if (!byToken && !byCustomer) return res.status(404).json({ error: "Order not found" });
+      const stars = (v) => {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
+      };
+      if (!stars(overallRating)) return res.status(400).json({ error: "overallRating must be 1\u20135" });
+      const rating = await storage.createOrderRating({
+        orderId,
+        customerId: customer?.id ?? null,
+        driverId: order.driverId ?? null,
+        overallRating: stars(overallRating),
+        foodRating: stars(foodRating),
+        deliveryRating: stars(deliveryRating),
+        comment: comment == null ? null : String(comment).slice(0, 2e3)
+      });
+      res.json(rating);
+    } catch (e) {
+      if (e?.code === "ER_DUP_ENTRY") return res.status(409).json({ error: "This order has already been rated", code: "ALREADY_RATED" });
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/auth", async (req, res) => {
+    try {
+      const { accessToken } = req.body;
+      if (!accessToken) return res.status(400).json({ error: "accessToken required" });
+      const driver = await storage.getVehicleByAccessToken(accessToken);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      res.json({ driver: { id: driver.id, driverName: driver.driverName, driverPhone: driver.driverPhone, driverStatus: driver.driverStatus } });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  const driverTokenFromRequest = (req) => {
+    const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    return (bearer || req.body && req.body.token || req.query && req.query.token || "").trim();
+  };
+  app2.get("/api/delivery/driver/orders", async (req, res) => {
+    try {
+      const token = driverTokenFromRequest(req);
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orders = await storage.getDriverActiveOrders(driver.id, driver.tenantId);
+      res.json(orders);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/orders/:id/accept", async (req, res) => {
+    try {
+      const token = driverTokenFromRequest(req);
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await assignDriverToOrder(orderId, driver.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/orders/:id/picked-up", async (req, res) => {
+    try {
+      const token = driverTokenFromRequest(req);
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status: "on_way", riderPickedUpAt: /* @__PURE__ */ new Date() });
+      const order = await storage.getOnlineOrder(orderId);
+      if (order?.customerPhone && order.trackingToken) {
+        try {
+          if (order.tenantId) await whatsappService.orderStatusChanged(order, "on_way", order.tenantId);
+        } catch (_) {
+        }
+      }
+      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "on_way", driverName: driver.driverName }, driver.tenantId);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/orders/:id/delivered", async (req, res) => {
+    try {
+      const token = driverTokenFromRequest(req);
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status: "delivered", riderDeliveredAt: /* @__PURE__ */ new Date() });
+      await releaseDriver(driver.id);
+      const order = await storage.getOnlineOrder(orderId);
+      if (order) {
+        const customerId = await storage.getCustomerIdByPhone(order.customerPhone, driver.tenantId);
+        if (customerId) {
+          await awardLoyaltyPoints(customerId, driver.tenantId, orderId, Number(order.totalAmount));
+        }
+        if (order.customerPhone && order.tenantId) {
+          whatsappService.orderStatusChanged(order, "delivered", order.tenantId).catch(() => {
+          });
+        }
+      }
+      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "delivered", driverName: driver.driverName }, driver.tenantId);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/status", async (req, res) => {
+    try {
+      const token = driverTokenFromRequest(req);
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const status = String(req.body?.status || "").trim();
+      if (!["available", "offline", "on_delivery"].includes(status)) {
+        return res.status(400).json({ error: "status must be available | offline | on_delivery" });
+      }
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10 } = await import("drizzle-orm");
+      await db2.update(vehicles2).set({ driverStatus: status, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
+      try {
+        callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId);
+      } catch {
+      }
+      res.json({ success: true, driverStatus: status });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/location", async (req, res) => {
+    try {
+      const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+      const token = (req.body?.token || bearer || "").trim();
+      const { lat, lng, orderId, status } = req.body || {};
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      if (status && ["available", "offline", "on_delivery"].includes(status)) {
+        try {
+          const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+          const { eq: eq10 } = await import("drizzle-orm");
+          await db2.update(vehicles2).set({ driverStatus: status, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
+          try {
+            callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId);
+          } catch {
+          }
+        } catch (_) {
+        }
+      }
+      if (lat === void 0 || lat === null || lng === void 0 || lng === null) {
+        return res.json({ success: true, statusOnly: true });
+      }
+      const oid = orderId ? Number(orderId) : void 0;
+      await storage.updateDriverLocation(driver.id, Number(lat), Number(lng), oid);
+      if (oid) {
+        try {
+          await storage.updateOnlineOrder(oid, {
+            driverLat: Number(lat).toFixed(7),
+            driverLng: Number(lng).toFixed(7)
+          });
+        } catch (_) {
+        }
+      }
+      callerIdService.broadcastDriverLocation(driver.tenantId, driver.id, Number(lat), Number(lng), oid);
+      if (oid) {
+        try {
+          const sseMap = app2._orderSseClients;
+          const set = sseMap?.get(oid);
+          if (set && set.size) {
+            const msg = `data: ${JSON.stringify({ type: "driver_location_update", driverLat: Number(lat), driverLng: Number(lng), vehicleId: driver.id })}
+
+`;
+            set.forEach((c) => {
+              try {
+                c.write(msg);
+              } catch {
+              }
+            });
+          }
+        } catch (_) {
+        }
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/driver/earnings", async (req, res) => {
+    try {
+      const token = driverTokenFromRequest(req);
+      const days = req.query.days || "7";
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const earnings = await storage.getDriverEarnings(driver.id, Number(days ?? 7));
+      res.json(earnings);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/orders", async (req, res) => {
+    try {
+      const { tenantId, status, orderType } = req.query;
+      const tid = req.tenantId || Number(tenantId);
+      if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      const orders = await storage.getDeliveryOrders(tid, { status, orderType });
+      res.json(orders);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/manage/orders/:id/assign", async (req, res) => {
+    try {
+      const { vehicleId } = req.body;
+      if (!vehicleId) return res.status(400).json({ error: "vehicleId required" });
+      const orderId = Number(req.params.id);
+      const vehicle = await storage.getVehicle(Number(vehicleId));
+      if (!vehicle || vehicle.isActive === false) return res.status(404).json({ error: "Driver not found" });
+      await storage.assignDriverToOrder(orderId, Number(vehicleId));
+      const driver = await storage.getVehicle(Number(vehicleId));
+      const order = await storage.getOnlineOrder(orderId);
+      if (driver?.driverPhone && driver.driverAccessToken && order) {
+        try {
+          await whatsappService.sendMessage(
+            driver.driverPhone,
+            `\u{1F6F5} New delivery assignment!
+Order #${order.orderNumber}
+Customer: ${order.customerName}
+Address: ${order.customerAddress || "Pickup"}
+Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`,
+            order.tenantId || void 0
+          );
+        } catch (_) {
+        }
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/manage/orders/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ error: "status required" });
+      if (!ORDER_STATUSES.has(String(status))) return res.status(400).json({ error: "Invalid status", code: "INVALID_STATUS" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status });
+      const order = await storage.getOnlineOrder(orderId);
+      if (order?.driverId && TERMINAL_ORDER_STATUSES.has(String(status))) {
+        try {
+          await storage.releaseDriverFromOrder(Number(order.driverId), orderId);
+        } catch {
+        }
+      }
+      if (order?.customerPhone && order.tenantId) {
+        try {
+          await whatsappService.orderStatusChanged(order, status, order.tenantId);
+        } catch (_) {
+        }
+      }
+      if (order?.tenantId) {
+        callerIdService.broadcast({ type: "delivery_status_change", orderId, status }, order.tenantId);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/manage/orders/:id/unassign", async (req, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const order = await storage.getOnlineOrder(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      const previous = order.driverId ? Number(order.driverId) : null;
+      await storage.updateOnlineOrder(orderId, { driverId: null });
+      if (previous) await storage.releaseDriverFromOrder(previous, orderId);
+      if (order.tenantId) callerIdService.broadcast({ type: "delivery_status_change", orderId, status: order.status, vehicleId: null }, Number(order.tenantId));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/drivers", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const drivers = await storage.getActiveDrivers(tid);
+      res.json(drivers);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/stats", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const stats = await storage.getDeliveryStats(tid);
+      res.json(stats);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/zones", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      res.json(await storage.getDeliveryZones(tid));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/manage/zones", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      const { id: _id, createdAt: _c, ...body } = req.body || {};
+      const zone = await storage.createDeliveryZone({ ...body, tenantId: tid });
+      res.status(201).json(zone);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/manage/zones/:id", async (req, res) => {
+    try {
+      const { id: _id, createdAt: _c, ...body } = withoutTenant(req.body || {});
+      const zone = await storage.updateDeliveryZone(Number(req.params.id), body);
+      res.json(zone);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/manage/zones/:id", async (req, res) => {
+    try {
+      await storage.deleteDeliveryZone(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/promos", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      res.json(await storage.getPromoCodes(tid));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/promos", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      const parsed = promoFields(req.body || {}, true);
+      if ("error" in parsed) return res.status(400).json({ error: parsed.error, code: parsed.code });
+      const promo = await storage.createPromoCode({ ...parsed.data, tenantId: tid });
+      res.status(201).json(promo);
+    } catch (e) {
+      promoWriteError(res, e);
+    }
+  });
+  app2.put("/api/delivery/promos/:id", async (req, res) => {
+    try {
+      const parsed = promoFields(req.body || {}, false);
+      if ("error" in parsed) return res.status(400).json({ error: parsed.error, code: parsed.code });
+      if (!Object.keys(parsed.data).length) return res.status(400).json({ error: "Nothing to update", code: "NO_FIELDS" });
+      const promo = await storage.updatePromoCode(Number(req.params.id), parsed.data);
+      res.json(promo);
+    } catch (e) {
+      promoWriteError(res, e);
+    }
+  });
+  app2.delete("/api/delivery/promos/:id", async (req, res) => {
+    try {
+      await storage.deletePromoCode(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/loyalty/:customerId", async (req, res) => {
+    try {
+      const customerId = Number(req.params.customerId);
+      const [customer, transactions] = await Promise.all([
+        storage.getCustomer(customerId),
+        storage.getLoyaltyTransactions(customerId)
+      ]);
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      res.json({ points: customer.loyaltyPoints, tier: customer.loyaltyTier, transactions });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/loyalty/redeem", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const points = Math.floor(Number(req.body?.points) || 0);
+      const tenantId = Number(req.body?.tenantId) || customer.tenantId;
+      const refusal = await checkLoyaltyRedemption(customer.id, tenantId, points);
+      if (refusal) return res.json({ success: false, discountAmount: 0, error: refusal });
+      const cfg = await getLoyaltyConfig(tenantId);
+      res.json({ success: true, discountAmount: roundMoney(points * cfg.redemptionRate, await storeCurrency(tenantId)), deferred: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/wallet/:customerId", async (req, res) => {
+    try {
+      const customerId = Number(req.params.customerId);
+      const [customer, transactions] = await Promise.all([
+        storage.getCustomer(customerId),
+        storage.getWalletTransactions(customerId)
+      ]);
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      res.json({ balance: customer.walletBalance, transactions });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/wallet/topup", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      return res.status(410).json({
+        error: "\u0634\u062D\u0646 \u0627\u0644\u0645\u062D\u0641\u0638\u0629 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u062D\u0627\u0644\u064A\u0627\u064B / Wallet top-up is not available at the moment",
+        code: "WALLET_TOPUP_DISABLED"
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/referral/:code", async (req, res) => {
+    try {
+      const customer = await storage.getCustomerByReferralCode(req.params.code);
+      if (!customer) return res.status(404).json({ error: "Referral code not found" });
+      res.json({ valid: true, referrerName: customer.name });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/orders/:idOrToken/status-stream", (req, res) => {
+    const idOrToken = req.params.idOrToken;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(": heartbeat\n\n");
+      } catch (_) {
+      }
+    }, 25e3);
+    const resolveAndListen = async () => {
+      try {
+        let orderId;
+        if (/^\d+$/.test(idOrToken)) {
+          const byId = await storage.getOnlineOrder(Number(idOrToken)).catch(() => null);
+          const token = String(req.query.token || req.query.trackingToken || "");
+          if (!byId || !byId.trackingToken || token !== byId.trackingToken) {
+            res.write(`data: ${JSON.stringify({ type: "error", error: "Order not found" })}
+
+`);
+            clearInterval(heartbeat);
+            res.end();
+            return;
+          }
+          orderId = byId.id;
+        } else {
+          const order = await storage.getOnlineOrderByTrackingToken(idOrToken);
+          if (!order) {
+            res.write(`data: ${JSON.stringify({ type: "error", error: "Order not found" })}
+
+`);
+            clearInterval(heartbeat);
+            res.end();
+            return;
+          }
+          orderId = order.id;
+          res.write(`data: ${JSON.stringify({ type: "status_update", order: { id: order.id, status: order.status, orderNumber: order.orderNumber } })}
+
+`);
+        }
+        if (!app2._orderSseClients) {
+          app2._orderSseClients = /* @__PURE__ */ new Map();
+        }
+        const sseMap = app2._orderSseClients;
+        if (!sseMap.has(orderId)) sseMap.set(orderId, /* @__PURE__ */ new Set());
+        sseMap.get(orderId).add(res);
+        req.on("close", () => {
+          clearInterval(heartbeat);
+          sseMap.get(orderId)?.delete(res);
+          if (sseMap.get(orderId)?.size === 0) sseMap.delete(orderId);
+        });
+      } catch (err) {
+        clearInterval(heartbeat);
+        res.end();
+      }
+    };
+    resolveAndListen();
+  });
+  if (!app2._broadcastDeliveryStatus) {
+    app2._broadcastDeliveryStatus = (orderId, payload) => {
+      const sseMap = app2._orderSseClients;
+      if (!sseMap) return;
+      const clients = sseMap.get(orderId);
+      if (!clients) return;
+      const msg = `data: ${JSON.stringify(payload)}
+
+`;
+      clients.forEach((client) => {
+        try {
+          client.write(msg);
+        } catch (_) {
+          clients.delete(client);
+        }
+      });
+    };
+  }
+  app2.post("/api/delivery/orders/:id/reorder", async (req, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const originalOrder = await storage.getOnlineOrder(orderId);
+      if (!originalOrder) return res.status(404).json({ error: "Order not found" });
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      const token = String(req.body?.trackingToken || req.query.token || "");
+      const byToken = !!originalOrder.trackingToken && token === originalOrder.trackingToken;
+      const byCustomer = !!customer && customer.tenantId === originalOrder.tenantId && !!customer.phone && canonicalPhone(customer.phone) === canonicalPhone(originalOrder.customerPhone);
+      if (!byToken && !byCustomer) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      let repriced;
+      try {
+        repriced = await repriceOrder({
+          tenantId: originalOrder.tenantId,
+          items: originalOrder.items || [],
+          clientDeliveryFee: originalOrder.deliveryFee,
+          orderType: originalOrder.orderType || "delivery"
+        });
+      } catch (e) {
+        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+      const trackingToken = generateTrackingToken();
+      const orderNumber = `DEL-${Date.now()}`;
+      const newOrder = await storage.createOnlineOrder({
+        tenantId: originalOrder.tenantId,
+        orderNumber,
+        customerName: originalOrder.customerName,
+        customerPhone: originalOrder.customerPhone,
+        customerEmail: originalOrder.customerEmail ?? null,
+        customerAddress: originalOrder.customerAddress ?? null,
+        items: repriced.items,
+        subtotal: repriced.subtotal.toFixed(2),
+        taxAmount: "0",
+        deliveryFee: repriced.deliveryFee.toFixed(2),
+        totalAmount: repriced.totalAmount.toFixed(2),
+        paymentMethod: originalOrder.paymentMethod || "cash",
+        paymentStatus: "pending",
+        status: "pending",
+        orderType: originalOrder.orderType || "delivery",
+        notes: originalOrder.notes ?? null,
+        estimatedTime: 35,
+        language: originalOrder.language || "en",
+        trackingToken,
+        sourceChannel: "web"
+      });
+      try {
+        callerIdService.broadcast({
+          type: "new_online_order",
+          order: { id: newOrder.id, orderNumber, customerName: originalOrder.customerName, totalAmount: repriced.totalAmount.toFixed(2), orderType: originalOrder.orderType }
+        }, originalOrder.tenantId);
+      } catch (_) {
+      }
+      res.status(201).json({ success: true, orderId: newOrder.id, orderNumber, trackingToken });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/favorites", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10, and: and7 } = await import("drizzle-orm");
+      const favs = await db2.select({
+        id: customerFavorites2.id,
+        productId: customerFavorites2.productId,
+        createdAt: customerFavorites2.createdAt,
+        productName: products2.name,
+        productNameAr: products2.nameAr,
+        productPrice: products2.price,
+        productImage: products2.image,
+        productDescription: products2.description
+      }).from(customerFavorites2).innerJoin(products2, eq10(products2.id, customerFavorites2.productId)).where(and7(eq10(customerFavorites2.customerId, customer.id), eq10(customerFavorites2.tenantId, customer.tenantId)));
+      res.json(favs);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/favorites", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { productId } = req.body;
+      if (!productId) return res.status(400).json({ error: "productId required" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const [fav] = await db2.insert(customerFavorites2).values({
+        tenantId: customer.tenantId,
+        customerId: customer.id,
+        productId: Number(productId)
+      }).$returningId();
+      res.status(201).json({ id: fav.id, productId: Number(productId) });
+    } catch (e) {
+      if (e.code === "ER_DUP_ENTRY") return res.status(409).json({ error: "Already in favorites" });
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/favorites/:id", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10, and: and7 } = await import("drizzle-orm");
+      await db2.delete(customerFavorites2).where(
+        and7(eq10(customerFavorites2.id, Number(req.params.id)), eq10(customerFavorites2.customerId, customer.id))
+      );
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/search", async (req, res) => {
+    try {
+      const q8 = (req.query.q || "").trim();
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      if (!q8) return res.json([]);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10, and: and7, or: or5, like: like2, sql: sql8 } = await import("drizzle-orm");
+      const pattern = `%${q8}%`;
+      const results = await db2.select({
+        id: products2.id,
+        name: products2.name,
+        nameAr: products2.nameAr,
+        description: products2.description,
+        price: products2.price,
+        image: products2.image,
+        categoryId: products2.categoryId,
+        categoryName: categories2.name
+      }).from(products2).leftJoin(categories2, eq10(categories2.id, products2.categoryId)).where(and7(
+        eq10(products2.tenantId, tenantId),
+        eq10(products2.isActive, true),
+        or5(
+          like2(products2.name, pattern),
+          like2(products2.nameAr, pattern),
+          like2(products2.description, pattern)
+        )
+      )).limit(50);
+      res.json(results);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/help/faq", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { faqEntries: faqEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10, and: and7, asc } = await import("drizzle-orm");
+      const faqs = await db2.select().from(faqEntries2).where(and7(eq10(faqEntries2.tenantId, tenantId), eq10(faqEntries2.isActive, true))).orderBy(asc(faqEntries2.sortOrder));
+      res.json(faqs);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/help/ticket", async (req, res) => {
+    try {
+      const { subject, message, orderId, tenantId } = req.body;
+      if (!subject || !message || !tenantId) return res.status(400).json({ error: "subject, message, tenantId required" });
+      const customer = await getAuthenticatedCustomer(req.headers.authorization).catch(() => null);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const [ticket] = await db2.insert(helpTickets2).values({
+        tenantId: Number(tenantId),
+        customerId: customer?.id ?? null,
+        orderId: orderId ? Number(orderId) : null,
+        subject,
+        message,
+        status: "open",
+        priority: "normal"
+      }).$returningId();
+      res.status(201).json({ id: ticket.id, status: "open" });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/help/tickets", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10, and: and7, desc: desc5 } = await import("drizzle-orm");
+      const tickets = await db2.select().from(helpTickets2).where(and7(eq10(helpTickets2.customerId, customer.id), eq10(helpTickets2.tenantId, customer.tenantId))).orderBy(desc5(helpTickets2.createdAt));
+      res.json(tickets);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/recently-ordered", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { onlineOrders: onlineOrders2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq10, and: and7, desc: desc5 } = await import("drizzle-orm");
+      const orders = await db2.select({ items: onlineOrders2.items }).from(onlineOrders2).where(and7(
+        eq10(onlineOrders2.customerPhone, customer.phone),
+        eq10(onlineOrders2.tenantId, customer.tenantId)
+      )).orderBy(desc5(onlineOrders2.createdAt)).limit(20);
+      const seenIds = /* @__PURE__ */ new Set();
+      const recentItems = [];
+      for (const order of orders) {
+        const items = order.items || [];
+        for (const item of items) {
+          if (item.productId && !seenIds.has(item.productId)) {
+            seenIds.add(item.productId);
+            recentItems.push({ productId: item.productId, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice });
+          }
+        }
+      }
+      const enriched = [];
+      for (const item of recentItems.slice(0, 20)) {
+        const [product] = await db2.select({ id: products2.id, name: products2.name, nameAr: products2.nameAr, price: products2.price, image: products2.image, isActive: products2.isActive }).from(products2).where(eq10(products2.id, item.productId)).limit(1);
+        enriched.push({
+          productId: item.productId,
+          name: product?.name || item.name,
+          nameAr: product?.nameAr || null,
+          price: product?.price || String(item.unitPrice),
+          image: product?.image || null,
+          isActive: product?.isActive ?? true,
+          lastOrderedQuantity: item.quantity
+        });
+      }
+      res.json(enriched);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/sitemap.xml", async (_req, res) => {
+    try {
+      const configs = await storage.getAllLandingPageConfigs();
+      const baseUrl = process.env.APP_URL || "https://kassenta.com";
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`;
+      for (const config of configs || []) {
+        if (!config.slug) continue;
+        xml += `  <url>
+`;
+        xml += `    <loc>${baseUrl}/order/${config.slug}</loc>
+`;
+        xml += `    <changefreq>daily</changefreq>
+`;
+        xml += `    <priority>0.8</priority>
+`;
+        xml += `  </url>
+`;
+      }
+      xml += `</urlset>`;
+      res.set("Content-Type", "application/xml");
+      res.send(xml);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/order-ratings", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const ratings = await storage.getOrderRatings(tid);
+      res.json(ratings);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/reviews", async (req, res) => {
+    try {
+      const slug = req.params.slug;
+      const page = parseInt(req.query.page) || 1;
+      const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+      const config = await resolveSlugConfig(slug);
+      const tenant = config ? await storage.getTenant(config.tenantId).catch(() => null) : null;
+      if (!tenant) {
+        return res.json({ reviews: [], summary: { avgRating: 0, totalReviews: 0, distribution: {} } });
+      }
+      const ratings = await storage.getOrderRatings(tenant.id);
+      const total = ratings.length;
+      const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      let sum2 = 0;
+      for (const r of ratings) {
+        const star = Math.round(r.overallRating || r.foodRating || 0);
+        if (star >= 1 && star <= 5) distribution[star]++;
+        sum2 += r.overallRating || r.foodRating || 0;
+      }
+      const avgRating = total > 0 ? sum2 / total : 0;
+      const offset = (page - 1) * limit;
+      const pagedRatings = ratings.slice(offset, offset + limit);
+      const reviews = pagedRatings.map((r) => ({
+        id: r.id,
+        rating: r.overallRating || r.foodRating || 0,
+        comment: r.comment || "",
+        customerName: r.customerName || "Customer",
+        createdAt: r.createdAt,
+        orderItems: r.orderItems || ""
+      }));
+      res.json({
+        reviews,
+        summary: { avgRating: Math.round(avgRating * 10) / 10, totalReviews: total, distribution },
+        page,
+        limit,
+        hasMore: offset + limit < total
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  const _recoCache = /* @__PURE__ */ new Map();
+  const RECO_TTL = 5 * 60 * 1e3;
+  app2.get("/api/delivery/recommendations", async (req, res) => {
+    try {
+      const tid = parseInt(req.query.tenantId) || req.tenantId;
+      if (!tid) return res.json({ popular: [], recentlyOrdered: [] });
+      const cacheKey = `reco_${tid}`;
+      const cached2 = _recoCache.get(cacheKey);
+      if (cached2 && Date.now() - cached2.ts < RECO_TTL) {
+        return res.json(cached2.data);
+      }
+      const products2 = await storage.getProductsByTenant(tid);
+      const popular = products2.filter((p) => p.isActive !== false && parseFloat(p.price || "0") > 0).sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0)).slice(0, 10).map((p) => ({
+        id: p.id,
+        name: p.name,
+        nameAr: p.nameAr,
+        price: p.price,
+        imageUrl: p.imageUrl,
+        categoryId: p.categoryId
+      }));
+      const result = { popular, recentlyOrdered: [] };
+      _recoCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/robots.txt", (_req, res) => {
+    res.type("text/plain").send(
+      `User-agent: *
+Allow: /api/order/
+Allow: /api/restaurants
+Disallow: /api/delivery/
+Sitemap: https://kassenta.com/api/delivery/sitemap.xml
+`
+    );
+  });
+  const httpServer = (0, import_node_http.createServer)(app2);
+  return httpServer;
+}
+
 // server/superAdminRoutes.ts
-async function q4(text2, params = []) {
+var bcrypt7 = __toESM(require("bcrypt"));
+var crypto7 = __toESM(require("crypto"));
+var fs4 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
+init_storage();
+var import_date_fns5 = require("date-fns");
+init_db();
+var import_drizzle_orm7 = require("drizzle-orm");
+async function q5(text2, params = []) {
   const [rows] = await pool.query(text2, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -14617,11 +16495,11 @@ function registerSuperAdminRoutes(app2) {
       for (let i = 5; i >= 0; i--) {
         const d = /* @__PURE__ */ new Date();
         d.setMonth(d.getMonth() - i);
-        const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+        const monthStart2 = new Date(d.getFullYear(), d.getMonth(), 1);
         const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0);
         const monthSubs = allSubs.filter((s) => {
           const created = new Date(s.createdAt);
-          return created >= monthStart && created <= monthEnd;
+          return created >= monthStart2 && created <= monthEnd;
         });
         const monthRev = monthSubs.reduce((acc, s) => acc + parseFloat(s.price || "0"), 0);
         monthly.push({
@@ -14848,7 +16726,7 @@ function registerSuperAdminRoutes(app2) {
       const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
       const billingMap = {};
       try {
-        const rows = await q4(
+        const rows = await q5(
           `SELECT id, stripe_customer_id, stripe_subscription_id, stripe_price_id,
                   last_invoice_id, last_payment_error
              FROM tenant_subscriptions`
@@ -15076,13 +16954,13 @@ function registerSuperAdminRoutes(app2) {
       let rows = [];
       let totals = {};
       try {
-        rows = await q4(
+        rows = await q5(
           `SELECT * FROM ( ${union.sql} ) p
             ORDER BY COALESCE(p.paidAt, p.createdAt) DESC
             LIMIT ?`,
           [...union.params, limit]
         );
-        const agg = await q4(
+        const agg = await q5(
           `SELECT COUNT(*) AS n,
                   SUM(CASE WHEN p.status IN ('paid','completed') THEN p.amount ELSE 0 END) AS collected,
                   SUM(COALESCE(p.refunded, 0)) AS refunded,
@@ -15101,11 +16979,11 @@ function registerSuperAdminRoutes(app2) {
       }
       const tenantList = await storage.getTenants();
       const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
-      const currencyCache = /* @__PURE__ */ new Map();
+      const currencyCache2 = /* @__PURE__ */ new Map();
       const currencyOf = async (tid) => {
         const key = Number(tid) || 0;
-        if (!currencyCache.has(key)) currencyCache.set(key, await currencyFor(key || null));
-        return currencyCache.get(key);
+        if (!currencyCache2.has(key)) currencyCache2.set(key, await currencyFor(key || null));
+        return currencyCache2.get(key);
       };
       const payments = [];
       for (const r of rows) {
@@ -15153,7 +17031,7 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/payments/events", requireSuperAdmin, async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 200);
     try {
-      const rows = await q4(
+      const rows = await q5(
         `SELECT id, type, status, livemode, error, received_at, processed_at
            FROM stripe_webhook_events
           ORDER BY received_at DESC
@@ -15181,7 +17059,7 @@ function registerSuperAdminRoutes(app2) {
       if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)) {
         return res.status(400).json({ error: "A Stripe PaymentIntent id (pi_...) is required" });
       }
-      const known = await q4(
+      const known = await q5(
         `SELECT total_amount AS amount, COALESCE(amount_refunded, 0) AS refunded
            FROM online_orders WHERE stripe_payment_intent_id = ?
           UNION ALL
@@ -15620,8 +17498,8 @@ function registerSuperAdminRoutes(app2) {
         const branchIds = branchesList.map((b) => b.id);
         let total = 0;
         if (branchIds.length > 0) {
-          const { inArray: inArray3 } = await import("drizzle-orm");
-          const rows = await db.select().from(expenses2).where(inArray3(expenses2.branchId, branchIds));
+          const { inArray: inArray4 } = await import("drizzle-orm");
+          const rows = await db.select().from(expenses2).where(inArray4(expenses2.branchId, branchIds));
           total = rows.reduce((acc, e) => acc + parseFloat(e.amount || "0"), 0);
         }
         result.push({ tenantId: t2.id, businessName: t2.businessName, totalExpenses: total });
@@ -15842,6 +17720,12 @@ init_db();
 init_schema();
 var import_drizzle_orm8 = require("drizzle-orm");
 init_callerIdService();
+function idempotencyKeyOf(req) {
+  const raw = req.get("Idempotency-Key");
+  const v = String(raw ?? "").trim();
+  return v && v.length <= 100 ? v : null;
+}
+var inflightBroadcasts = /* @__PURE__ */ new Set();
 var broadcastMigrationRan = false;
 async function ensureBroadcastTables() {
   if (broadcastMigrationRan) return;
@@ -16037,6 +17921,30 @@ function registerBroadcastRoutes(app2) {
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: "items must be a non-empty array" });
       }
+      const idemKey = idempotencyKeyOf(req);
+      let clientRefOk = false;
+      if (idemKey) {
+        await ensureBroadcastClientRef().catch(() => {
+        });
+        try {
+          const [prior] = await pool.query(
+            `SELECT id, broadcast_token, status, expires_at FROM broadcast_orders
+              WHERE client_ref = ? AND customer_phone = ? AND created_at >= NOW() - INTERVAL 1 DAY
+              ORDER BY id LIMIT 1`,
+            [idemKey, String(customerPhone).slice(0, 40)]
+          );
+          clientRefOk = true;
+          if (prior?.[0]) {
+            return res.status(200).json({ id: prior[0].id, token: prior[0].broadcast_token, status: prior[0].status, expiresAt: prior[0].expires_at, duplicate: true });
+          }
+        } catch {
+        }
+        if (inflightBroadcasts.has(idemKey)) return res.status(409).json({ error: "This order is already being placed", code: "ORDER_IN_PROGRESS" });
+        inflightBroadcasts.add(idemKey);
+        const release = () => inflightBroadcasts.delete(idemKey);
+        res.on("finish", release);
+        res.on("close", release);
+      }
       const token = generateBroadcastToken();
       const expiresAt = new Date(Date.now() + BROADCAST_TTL_MINUTES * 60 * 1e3);
       const [inserted] = await db.insert(broadcastOrders).values({
@@ -16055,6 +17963,10 @@ function registerBroadcastRoutes(app2) {
         expiresAt
       });
       const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.broadcastToken, token)).limit(1);
+      if (idemKey && clientRefOk) {
+        await pool.query("UPDATE broadcast_orders SET client_ref = ? WHERE id = ?", [idemKey, row.id]).catch(() => {
+        });
+      }
       const normalizedItems = normalizeItems(row.items);
       const payload = {
         type: "broadcast_new",
@@ -16070,11 +17982,11 @@ function registerBroadcastRoutes(app2) {
         expiresAt: row.expiresAt
       };
       try {
-        callerIdService.broadcast(payload);
+        callerIdService.broadcastToStores(payload);
       } catch (_) {
       }
       try {
-        pushService.broadcast({ type: "broadcast_new", title: "\u{1F6F5} New Broadcast Order", body: `${row.customerName} \u2014 CHF ${row.estimatedTotal || "?"}`, data: { id: row.id, token: row.broadcastToken } });
+        void pushService.notifyBroadcastOrder(row.id, row.estimatedTotal, normalizedItems.length);
       } catch (_) {
       }
       res.status(201).json({
@@ -16245,10 +18157,7 @@ function registerBroadcastRoutes(app2) {
         id: bc.id,
         token: bc.broadcastToken,
         claimedByTenantId: tenantId,
-        claimedByName: tenantRow?.businessName || null,
-        orderNumber,
-        trackingToken,
-        onlineOrderId
+        claimedByName: tenantRow?.businessName || null
       };
       try {
         callerIdService.broadcast(claimPayload);
@@ -16303,6 +18212,14 @@ init_schema();
 var import_drizzle_orm9 = require("drizzle-orm");
 init_storage();
 init_callerIdService();
+init_phone();
+async function customerOwnsRoom(customer, room) {
+  if (!customer || !room) return false;
+  if (room.customerId) return room.customerId === customer.id;
+  const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm9.eq)(onlineOrders.id, room.orderId)).limit(1);
+  if (!order || !customer.phone || String(customer.phone).startsWith("guest-")) return false;
+  return order.tenantId === customer.tenantId && canonicalPhone(order.customerPhone) === canonicalPhone(customer.phone);
+}
 var chatMigrationRan = false;
 async function ensureChatTables() {
   if (chatMigrationRan) return;
@@ -16376,25 +18293,20 @@ function registerCustomerExtraRoutes(app2) {
     try {
       const { name, phone, tenantId } = req.body || {};
       const tid = Number(tenantId) || 24;
-      const guestPhone = phone || `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const guestName = name || "Guest";
-      const customer = await findOrCreateCustomerByPhone(guestPhone, tid).catch(async () => {
-        await db.insert(customers).values({
-          tenantId: tid,
-          name: guestName,
-          phone: guestPhone,
-          hasAccount: false
-        });
-        const [c] = await db.select().from(customers).where((0, import_drizzle_orm9.eq)(customers.phone, guestPhone)).limit(1);
-        return c;
-      });
+      if (!await storage.getTenant(tid)) return res.status(404).json({ error: "Store not found" });
+      const guestName = String(name || "Guest").trim().slice(0, 120) || "Guest";
+      const typed = phone ? canonicalPhone(phone) : "";
+      const taken = typed ? await storage.findCustomerByPhoneExact(typed, tid) : void 0;
+      const guestPhone = typed && !taken ? typed : `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const [ins] = await db.insert(customers).values({
+        tenantId: tid,
+        name: guestName,
+        phone: guestPhone,
+        hasAccount: false,
+        source: "customer-app-guest"
+      }).$returningId();
+      const [customer] = await db.select().from(customers).where((0, import_drizzle_orm9.eq)(customers.id, ins.id)).limit(1);
       if (!customer) return res.status(500).json({ error: "Failed to create guest" });
-      if (!customer.hasAccount && guestName && customer.name !== guestName) {
-        try {
-          await storage.updateCustomer(customer.id, { name: guestName });
-        } catch {
-        }
-      }
       const token = await createCustomerSession(customer.id, tid, req.headers["user-agent"]);
       res.json({
         success: true,
@@ -16404,7 +18316,7 @@ function registerCustomerExtraRoutes(app2) {
           id: customer.id,
           name: guestName,
           // honor the user-provided name in the response
-          phone: customer.phone,
+          phone: typed || customer.phone,
           isGuest: true
         }
       });
@@ -16442,7 +18354,7 @@ function registerCustomerExtraRoutes(app2) {
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const room = await getOrCreateRoom(orderId);
       if (!room) return res.status(404).json({ error: "Order not found" });
-      if (room.customerId && room.customerId !== customer.id) {
+      if (!await customerOwnsRoom(customer, room)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const messages = await db.select().from(chatMessages).where((0, import_drizzle_orm9.eq)(chatMessages.roomId, room.id)).orderBy(chatMessages.createdAt).limit(200);
@@ -16465,7 +18377,7 @@ function registerCustomerExtraRoutes(app2) {
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const room = await getOrCreateRoom(orderId);
       if (!room) return res.status(404).json({ error: "Order not found" });
-      if (room.customerId && room.customerId !== customer.id) {
+      if (!await customerOwnsRoom(customer, room)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       await db.insert(chatMessages).values({
@@ -16502,7 +18414,7 @@ function registerCustomerExtraRoutes(app2) {
   app2.get("/api/chat/rooms", async (req, res) => {
     try {
       await ensureChatTables();
-      const tenantId = Number(req.query.tenantId);
+      const tenantId = Number(req.tenantId || req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const rooms = await db.select({
         id: chatRooms.id,
@@ -16523,10 +18435,12 @@ function registerCustomerExtraRoutes(app2) {
   app2.post("/api/chat/order/:orderId/ensure", async (req, res) => {
     try {
       const orderId = Number(req.params.orderId);
-      const tenantId = Number(req.query.tenantId || req.tenantId);
+      const tenantId = Number(req.tenantId || 0);
+      if (!tenantId && !req.isSuperAdmin) return res.status(400).json({ error: "tenantId required" });
+      const [order] = await db.select({ tenantId: onlineOrders.tenantId }).from(onlineOrders).where((0, import_drizzle_orm9.eq)(onlineOrders.id, orderId)).limit(1);
+      if (!order || tenantId && order.tenantId !== tenantId) return res.status(404).json({ error: "Order not found" });
       const room = await getOrCreateRoom(orderId);
       if (!room) return res.status(404).json({ error: "Order not found" });
-      if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
       res.json({ room });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -16536,10 +18450,10 @@ function registerCustomerExtraRoutes(app2) {
     try {
       await ensureChatTables();
       const id = Number(req.params.id);
-      const tenantId = Number(req.query.tenantId || req.tenantId);
+      const tenantId = Number(req.tenantId || 0);
+      if (!tenantId && !req.isSuperAdmin) return res.status(400).json({ error: "tenantId required" });
       const [room] = await db.select().from(chatRooms).where((0, import_drizzle_orm9.eq)(chatRooms.id, id)).limit(1);
-      if (!room) return res.status(404).json({ error: "Room not found" });
-      if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
+      if (!room || tenantId && room.tenantId !== tenantId) return res.status(404).json({ error: "Room not found" });
       const messages = await db.select().from(chatMessages).where((0, import_drizzle_orm9.eq)(chatMessages.roomId, id)).orderBy(chatMessages.createdAt).limit(500);
       try {
         await db.update(chatRooms).set({ unreadByTenant: 0 }).where((0, import_drizzle_orm9.eq)(chatRooms.id, id));
@@ -16556,13 +18470,14 @@ function registerCustomerExtraRoutes(app2) {
       const id = Number(req.params.id);
       const { body, senderName, senderId, senderType } = req.body || {};
       if (!body || !String(body).trim()) return res.status(400).json({ error: "body required" });
+      const tenantId = Number(req.tenantId || 0);
+      if (!tenantId && !req.isSuperAdmin) return res.status(400).json({ error: "tenantId required" });
       const [room] = await db.select().from(chatRooms).where((0, import_drizzle_orm9.eq)(chatRooms.id, id)).limit(1);
-      if (!room) return res.status(404).json({ error: "Room not found" });
-      const tenantId = Number(req.query.tenantId || req.tenantId);
-      if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
+      if (!room || tenantId && room.tenantId !== tenantId) return res.status(404).json({ error: "Room not found" });
       await db.insert(chatMessages).values({
         roomId: id,
-        senderType: senderType || "tenant",
+        // The store side cannot post as the customer.
+        senderType: senderType === "driver" ? "driver" : "tenant",
         senderId: senderId ? Number(senderId) : null,
         senderName: senderName || "Restaurant",
         body: String(body).slice(0, 2e3)
@@ -16576,7 +18491,7 @@ function registerCustomerExtraRoutes(app2) {
         type: "chat_new_message",
         roomId: id,
         orderId: room.orderId,
-        senderType: senderType || "tenant",
+        senderType: senderType === "driver" ? "driver" : "tenant",
         senderName: senderName || "Restaurant",
         body: String(body),
         createdAt: now.toISOString()
@@ -16594,223 +18509,13 @@ function registerCustomerExtraRoutes(app2) {
   console.log("[CUSTOMER-EXTRAS] Routes registered: /api/delivery/auth/guest + chat endpoints");
 }
 
-// server/tenantAuth.ts
-var import_jsonwebtoken3 = __toESM(require("jsonwebtoken"));
-init_storage();
-var PUBLIC_ROUTES = [
-  "/api/health",
-  "/api/license/validate",
-  "/api/auth/google",
-  "/api/landing/subscribe",
-  "/api/landing/plans",
-  // Public plan catalogue for the pricing page
-  "/api/landing/checkout-session",
-  // Read-only Checkout status for /pay/success
-  "/api/landing-page-config",
-  "/api/store/",
-  "/api/store-public/",
-  "/api/online-orders/public",
-  "/api/stripe/webhook",
-  "/api/stripe/publishable-key",
-  "/api/payment-gateway/config",
-  // ── Payments ──
-  // Only the routes a guest checkout genuinely needs. Everything else under
-  // /api/payments/ (sale intents, refunds, health) deliberately stays behind
-  // the licence/employee check, so this must NOT become a bare "/api/payments/".
-  "/api/payments/webhook",
-  // signature-verified, see stripeWebhook.ts
-  "/api/payments/config",
-  // publishable key + offered methods
-  "/api/payments/order/",
-  // guarded by the order's tracking token
-  "/api/payments/status/",
-  // PaymentIntent id is already a bearer secret
-  "/api/payments/checkout-session",
-  // plan price comes from the DB, never the caller
-  "/api/products/template",
-  "/api/dashboard/subscriptions",
-  "/api/caller-id/incoming",
-  // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
-  "/api/caller-id/active-calls",
-  // HTTP polling fallback — tenantId required in query string
-  "/api/push/vapid-public-key",
-  // Public — needed for SW push subscription before auth
-  "/api/push/subscribe",
-  // Public — SW registers subscription before full auth
-  "/api/maintenance/fix-tenant-ids",
-  // One-time migration fix (secured by secret header)
-  // ── Delivery Platform Public Routes ──
-  "/api/dine-in/validate/",
-  // Public QR token validation for dine-in
-  "/api/delivery/auth/",
-  // Customer OTP login/register
-  "/api/delivery/store/",
-  // Menu & store config browsing
-  "/api/delivery/restaurants",
-  // Multi-restaurant discovery listing
-  "/api/delivery/orders/track/",
-  // Public order tracking by token
-  "/api/delivery/orders/public",
-  // Public order placement
-  "/api/delivery/orders",
-  // Order creation (customer-facing)
-  "/api/delivery/promo/validate",
-  // Promo code validation
-  "/api/delivery/zones",
-  // Delivery zones for checkout map
-  "/api/delivery/referral/",
-  // Referral code lookup
-  "/api/delivery/driver/",
-  // All driver endpoints (auth via Bearer driver token)
-  "/api/delivery/search",
-  // Public product search
-  "/api/delivery/help/faq",
-  // Public FAQ listing
-  "/api/delivery/sitemap.xml",
-  // Dynamic sitemap XML
-  "/api/delivery/recommendations",
-  // Public recommendations
-  "/api/delivery/broadcast",
-  // Public broadcast order creation (drop-shipping)
-  "/api/delivery/broadcast/menu",
-  // Public aggregated menu for /broadcast page
-  "/api/customer/chats",
-  // Customer chat list (auth via Bearer customer token)
-  "/api/customer/chats/",
-  // Customer chat single room + messages
-  "/api/robots.txt",
-  // SEO robots.txt
-  "/api/sitemap.xml",
-  // SEO sitemap (CDN-prefixed variant)
-  "/api/contact",
-  // Website demo request (rate limited, no auth)
-  "/api/favicon.ico",
-  // Favicon via the CDN-prefixed path
-  // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
-  "/api/order",
-  // Delivery listing (no-slug) + /api/order/
-  "/api/track/",
-  // Public tracking page HTML
-  "/api/driver",
-  // Driver PWA HTML (exact)
-  "/api/driver/",
-  // Driver PWA HTML (with slash/slug)
-  "/api/restaurants",
-  // Restaurant listing HTML
-  "/api/delivery-app/",
-  // Static assets (CSS, JS, images)
-  // ── Static files under /api/ prefix (CDN compatibility) ──
-  "/api/uploads/",
-  // Product images & media
-  "/api/assets/",
-  // App assets
-  "/api/objects/",
-  // Alias for uploads
-  "/api/sounds/",
-  // Notification sounds
-  "/api/ws/",
-  // WebSocket upgrade — auth handled by ws server itself
-  "/api/events"
-  // SSE fallback for the WS broadcast channel
-];
-var PUBLIC_ROUTE_PATTERNS = [
-  /^\/api\/store\/\d+\/menu$/
-];
-function matchesPrefix(path5, route) {
-  if (route.endsWith("/")) return path5.startsWith(route);
-  if (path5 === route) return true;
-  return path5.startsWith(route + "/");
-}
-function isPublicRoute(path5) {
-  if (PUBLIC_ROUTES.some((route) => matchesPrefix(path5, route))) return true;
-  if (PUBLIC_ROUTE_PATTERNS.some((pattern) => pattern.test(path5))) return true;
-  return false;
-}
-var SEED_ROUTES = [
-  "/api/admin/seed-pizza-lemon",
-  "/api/admin/seed-zurich-restaurants",
-  "/api/admin/check-pizza-lemon",
-  "/api/seed",
-  "/api/fix-schema-and-seed",
-  "/api/force-full-seed"
-];
-function isSeedRoute(path5) {
-  return SEED_ROUTES.some((route) => matchesPrefix(path5, route));
-}
-function tenantAuthMiddleware() {
-  const isDev = process.env.NODE_ENV === "development";
-  return async (req, res, next) => {
-    if (!req.path.startsWith("/api")) {
-      return next();
-    }
-    if (req.path.startsWith("/api/super-admin")) {
-      return next();
-    }
-    if (isPublicRoute(req.path)) {
-      return next();
-    }
-    if (isSeedRoute(req.path)) {
-      if (isDev) return next();
-      console.warn(`[tenantAuth] Blocked seed route in production: ${req.path}`);
-      return res.status(404).json({ error: "Not found" });
-    }
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      try {
-        const token = authHeader.split(" ")[1];
-        const decoded = import_jsonwebtoken3.default.verify(token, JWT_SECRET);
-        const admin = await storage.getSuperAdmin(decoded.id);
-        if (admin && admin.isActive) {
-          const tenantId2 = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
-          if (tenantId2) req.tenantId = tenantId2;
-          return next();
-        }
-      } catch (_) {
-      }
-    }
-    const tenantId = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
-    const licenseKey = req.headers["x-license-key"];
-    if (!tenantId && !licenseKey) {
-      return res.status(401).json({ error: "Authentication required. Provide x-license-key header." });
-    }
-    if (!licenseKey) {
-      return res.status(401).json({ error: "Authentication required. Provide x-license-key header." });
-    }
-    try {
-      const license = await storage.getLicenseByKey(licenseKey);
-      if (!license) {
-        return res.status(401).json({ error: "Invalid license key" });
-      }
-      if (license.status !== "active") {
-        return res.status(401).json({ error: `License is ${license.status}` });
-      }
-      if (tenantId && license.tenantId !== tenantId) {
-        return res.status(403).json({ error: "License key does not match the requested tenant" });
-      }
-      if (license.expiresAt && new Date(license.expiresAt) < /* @__PURE__ */ new Date()) {
-        const isTrial = license.licenseKey.startsWith("TRIAL-");
-        return res.status(401).json({
-          error: isTrial ? "Your 14-day trial period has expired. Please subscribe to continue." : "License has expired",
-          code: "LICENSE_EXPIRED",
-          isTrial
-        });
-      }
-      req.tenantId = license.tenantId;
-      req.licenseKey = licenseKey;
-      next();
-    } catch (error) {
-      console.error("[tenantAuth] Error validating license:", error);
-      return res.status(500).json({ error: "Authentication error" });
-    }
-  };
-}
-
 // server/index.ts
 init_callerIdService();
 
 // server/paymentRoutes.ts
 var import_express = __toESM(require("express"));
 init_db();
+init_storage();
 
 // server/shamcash.ts
 var import_crypto7 = __toESM(require("crypto"));
@@ -16818,7 +18523,7 @@ init_db();
 var BASE = (process.env.SHAMCASH_API_URL || "https://api-shamcash.com/api").replace(/\/$/, "");
 var SHAMCASH_CURRENCIES = ["SYP", "USD"];
 var INVOICE_MINUTES = 60;
-async function q5(sqlText, params = []) {
+async function q6(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -16845,7 +18550,7 @@ var PAYER_MESSAGES = {
 };
 async function runShamCashMigrations() {
   try {
-    await q5(`
+    await q6(`
       CREATE TABLE IF NOT EXISTS shamcash_invoices (
         id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
         tenant_id int NOT NULL,
@@ -16870,7 +18575,7 @@ async function runShamCashMigrations() {
   }
 }
 async function readConfigJson(tenantId) {
-  const rows = await q5(
+  const rows = await q6(
     `SELECT config_json FROM payment_gateway_settings WHERE tenant_id = ? LIMIT 1`,
     [tenantId]
   );
@@ -16919,7 +18624,7 @@ async function saveShamCashSettings(tenantId, patch) {
   if (patch.phone !== void 0) next.phone = clip2(patch.phone, 40);
   if (patch.holderName !== void 0) next.holderName = clip2(patch.holderName, 80);
   cfg.shamcash = next;
-  await q5(
+  await q6(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json)
      VALUES (?, ?)
      ON DUPLICATE KEY UPDATE config_json = VALUES(config_json)`,
@@ -16931,7 +18636,7 @@ function keyFor(s) {
   return s.apiKey || process.env.SHAMCASH_API_KEY || null;
 }
 async function shamCashCurrencyFor(tenantId) {
-  const rows = await q5(
+  const rows = await q6(
     `SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id ASC LIMIT 1`,
     [tenantId]
   );
@@ -16967,7 +18672,7 @@ async function publicShamCashStatus(tenantId) {
 async function recordOrderReference(orderId, reference) {
   const ref = String(reference || "").replace(/[^\w\- ]/g, "").trim().slice(0, 40);
   if (!ref) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400);
-  await q5(
+  await q6(
     `UPDATE online_orders
         SET payment_method = 'shamcash',
             notes = TRIM(CONCAT(COALESCE(notes, ''), CASE WHEN COALESCE(notes, '') = '' THEN '' ELSE ' | ' END, ?))
@@ -17030,7 +18735,7 @@ function matchWallet(wallets, id) {
 }
 async function loadTarget(t2) {
   if (t2.kind === "order") {
-    const rows2 = await q5(
+    const rows2 = await q6(
       `SELECT tenant_id, total_amount, payment_status, order_number FROM online_orders WHERE id = ? LIMIT 1`,
       [t2.id]
     );
@@ -17043,7 +18748,7 @@ async function loadTarget(t2) {
       label: `Order ${r2.order_number}`
     };
   }
-  const rows = await q5(
+  const rows = await q6(
     `SELECT b.tenant_id, s.total_amount, s.payment_status, s.receipt_number
        FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
     [t2.id]
@@ -17102,7 +18807,7 @@ async function createInvoiceFor(t2, publicBaseUrl) {
     throw new ShamCashError("\u0634\u0627\u0645 \u0643\u0627\u0634 \u064A\u062F\u0639\u0645 \u0627\u0644\u0644\u064A\u0631\u0629 \u0627\u0644\u0633\u0648\u0631\u064A\u0629 \u0648\u0627\u0644\u062F\u0648\u0644\u0627\u0631 \u0641\u0642\u0637", 400, "UNSUPPORTED_CURRENCY");
   }
   if (!(target.amount > 0)) throw new ShamCashError("\u0642\u064A\u0645\u0629 \u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629", 400);
-  const open = await q5(
+  const open = await q6(
     `SELECT * FROM shamcash_invoices
       WHERE ${col(t2)} = ? AND status = 'pending' AND expires_at > NOW() + INTERVAL 2 MINUTE
       ORDER BY id DESC LIMIT 1`,
@@ -17127,23 +18832,23 @@ async function createInvoiceFor(t2, publicBaseUrl) {
     throw new ShamCashError("\u062A\u0639\u0630\u0651\u0631 \u0625\u0646\u0634\u0627\u0621 \u0641\u0627\u062A\u0648\u0631\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634", 502);
   }
   const expiresAt = inv?.expiresAt ? new Date(inv.expiresAt) : new Date(Date.now() + INVOICE_MINUTES * 6e4);
-  await q5(
+  await q6(
     `INSERT INTO shamcash_invoices (tenant_id, ${col(t2)}, invoice_number, amount, currency, wallet, status, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [target.tenantId, t2.id, invoiceNumber, target.amount.toFixed(2), currency, walletRef, expiresAt]
   );
-  const [row] = await q5(`SELECT * FROM shamcash_invoices WHERE invoice_number = ?`, [invoiceNumber]);
+  const [row] = await q6(`SELECT * FROM shamcash_invoices WHERE invoice_number = ?`, [invoiceNumber]);
   return publicInvoice(row, await payToDetails(apiKey, walletRef));
 }
 async function markSettled(row, tranId) {
-  await q5(
+  await q6(
     `UPDATE shamcash_invoices
         SET status = 'paid', tran_id = COALESCE(?, tran_id), paid_at = COALESCE(paid_at, NOW())
       WHERE id = ?`,
     [tranId, row.id]
   );
   if (row.online_order_id) {
-    await q5(
+    await q6(
       `UPDATE online_orders
           SET payment_status = 'paid', payment_method = 'shamcash',
               paid_at = COALESCE(paid_at, NOW()), payment_error = NULL
@@ -17152,7 +18857,7 @@ async function markSettled(row, tranId) {
     );
   }
   if (row.sale_id) {
-    await q5(
+    await q6(
       `UPDATE sales
           SET payment_status = 'paid', payment_method = 'shamcash', paid_at = COALESCE(paid_at, NOW())
         WHERE id = ? AND (payment_status IS NULL OR payment_status <> 'paid')`,
@@ -17166,7 +18871,7 @@ async function apiKeyForRow(row) {
   return key;
 }
 async function refreshInvoice(invoiceNumber) {
-  const [row] = await q5(`SELECT * FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  const [row] = await q6(`SELECT * FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
   if (!row) throw new ShamCashError("\u0641\u0627\u062A\u0648\u0631\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641\u0629", 404);
   if (row.status !== "paid") {
     const remote = await call(await apiKeyForRow(row), "GET", `/v1/invoices/${encodeURIComponent(invoiceNumber)}`);
@@ -17175,16 +18880,16 @@ async function refreshInvoice(invoiceNumber) {
     if (status === "paid") {
       await markSettled(row, inv?.transactionRef ?? inv?.tranId ?? inv?.tran_id ?? null);
     } else if (status === "expired" || status === "cancelled") {
-      await q5(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status, row.id]);
+      await q6(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status, row.id]);
     }
   }
-  const [fresh] = await q5(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
+  const [fresh] = await q6(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
   return fresh;
 }
 async function verifyInvoice(t2, tranId) {
   const clean2 = String(tranId ?? "").trim();
   if (!clean2) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400, "MISSING_TRAN_ID");
-  const [row] = await q5(
+  const [row] = await q6(
     `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
     [t2.id]
   );
@@ -17199,12 +18904,12 @@ async function verifyInvoice(t2, tranId) {
   }
   const fresh = await refreshInvoice(row.invoice_number);
   if (fresh.status === "paid" && !fresh.tran_id) {
-    await q5(`UPDATE shamcash_invoices SET tran_id = ? WHERE id = ?`, [clean2, fresh.id]);
+    await q6(`UPDATE shamcash_invoices SET tran_id = ? WHERE id = ?`, [clean2, fresh.id]);
   }
   return { status: fresh.status, invoiceNumber: fresh.invoice_number };
 }
 async function invoiceStatus(t2) {
-  const [row] = await q5(
+  const [row] = await q6(
     `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
     [t2.id]
   );
@@ -17231,7 +18936,7 @@ async function handleWebhook(rawBody, signatureHeader) {
   }
   const invoiceNumber = body?.invoiceNumber;
   if (!invoiceNumber) return { ignored: true };
-  const [row] = await q5(`SELECT id FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  const [row] = await q6(`SELECT id FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
   if (!row) return { ignored: true };
   const fresh = await refreshInvoice(String(invoiceNumber));
   return { invoiceNumber, status: fresh.status };
@@ -17251,7 +18956,7 @@ async function adminShamCashView(tenantId) {
 
 // server/paymentRoutes.ts
 var PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
-async function q6(sqlText, params = []) {
+async function q7(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -17270,7 +18975,7 @@ var DEFAULT_GATEWAY = {
 };
 async function loadGatewaySettings(tenantId) {
   try {
-    const rows = await q6(
+    const rows = await q7(
       `SELECT tenant_id, config_json FROM payment_gateway_settings
         WHERE tenant_id IN (?, 0) ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId || 0]
@@ -17287,7 +18992,7 @@ async function loadGatewaySettings(tenantId) {
 }
 async function saveGatewaySettings(tenantId, config) {
   const currency = config?.stripe?.currency || "CHF";
-  await q6(
+  await q7(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json, currency, enabled_methods)
      VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE config_json = VALUES(config_json),
@@ -17339,13 +19044,16 @@ function registerPaymentRoutes(app2) {
       const publishableKey = await getStripePublishableKey();
       const methods = configured ? (await listAvailablePaymentMethods()).methods : [];
       const { shamcash: _storedShamCash, ...publicSettings } = settings;
+      const currency = await currencyFor(tenantId);
+      const cardAvailable = cardSupported(currency) && configured && !!publishableKey;
       res.json({
         ...publicSettings,
         shamcash: await publicShamCashStatus(tenantId),
-        currency: (await currencyFor(tenantId)).toUpperCase(),
+        currency: currency.toUpperCase(),
+        cardAvailable,
         stripe: {
           ...settings.stripe,
-          status: configured && publishableKey ? "connected" : "disconnected",
+          status: cardAvailable ? "connected" : "disconnected",
           mode: mode ?? settings.stripe?.mode ?? "test",
           // Safe to publish; this is the whole point of a publishable key.
           publishableKey: publishableKey ?? null,
@@ -17383,13 +19091,13 @@ function registerPaymentRoutes(app2) {
       const orderId = Number.parseInt(String(req.params.orderId), 10);
       if (!Number.isFinite(orderId)) return res.status(400).json({ error: "Invalid order id" });
       const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
-      const rows = await q6(
+      const rows = await q7(
         `SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`,
         [orderId]
       );
       if (!rows.length) return res.status(404).json({ error: "Order not found" });
       const expected = rows[0].tracking_token;
-      if (expected && token !== expected) {
+      if (!expected || token !== expected) {
         return res.status(403).json({ error: "Invalid tracking token for this order" });
       }
       res.json(await createOrderPaymentIntent(orderId));
@@ -17401,7 +19109,7 @@ function registerPaymentRoutes(app2) {
     try {
       const stripe = await requireStripeClient();
       const pi = await stripe.paymentIntents.retrieve(String(req.params.paymentIntentId));
-      const orderRows = await q6(
+      const orderRows = await q7(
         `SELECT id, order_number, payment_status, tracking_token
            FROM online_orders WHERE stripe_payment_intent_id = ? LIMIT 1`,
         [pi.id]
@@ -17424,8 +19132,8 @@ function registerPaymentRoutes(app2) {
   });
   app2.post("/api/payments/sale/:saleId/intent", async (req, res) => {
     try {
-      const saleId = Number.parseInt(String(req.params.saleId), 10);
-      if (!Number.isFinite(saleId)) return res.status(400).json({ error: "Invalid sale id" });
+      const saleId = await saleOfTenant(req, res);
+      if (saleId == null) return;
       res.json(await createSalePaymentIntent(saleId));
     } catch (e) {
       fail(res, e);
@@ -17454,6 +19162,9 @@ function registerPaymentRoutes(app2) {
       const { tenantId, planId, amount, email } = req.body ?? {};
       const tid = Number(tenantId ?? req.tenantId ?? 0);
       if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      if (!planId && !req.isSuperAdmin) {
+        return res.status(400).json({ error: "planId is required", code: "PLAN_REQUIRED" });
+      }
       res.json(
         await createSubscriptionIntent({
           tenantId: tid,
@@ -17472,6 +19183,24 @@ function registerPaymentRoutes(app2) {
       if (!planId && !orderId && !saleId) {
         return res.status(400).json({ error: "planId, orderId or saleId is required" });
       }
+      let licenceTenant = null;
+      if (!planId && orderId) {
+        const rows = await q7(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
+        const token = String(req.body?.trackingToken ?? "");
+        if (!rows.length || !rows[0].tracking_token || token !== rows[0].tracking_token) {
+          return res.status(403).json({ error: "Invalid tracking token for this order" });
+        }
+      } else if (!planId && saleId) {
+        const key = String(req.headers["x-license-key"] || "");
+        const lic = key ? await storage.getLicenseByKey(key) : null;
+        if (!lic || lic.status !== "active") return res.status(401).json({ error: "Authentication required. Provide x-license-key header." });
+        licenceTenant = Number(lic.tenantId);
+        const rows = await q7(
+          `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
+          [Number(saleId)]
+        );
+        if (!rows.length || Number(rows[0].tenant_id) !== licenceTenant) return res.status(404).json({ error: "Sale not found" });
+      }
       const base = process.env.PUBLIC_BASE_URL || `https://${req.get("host")}`;
       const kind = planId ? "tenant_subscription" : orderId ? "online_order" : "pos_sale";
       res.json(
@@ -17480,7 +19209,7 @@ function registerPaymentRoutes(app2) {
           planId: planId ? Number(planId) : null,
           orderId: orderId ? Number(orderId) : null,
           saleId: saleId ? Number(saleId) : null,
-          tenantId: Number(req.tenantId ?? 0) || null,
+          tenantId: licenceTenant ?? (Number(req.tenantId ?? 0) || null),
           email: email ?? null,
           successUrl: String(successUrl || `${base}/pay/success`),
           cancelUrl: String(cancelUrl || `${base}/pay/cancelled`)
@@ -17495,6 +19224,19 @@ function registerPaymentRoutes(app2) {
       const { paymentIntentId, amount, reason } = req.body ?? {};
       if (!paymentIntentId) {
         return res.status(400).json({ error: "paymentIntentId is required" });
+      }
+      if (!req.isSuperAdmin) {
+        const tenantId = Number(req.tenantId || 0);
+        const pi = String(paymentIntentId);
+        const own = tenantId > 0 && ((await q7(
+          `SELECT 1 FROM online_orders WHERE stripe_payment_intent_id = ? AND tenant_id = ? LIMIT 1`,
+          [pi, tenantId]
+        )).length > 0 || (await q7(
+          `SELECT 1 FROM sales s JOIN branches b ON b.id = s.branch_id
+            WHERE s.stripe_payment_intent_id = ? AND b.tenant_id = ? LIMIT 1`,
+          [pi, tenantId]
+        )).length > 0);
+        if (!own) return res.status(404).json({ error: "Payment not found" });
       }
       res.json(
         await refundPayment({
@@ -17521,12 +19263,12 @@ function registerPaymentRoutes(app2) {
       return null;
     }
     const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
-    const rows = await q6(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
+    const rows = await q7(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
     if (!rows.length) {
       res.status(404).json({ error: "Order not found" });
       return null;
     }
-    if (rows[0].tracking_token && token !== rows[0].tracking_token) {
+    if (!rows[0].tracking_token || token !== rows[0].tracking_token) {
       res.status(403).json({ error: "Invalid tracking token for this order" });
       return null;
     }
@@ -17575,7 +19317,7 @@ function registerPaymentRoutes(app2) {
       res.status(400).json({ error: "Invalid sale id" });
       return null;
     }
-    const rows = await q6(
+    const rows = await q7(
       `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
       [saleId]
     );
@@ -17637,7 +19379,7 @@ function registerPaymentRoutes(app2) {
     }
   });
   app2.get("/api/payments/health", health);
-  app2.post("/api/payment-gateway/test-stripe", async (_req, res) => {
+  app2.post("/api/payment-gateway/test-stripe", requireAdmin, async (_req, res) => {
     const status = await stripeAccountStatus();
     res.json({ success: status.connected, ...status });
   });
@@ -17659,6 +19401,15 @@ function registerPaymentRoutes(app2) {
     const orderId = req.body?.orderId ?? req.body?.metadata?.orderId;
     if (orderId) {
       try {
+        const rows = await q7(`SELECT tenant_id, tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
+        if (!rows.length) return res.status(404).json({ error: "Order not found" });
+        const tenantId = Number(req.tenantId || 0);
+        const token = String(req.body?.trackingToken ?? "");
+        const ownStore = tenantId > 0 && Number(rows[0].tenant_id) === tenantId;
+        const holdsToken = !!rows[0].tracking_token && token === rows[0].tracking_token;
+        if (!ownStore && !holdsToken && !req.isSuperAdmin) {
+          return res.status(404).json({ error: "Order not found" });
+        }
         return res.json(await createOrderPaymentIntent(Number(orderId)));
       } catch (e) {
         return fail(res, e);
@@ -17687,6 +19438,8 @@ function registerPaymentRoutes(app2) {
 // server/whatsappStoreRoutes.ts
 init_storage();
 init_db();
+init_phone();
+init_storeTime();
 function tenantOf2(req, res) {
   const tenantId = Number(req.tenantId ?? 0) || 0;
   if (!tenantId) {
@@ -17694,6 +19447,27 @@ function tenantOf2(req, res) {
     return null;
   }
   return tenantId;
+}
+function dialDigits(raw) {
+  const typed = asciiDigits(raw).trim();
+  if (!typed) return "";
+  return (canonicalPhone(typed) || typed).replace(/\D/g, "");
+}
+var SEND_WAIT_MS = 15e3;
+async function sendCapped(tenantId, to, text2) {
+  let timer;
+  const timeout = new Promise((resolve3) => {
+    timer = setTimeout(() => resolve3({ ok: false, queued: true }), SEND_WAIT_MS);
+  });
+  try {
+    return await Promise.race([whatsappService.storeSend(tenantId, to, text2), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+async function secondsSinceStoreMidnight(tenantId) {
+  const tz = await storeTimeZone(tenantId);
+  return Math.max(0, Math.floor((Date.now() - dayStart(tz, /* @__PURE__ */ new Date()).getTime()) / 1e3));
 }
 async function readMeta2(tenantId) {
   const tenant = await storage.getTenant(tenantId);
@@ -17713,7 +19487,7 @@ async function storeLang(tenantId, meta2) {
 }
 var fail2 = (res, e) => res.status(500).json({ error: e?.message || "Error" });
 function phoneKey(raw) {
-  let d = String(raw || "").replace(/\D/g, "");
+  let d = asciiDigits(raw || "").replace(/\D/g, "");
   if (d.startsWith("00")) d = d.slice(2);
   if (d.startsWith("410") && d.length === 12) d = "41" + d.slice(3);
   else if (d.startsWith("0") && d.length === 10 && /^07/.test(d)) d = "41" + d.slice(1);
@@ -17793,6 +19567,15 @@ function registerWhatsAppStoreRoutes(app2) {
       fail2(res, e);
     }
   });
+  app2.post("/api/whatsapp/session/disconnect", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      res.json(await whatsappService.storeDisconnect(tenantId));
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
   app2.post("/api/whatsapp/session/logout", requireAdmin, async (req, res) => {
     try {
       const tenantId = tenantOf2(req, res);
@@ -17820,15 +19603,16 @@ function registerWhatsAppStoreRoutes(app2) {
         if (tenantId == null) return;
         const view = await whatsappService.storeSession(tenantId, true);
         if (view.status !== "connected") return res.status(409).json({ error: "\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u062A\u062C\u0631 \u063A\u064A\u0631 \u0645\u062A\u0635\u0644 \u062D\u0627\u0644\u064A\u0627\u064B" });
-        const to = String(req.body?.phone || "").replace(/\D/g, "") || view.phone || "";
+        const to = dialDigits(req.body?.phone) || view.phone || "";
         if (!to) return res.status(400).json({ error: "\u0627\u0643\u062A\u0628 \u0631\u0642\u0645\u0627\u064B \u0644\u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u0627\u062E\u062A\u0628\u0627\u0631" });
         const tenant = await storage.getTenant(tenantId);
         const text2 = String(req.body?.text || "").trim() || `\u2705 \u0631\u0633\u0627\u0644\u0629 \u0627\u062E\u062A\u0628\u0627\u0631 \u0645\u0646 ${tenant?.businessName || "Kassenta"}
 \u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u062A\u062C\u0631 \u0645\u0631\u0628\u0648\u0637 \u0648\u064A\u0639\u0645\u0644.
 
 Test message \u2014 the store's WhatsApp is connected.`;
-        const r = await whatsappService.storeSend(tenantId, to, text2);
-        if (!r.ok) return res.status(502).json({ error: r.error || (r.queued ? "\u062A\u0645 \u0648\u0636\u0639 \u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0641\u064A \u0627\u0644\u0627\u0646\u062A\u0638\u0627\u0631" : "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644") });
+        const r = await sendCapped(tenantId, to, text2);
+        if (!r.ok && r.queued) return res.status(202).json({ ok: false, queued: true, to, message: "\u062A\u0645 \u0648\u0636\u0639 \u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0641\u064A \u0627\u0644\u0627\u0646\u062A\u0638\u0627\u0631 \u0648\u0633\u064A\u062A\u0645 \u0625\u0631\u0633\u0627\u0644\u0647\u0627 \u0642\u0631\u064A\u0628\u0627\u064B" });
+        if (!r.ok) return res.status(502).json({ error: r.error || "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644" });
         res.json({ ok: true, to });
       } catch (e) {
         fail2(res, e);
@@ -17839,12 +19623,12 @@ Test message \u2014 the store's WhatsApp is connected.`;
     try {
       const tenantId = tenantOf2(req, res);
       if (tenantId == null) return;
-      const q7 = String(req.query.q || "").trim();
+      const q8 = String(req.query.q || "").trim();
       const params = [storeKey(tenantId)];
       let where = "session_key = ?";
-      if (q7) {
+      if (q8) {
         where += " AND (name LIKE ? OR phone LIKE ? OR last_message LIKE ?)";
-        params.push(`%${q7}%`, `%${q7.replace(/\D/g, "") || q7}%`, `%${q7}%`);
+        params.push(`%${q8}%`, `%${asciiDigits(q8).replace(/\D/g, "") || q8}%`, `%${q8}%`);
       }
       const [rows] = await pool.query(
         `SELECT jid, name, phone, is_group AS isGroup, last_message AS lastMessage, last_from_me AS lastFromMe,
@@ -17898,7 +19682,7 @@ Test message \u2014 the store's WhatsApp is connected.`;
       if (tenantId == null) return;
       const text2 = String(req.body?.text || "").trim();
       if (!text2) return res.status(400).json({ error: "\u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0641\u0627\u0631\u063A\u0629" });
-      const r = await whatsappService.storeSend(tenantId, String(req.params.jid), text2);
+      const r = await sendCapped(tenantId, String(req.params.jid), text2);
       if (!r.ok && !r.queued) return res.status(502).json({ error: r.error || "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644" });
       res.json(r);
     } catch (e) {
@@ -17909,10 +19693,10 @@ Test message \u2014 the store's WhatsApp is connected.`;
     try {
       const tenantId = tenantOf2(req, res);
       if (tenantId == null) return;
-      const phone = String(req.body?.phone || "").replace(/\D/g, "");
+      const phone = dialDigits(req.body?.phone);
       const text2 = String(req.body?.text || "").trim();
       if (phone.length < 8 || !text2) return res.status(400).json({ error: "\u0627\u0643\u062A\u0628 \u0627\u0644\u0631\u0642\u0645 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629 \u0648\u0646\u0635 \u0627\u0644\u0631\u0633\u0627\u0644\u0629" });
-      const r = await whatsappService.storeSend(tenantId, phone, text2);
+      const r = await sendCapped(tenantId, phone, text2);
       if (!r.ok && !r.queued) return res.status(502).json({ error: r.error || "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644" });
       res.json(r);
     } catch (e) {
@@ -17992,8 +19776,8 @@ Test message \u2014 the store's WhatsApp is connected.`;
         [tenantId]
       );
       const [today] = await pool.query(
-        "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= CURDATE()",
-        [tenantId]
+        "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= NOW() - INTERVAL ? SECOND",
+        [tenantId, await secondsSinceStoreMidnight(tenantId)]
       );
       const sentToday = Number(today?.[0]?.n || 0);
       res.json({
@@ -18021,8 +19805,8 @@ Test message \u2014 the store's WhatsApp is connected.`;
         if (!view.linked && view.status !== "connected") return res.status(409).json({ error: "\u0627\u0631\u0628\u0637 \u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u062A\u062C\u0631 \u0623\u0648\u0644\u0627\u064B" });
         await ensureCampaignTable();
         const [today] = await pool.query(
-          "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= CURDATE()",
-          [tenantId]
+          "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= NOW() - INTERVAL ? SECOND",
+          [tenantId, await secondsSinceStoreMidnight(tenantId)]
         );
         const remaining = Math.max(0, CAMPAIGN_DAILY_CAP - Number(today?.[0]?.n || 0));
         const list = (await audienceList(tenantId, audience)).slice(0, remaining);
@@ -18295,6 +20079,9 @@ function registerWholesaleRoutes(app2) {
     res.json(await voidLedgerEntry(tenantOf3(req), idParam(req.params.id)));
   }));
 }
+
+// server/index.ts
+init_storeTime();
 
 // server/legal-pages.ts
 var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
@@ -22029,6 +23816,8 @@ if (!usingMySql) {
   }
 }
 var app = (0, import_express2.default)();
+var SECRET_JSON_KEYS = /* @__PURE__ */ new Set(["passwordHash", "password_hash"]);
+app.set("json replacer", (key, value) => SECRET_JSON_KEYS.has(key) ? void 0 : value);
 var log = console.log;
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
@@ -22313,8 +24102,8 @@ function configureExpoAndLanding(app2) {
               start_url: "/customer/",
               display: "standalone",
               scope: "/customer/",
-              theme_color: "#FF5722",
-              background_color: "#070A12",
+              theme_color: "#0A6E65",
+              background_color: "#ffffff",
               icons: [
                 { src: "/api/delivery-app/icons/icon-192.png", sizes: "192x192", type: "image/png" },
                 { src: "/api/delivery-app/icons/icon-512.png", sizes: "512x512", type: "image/png" }
@@ -22328,7 +24117,9 @@ function configureExpoAndLanding(app2) {
             basePath: req.path.startsWith("/api/") ? "/api" : "",
             currency: process.env.DEFAULT_CURRENCY || "CHF",
             stripePublishableKey: await getBrowserSafeStripeKey(),
-            language: req.query.lang || "en"
+            // Only an explicit ?lang= is passed on; otherwise the app picks
+            // (saved choice / device language) instead of being forced to "en".
+            ...req.query.lang ? { language: String(req.query.lang) } : {}
           });
           shell = shell.replace("__KASSENTA_CONFIG__", customerConfig);
           res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -22409,14 +24200,6 @@ function configureExpoAndLanding(app2) {
         let config;
         const isBrandAlias = slug === "barmagly";
         config = await storage2.getLandingPageConfigBySlug(isBrandAlias ? "pizza-lemon" : slug);
-        if (!config) {
-          config = await storage2.getLandingPageConfigBySlug("pizza-lemon");
-          if (config) {
-            const displayName = slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-            config.storeName = displayName;
-            config.heroTitle = displayName;
-          }
-        }
         if (isBrandAlias && config) {
           config.storeName = "Kassenta";
           config.heroTitle = "Kassenta Delivery";
@@ -22437,7 +24220,9 @@ function configureExpoAndLanding(app2) {
           basePath: isApiPrefixed ? "/api" : "",
           primaryColor: config.primaryColor || "#FF5722",
           accentColor: config.accentColor || "#2FD3C6",
-          currency: tenant.currency || process.env.DEFAULT_CURRENCY || "CHF",
+          // The main branch's currency — the one prices and payments use
+          // (tenant.currency is CHF even for Syrian stores).
+          currency: await storeCurrency(tenantId),
           language: config.language || "en",
           storeName: config.storeName || config.heroTitle || config.name || tenant.businessName,
           logo: config.logo || config.logoUrl || "",
@@ -22563,7 +24348,7 @@ function configureExpoAndLanding(app2) {
         html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
         html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config?.primaryColor || "#2FD3C6");
         html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config?.accentColor || "#6366F1");
-        html = html.replace(/\{\{CURRENCY\}\}/g, tenant.currency || "CHF");
+        html = html.replace(/\{\{CURRENCY\}\}/g, await storeCurrency(tenantId));
         html = html.replace(/\{\{LANGUAGE\}\}/g, config?.language || "en");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
@@ -22956,6 +24741,7 @@ async function initStripe() {
   await runShamCashMigrations();
   await runWholesaleMigrations();
   await runLoyaltyMigrations();
+  await runServerMigrations();
   setupCors(app);
   registerStripeWebhook(app);
   setupBodyParsing(app);
@@ -22963,6 +24749,7 @@ async function initStripe() {
   app.use(tenantAuthMiddleware());
   app.use(attachEmployee());
   app.use(guardTenantRoutes());
+  app.use(enforceTenantOwnership());
   configureExpoAndLanding(app);
   registerPaymentRoutes(app);
   registerWhatsAppVerifyRoutes(app);

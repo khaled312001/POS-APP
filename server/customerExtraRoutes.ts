@@ -15,6 +15,22 @@ import {
 } from "./customerAuthService";
 import { storage } from "./storage";
 import { callerIdService } from "./callerIdService";
+import { canonicalPhone } from "./phone";
+
+/**
+ * Does this logged-in customer own the order behind a chat room? By the
+ * room's customer id, or (for rooms without one) the same store and the
+ * same canonical phone. Any other customer used to be able to read and
+ * write every order's chat by guessing ids.
+ */
+async function customerOwnsRoom(customer: any, room: any): Promise<boolean> {
+  if (!customer || !room) return false;
+  if (room.customerId) return room.customerId === customer.id;
+  const [order] = await db.select().from(onlineOrders).where(eq(onlineOrders.id, room.orderId)).limit(1);
+  if (!order || !customer.phone || String(customer.phone).startsWith("guest-")) return false;
+  return order.tenantId === customer.tenantId
+    && canonicalPhone(order.customerPhone) === canonicalPhone(customer.phone);
+}
 
 let chatMigrationRan = false;
 async function ensureChatTables(): Promise<void> {
@@ -92,31 +108,30 @@ export function registerCustomerExtraRoutes(app: Express) {
   app.post("/api/delivery/auth/guest", async (req: Request, res: Response) => {
     try {
       const { name, phone, tenantId } = req.body || {};
-      // Default to Pizza Lemon (24) if no tenantId — guest sessions are
-      // platform-scoped; the tenant only matters when an order is actually placed.
+      // Default to Pizza Lemon (24) if no tenantId — the /customer app keeps
+      // its customer accounts under that tenant (PLATFORM_TENANT = 24).
       const tid = Number(tenantId) || 24;
-      const guestPhone = phone || `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const guestName = name || "Guest";
-      const customer = await findOrCreateCustomerByPhone(guestPhone, tid).catch(async () => {
-        // Fallback: create directly
-        await db.insert(customers).values({
-          tenantId: tid, name: guestName, phone: guestPhone, hasAccount: false,
-        } as any);
-        const [c] = await db.select().from(customers).where(eq(customers.phone, guestPhone)).limit(1);
-        return c;
-      });
+      if (!(await storage.getTenant(tid))) return res.status(404).json({ error: "Store not found" });
+      const guestName = String(name || "Guest").trim().slice(0, 120) || "Guest";
+      // A guest session must NEVER open an existing customer: that handed the
+      // account (addresses, wallet, order history) of any phone number to
+      // whoever typed it. A guest is always a fresh row; the typed phone is
+      // only stored when no customer of this store has it yet.
+      const typed = phone ? canonicalPhone(phone) : "";
+      const taken = typed ? await storage.findCustomerByPhoneExact(typed, tid) : undefined;
+      const guestPhone = typed && !taken ? typed : `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const [ins] = await db.insert(customers).values({
+        tenantId: tid, name: guestName, phone: guestPhone, hasAccount: false, source: "customer-app-guest",
+      } as any).$returningId();
+      const [customer] = await db.select().from(customers).where(eq(customers.id, ins.id)).limit(1);
       if (!customer) return res.status(500).json({ error: "Failed to create guest" });
-      // If we hit an existing record, just update the name (guest only, never overrides registered names)
-      if (!(customer as any).hasAccount && guestName && (customer as any).name !== guestName) {
-        try { await storage.updateCustomer((customer as any).id, { name: guestName } as any); } catch {}
-      }
       const token = await createCustomerSession((customer as any).id, tid, req.headers["user-agent"] as any);
       res.json({
         success: true, token, isGuest: true,
         customer: {
           id: (customer as any).id,
           name: guestName,                       // honor the user-provided name in the response
-          phone: (customer as any).phone,
+          phone: typed || (customer as any).phone,
           isGuest: true,
         },
       });
@@ -163,7 +178,7 @@ export function registerCustomerExtraRoutes(app: Express) {
       const room = await getOrCreateRoom(orderId);
       if (!room) return res.status(404).json({ error: "Order not found" });
       // Confirm the customer owns the order (customerId match OR phone match)
-      if (room.customerId && room.customerId !== (customer as any).id) {
+      if (!(await customerOwnsRoom(customer, room))) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const messages = await db.select().from(chatMessages)
@@ -189,7 +204,7 @@ export function registerCustomerExtraRoutes(app: Express) {
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const room = await getOrCreateRoom(orderId);
       if (!room) return res.status(404).json({ error: "Order not found" });
-      if (room.customerId && room.customerId !== (customer as any).id) {
+      if (!(await customerOwnsRoom(customer, room))) {
         return res.status(403).json({ error: "Forbidden" });
       }
       await db.insert(chatMessages).values({
@@ -225,7 +240,7 @@ export function registerCustomerExtraRoutes(app: Express) {
   app.get("/api/chat/rooms", async (req: Request, res: Response) => {
     try {
       await ensureChatTables();
-      const tenantId = Number(req.query.tenantId);
+      const tenantId = Number((req as any).tenantId || req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const rooms = await db.select({
         id: chatRooms.id,
@@ -251,10 +266,13 @@ export function registerCustomerExtraRoutes(app: Express) {
   app.post("/api/chat/order/:orderId/ensure", async (req: Request, res: Response) => {
     try {
       const orderId = Number(req.params.orderId);
-      const tenantId = Number(req.query.tenantId || (req as any).tenantId);
+      const tenantId = Number((req as any).tenantId || 0);
+      if (!tenantId && !(req as any).isSuperAdmin) return res.status(400).json({ error: "tenantId required" });
+      const [order] = await db.select({ tenantId: onlineOrders.tenantId }).from(onlineOrders).where(eq(onlineOrders.id, orderId)).limit(1);
+      // Checked before creating: a foreign order must not get a room.
+      if (!order || (tenantId && order.tenantId !== tenantId)) return res.status(404).json({ error: "Order not found" });
       const room = await getOrCreateRoom(orderId);
       if (!room) return res.status(404).json({ error: "Order not found" });
-      if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
       res.json({ room });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -264,10 +282,12 @@ export function registerCustomerExtraRoutes(app: Express) {
     try {
       await ensureChatTables();
       const id = Number(req.params.id);
-      const tenantId = Number(req.query.tenantId || (req as any).tenantId);
+      // The licence's store; the room must be one of its own (a missing
+      // tenant used to skip the check entirely).
+      const tenantId = Number((req as any).tenantId || 0);
+      if (!tenantId && !(req as any).isSuperAdmin) return res.status(400).json({ error: "tenantId required" });
       const [room] = await db.select().from(chatRooms).where(eq(chatRooms.id, id)).limit(1);
-      if (!room) return res.status(404).json({ error: "Room not found" });
-      if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
+      if (!room || (tenantId && room.tenantId !== tenantId)) return res.status(404).json({ error: "Room not found" });
       const messages = await db.select().from(chatMessages)
         .where(eq(chatMessages.roomId, id))
         .orderBy(chatMessages.createdAt)
@@ -286,13 +306,14 @@ export function registerCustomerExtraRoutes(app: Express) {
       const id = Number(req.params.id);
       const { body, senderName, senderId, senderType } = req.body || {};
       if (!body || !String(body).trim()) return res.status(400).json({ error: "body required" });
+      const tenantId = Number((req as any).tenantId || 0);
+      if (!tenantId && !(req as any).isSuperAdmin) return res.status(400).json({ error: "tenantId required" });
       const [room] = await db.select().from(chatRooms).where(eq(chatRooms.id, id)).limit(1);
-      if (!room) return res.status(404).json({ error: "Room not found" });
-      const tenantId = Number(req.query.tenantId || (req as any).tenantId);
-      if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
+      if (!room || (tenantId && room.tenantId !== tenantId)) return res.status(404).json({ error: "Room not found" });
       await db.insert(chatMessages).values({
         roomId: id,
-        senderType: senderType || "tenant",
+        // The store side cannot post as the customer.
+        senderType: senderType === "driver" ? "driver" : "tenant",
         senderId: senderId ? Number(senderId) : null,
         senderName: senderName || "Restaurant",
         body: String(body).slice(0, 2000),
@@ -305,7 +326,7 @@ export function registerCustomerExtraRoutes(app: Express) {
       const payload = {
         type: "chat_new_message",
         roomId: id, orderId: room.orderId,
-        senderType: senderType || "tenant",
+        senderType: senderType === "driver" ? "driver" : "tenant",
         senderName: senderName || "Restaurant",
         body: String(body),
         createdAt: now.toISOString(),

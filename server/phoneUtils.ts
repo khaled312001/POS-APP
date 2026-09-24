@@ -1,3 +1,5 @@
+import { asciiDigits, canonicalPhone } from "./phone";
+
 export function normalizePhone(phone: string): string {
   // Strip all non-digit chars except leading +
   let cleaned = phone.replace(/[\s\-\(\)\.\/]/g, '');
@@ -67,10 +69,23 @@ function isSwissLandlineWithAreaCode(digits: string): boolean {
 }
 
 export function getPhoneSearchVariants(search: string): string[] {
-  const cleaned = search.replace(/[\s\-\(\)\.\/]/g, '');
+  const cleaned = asciiDigits(search).replace(/[\s\-\(\)\.\/]/g, '');
   const variants = new Set<string>();
 
   variants.add(cleaned);
+
+  // ── Syria: 09xxxxxxxx ⇄ +9639xxxxxxxx ⇄ 9639xxxxxxxx ⇄ 009639xxxxxxxx ──────
+  // canonicalPhone() only rewrites Syrian/Egyptian numbers, so a Swiss number
+  // never takes this branch.
+  const canonical = canonicalPhone(cleaned);
+  if (/^\+9639\d{8}$/.test(canonical)) {
+    const local9 = canonical.slice(4); // 9xxxxxxxx
+    variants.add(canonical);
+    variants.add('963' + local9);
+    variants.add('00963' + local9);
+    variants.add('0' + local9);
+    variants.add(local9);
+  }
 
   const normalized = normalizePhone(cleaned);
   variants.add(normalized);

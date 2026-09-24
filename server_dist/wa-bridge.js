@@ -236,6 +236,8 @@ function toJid(to) {
   if (d.startsWith("410") && d.length === 12) d = "41" + d.slice(3);
   else if (d.startsWith("0") && d.length === 10 && /^07/.test(d)) d = "41" + d.slice(1);
   else if (d.startsWith("09") && d.length === 10) d = "963" + d.slice(1);
+  else if (/^9\d{8}$/.test(d)) d = "963" + d;
+  else if (/^01[0125]\d{8}$/.test(d)) d = "20" + d.slice(1);
   return `${d}@s.whatsapp.net`;
 }
 function textOf(m) {

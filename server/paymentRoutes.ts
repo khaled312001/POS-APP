@@ -17,6 +17,7 @@ import type { Express, Request, Response } from "express";
 import express from "express";
 import { requireAdmin, type EmployeeRequest } from "./employeeAuth";
 import { pool } from "./db";
+import { storage } from "./storage";
 import {
   isStripeConfigured,
   getStripePublishableKey,
@@ -32,6 +33,7 @@ import {
   listAvailablePaymentMethods,
   stripeAccountStatus,
   currencyFor,
+  cardSupported,
   createCheckoutSession,
 } from "./paymentService";
 import { processStripeWebhook } from "./stripeWebhook";
@@ -175,13 +177,18 @@ export function registerPaymentRoutes(app: Express): void {
       const methods = configured ? (await listAvailablePaymentMethods()).methods : [];
 
       const { shamcash: _storedShamCash, ...publicSettings } = settings;
+      const currency = await currencyFor(tenantId);
+      // Card checkout only where Stripe can charge the store's currency
+      // (never for SYP stores); checkouts hide the card option on this flag.
+      const cardAvailable = cardSupported(currency) && configured && !!publishableKey;
       res.json({
         ...publicSettings,
         shamcash: await publicShamCashStatus(tenantId),
-        currency: (await currencyFor(tenantId)).toUpperCase(),
+        currency: currency.toUpperCase(),
+        cardAvailable,
         stripe: {
           ...settings.stripe,
-          status: configured && publishableKey ? "connected" : "disconnected",
+          status: cardAvailable ? "connected" : "disconnected",
           mode: mode ?? settings.stripe?.mode ?? "test",
           // Safe to publish; this is the whole point of a publishable key.
           publishableKey: publishableKey ?? null,
@@ -241,8 +248,10 @@ export function registerPaymentRoutes(app: Express): void {
       );
       if (!rows.length) return res.status(404).json({ error: "Order not found" });
 
+      // An order with no tracking token used to be payable (and its intent
+      // readable) by anyone who guessed its id.
       const expected = rows[0].tracking_token;
-      if (expected && token !== expected) {
+      if (!expected || token !== expected) {
         return res.status(403).json({ error: "Invalid tracking token for this order" });
       }
 
@@ -287,8 +296,9 @@ export function registerPaymentRoutes(app: Express): void {
   /** Card/TWINT payment for a POS sale. Employee token required by default. */
   app.post("/api/payments/sale/:saleId/intent", async (req: Request, res: Response) => {
     try {
-      const saleId = Number.parseInt(String(req.params.saleId), 10);
-      if (!Number.isFinite(saleId)) return res.status(400).json({ error: "Invalid sale id" });
+      // Only a sale of this licence's store (any store's sale id used to work).
+      const saleId = await saleOfTenant(req as TenantRequest, res);
+      if (saleId == null) return;
       res.json(await createSalePaymentIntent(saleId));
     } catch (e: any) {
       fail(res, e);
@@ -321,6 +331,11 @@ export function registerPaymentRoutes(app: Express): void {
       const { tenantId, planId, amount, email } = req.body ?? {};
       const tid = Number(tenantId ?? req.tenantId ?? 0);
       if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      // A paid subscription intent activates the store, so the price must
+      // come from subscription_plans; only the platform may charge ad hoc.
+      if (!planId && !(req as any).isSuperAdmin) {
+        return res.status(400).json({ error: "planId is required", code: "PLAN_REQUIRED" });
+      }
       res.json(
         await createSubscriptionIntent({
           tenantId: tid,
@@ -350,6 +365,26 @@ export function registerPaymentRoutes(app: Express): void {
         return res.status(400).json({ error: "planId, orderId or saleId is required" });
       }
 
+      // This route is public (a prospect buying a plan has no licence), so an
+      // order needs its tracking token and a sale needs the owning store's
+      // licence key — ids alone used to be enough.
+      let licenceTenant: number | null = null;
+      if (!planId && orderId) {
+        const rows = await q(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
+        const token = String(req.body?.trackingToken ?? "");
+        if (!rows.length || !rows[0].tracking_token || token !== rows[0].tracking_token) {
+          return res.status(403).json({ error: "Invalid tracking token for this order" });
+        }
+      } else if (!planId && saleId) {
+        const key = String(req.headers["x-license-key"] || "");
+        const lic = key ? await storage.getLicenseByKey(key) : null;
+        if (!lic || lic.status !== "active") return res.status(401).json({ error: "Authentication required. Provide x-license-key header." });
+        licenceTenant = Number(lic.tenantId);
+        const rows = await q(
+          `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`, [Number(saleId)]);
+        if (!rows.length || Number(rows[0].tenant_id) !== licenceTenant) return res.status(404).json({ error: "Sale not found" });
+      }
+
       const base = process.env.PUBLIC_BASE_URL || `https://${req.get("host")}`;
       const kind = planId ? "tenant_subscription" : orderId ? "online_order" : "pos_sale";
 
@@ -359,7 +394,7 @@ export function registerPaymentRoutes(app: Express): void {
           planId: planId ? Number(planId) : null,
           orderId: orderId ? Number(orderId) : null,
           saleId: saleId ? Number(saleId) : null,
-          tenantId: Number(req.tenantId ?? 0) || null,
+          tenantId: licenceTenant ?? (Number(req.tenantId ?? 0) || null),
           email: email ?? null,
           successUrl: String(successUrl || `${base}/pay/success`),
           cancelUrl: String(cancelUrl || `${base}/pay/cancelled`),
@@ -376,6 +411,18 @@ export function registerPaymentRoutes(app: Express): void {
       const { paymentIntentId, amount, reason } = req.body ?? {};
       if (!paymentIntentId) {
         return res.status(400).json({ error: "paymentIntentId is required" });
+      }
+      // Only a payment taken for this store's own order or sale; any admin
+      // of any store used to be able to refund every store's payments.
+      if (!(req as any).isSuperAdmin) {
+        const tenantId = Number((req as TenantRequest).tenantId || 0);
+        const pi = String(paymentIntentId);
+        const own = tenantId > 0 && ((await q(
+          `SELECT 1 FROM online_orders WHERE stripe_payment_intent_id = ? AND tenant_id = ? LIMIT 1`, [pi, tenantId])).length > 0
+          || (await q(
+          `SELECT 1 FROM sales s JOIN branches b ON b.id = s.branch_id
+            WHERE s.stripe_payment_intent_id = ? AND b.tenant_id = ? LIMIT 1`, [pi, tenantId])).length > 0);
+        if (!own) return res.status(404).json({ error: "Payment not found" });
       }
       res.json(
         await refundPayment({
@@ -413,7 +460,7 @@ export function registerPaymentRoutes(app: Express): void {
       res.status(404).json({ error: "Order not found" });
       return null;
     }
-    if (rows[0].tracking_token && token !== rows[0].tracking_token) {
+    if (!rows[0].tracking_token || token !== rows[0].tracking_token) {
       res.status(403).json({ error: "Invalid tracking token for this order" });
       return null;
     }
@@ -538,7 +585,7 @@ export function registerPaymentRoutes(app: Express): void {
   });
 
   app.get("/api/payments/health", health);
-  app.post("/api/payment-gateway/test-stripe", async (_req, res) => {
+  app.post("/api/payment-gateway/test-stripe", requireAdmin, async (_req, res) => {
     const status = await stripeAccountStatus();
     res.json({ success: status.connected, ...status });
   });
@@ -571,6 +618,15 @@ export function registerPaymentRoutes(app: Express): void {
     const orderId = req.body?.orderId ?? req.body?.metadata?.orderId;
     if (orderId) {
       try {
+        const rows = await q(`SELECT tenant_id, tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
+        if (!rows.length) return res.status(404).json({ error: "Order not found" });
+        const tenantId = Number((req as TenantRequest).tenantId || 0);
+        const token = String(req.body?.trackingToken ?? "");
+        const ownStore = tenantId > 0 && Number(rows[0].tenant_id) === tenantId;
+        const holdsToken = !!rows[0].tracking_token && token === rows[0].tracking_token;
+        if (!ownStore && !holdsToken && !(req as any).isSuperAdmin) {
+          return res.status(404).json({ error: "Order not found" });
+        }
         return res.json(await createOrderPaymentIntent(Number(orderId)));
       } catch (e: any) {
         return fail(res, e);

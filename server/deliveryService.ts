@@ -10,6 +10,8 @@
 
 import crypto from "crypto";
 import { db, pool } from "./db";
+import { storeCurrency, roundMoney, formatMoney } from "./storeTime";
+import { asciiDigits } from "./phone";
 import {
   deliveryZones,
   promoCodes,
@@ -133,6 +135,11 @@ export async function validatePromoCode(
   customerId?: number
 ): Promise<PromoValidationResult> {
   const now = new Date();
+  // SYP stores get Arabic first and whole-unit amounts; Swiss stores keep the
+  // exact English messages they always had.
+  const currency = await storeCurrency(tenantId).catch(() => "CHF");
+  const arabic = currency === "SYP";
+  const msg = (en: string, ar: string) => (arabic ? `${ar} / ${en}` : en);
 
   const [promo] = await db
     .select()
@@ -140,37 +147,39 @@ export async function validatePromoCode(
     .where(
       and(
         eq(promoCodes.tenantId, tenantId),
-        eq(promoCodes.code, code.toUpperCase()),
+        eq(promoCodes.code, asciiDigits(code).trim().toUpperCase()),
         eq(promoCodes.isActive, true)
       )
     )
     .limit(1);
 
-  if (!promo) return { valid: false, error: "Invalid promo code" };
+  if (!promo) return { valid: false, error: msg("Invalid promo code", "رمز الخصم غير صالح") };
 
   if (promo.validFrom && new Date(promo.validFrom) > now)
-    return { valid: false, error: "Promo code is not active yet" };
+    return { valid: false, error: msg("Promo code is not active yet", "رمز الخصم غير مفعّل بعد") };
 
   if (promo.validUntil && new Date(promo.validUntil) < now)
-    return { valid: false, error: "Promo code has expired" };
+    return { valid: false, error: msg("Promo code has expired", "انتهت صلاحية رمز الخصم") };
 
   if (
     promo.usageLimit !== null &&
     promo.usageLimit !== undefined &&
     (promo.usageCount ?? 0) >= promo.usageLimit
   )
-    return { valid: false, error: "Promo code usage limit reached" };
+    return { valid: false, error: msg("Promo code usage limit reached", "تم الوصول إلى الحد الأقصى لاستخدام رمز الخصم") };
 
   const minAmount = parseFloat((promo.minOrderAmount as string) ?? "0");
   if (orderTotal < minAmount)
     return {
       valid: false,
-      error: `Minimum order amount is ${minAmount} to use this code`,
+      error: arabic
+        ? msg(`Minimum order amount is ${formatMoney(minAmount, currency)} to use this code`, `الحد الأدنى للطلب لاستخدام هذا الرمز هو ${formatMoney(minAmount, currency)}`)
+        : `Minimum order amount is ${minAmount} to use this code`,
     };
 
   const types = (promo.applicableOrderTypes as string[]) ?? ["delivery", "pickup"];
   if (!types.includes(orderType))
-    return { valid: false, error: "Promo code not applicable for this order type" };
+    return { valid: false, error: msg("Promo code not applicable for this order type", "رمز الخصم لا ينطبق على هذا النوع من الطلبات") };
 
   // Per-customer limit check
   if (customerId && promo.perCustomerLimit) {
@@ -185,7 +194,7 @@ export async function validatePromoCode(
       );
 
     if ((usageCount?.count ?? 0) >= promo.perCustomerLimit)
-      return { valid: false, error: "You have already used this promo code" };
+      return { valid: false, error: msg("You have already used this promo code", "لقد استخدمت رمز الخصم هذا من قبل") };
   }
 
   // Calculate discount
@@ -205,7 +214,8 @@ export async function validatePromoCode(
 
   return {
     valid: true,
-    discountAmount: Math.round(discountAmount * 100) / 100,
+    // Whole units for SYP (and other zero-decimal currencies), cents otherwise.
+    discountAmount: roundMoney(discountAmount, currency),
     discountType: promo.discountType,
     promoCode: promo,
   };
@@ -419,6 +429,25 @@ export async function redeemLoyaltyPoints(
     `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`,
   );
   return { success: true, discountAmount };
+}
+
+/**
+ * Takes points redeemed on an online order, once the order exists (checked
+ * beforehand with checkLoyaltyRedemption). /api/delivery/loyalty/redeem used
+ * to deduct them before any order was placed.
+ */
+export async function redeemPointsForOrder(
+  customerId: number,
+  tenantId: number,
+  points: number,
+  orderId: number,
+  value: number,
+): Promise<void> {
+  if (!(points > 0)) return;
+  await moveLoyaltyPoints(
+    customerId, tenantId, -points, "redeem",
+    `Redeemed ${points} points for ${value} discount on order #${orderId}`, orderId,
+  );
 }
 
 /**

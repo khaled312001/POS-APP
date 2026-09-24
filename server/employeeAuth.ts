@@ -208,9 +208,24 @@ const ROUTE_RULES: RouteRule[] = [
   // Operational settings.
   {
     methods: ["PUT", "PATCH", "POST"],
-    path: /^\/api\/(store-settings|promo-codes|delivery-zones|drivers|payment-gateway)(\/|$)/,
+    path: /^\/api\/(store-settings|payment-gateway|vehicles|table-qr-codes)(\/|$)/,
     roles: ["manager"],
     label: "operations",
+  },
+  // Promo codes and delivery zones — the real paths (/api/promo-codes and
+  // /api/delivery-zones never existed, so these were open to cashiers).
+  {
+    methods: ["POST", "PUT", "PATCH", "DELETE"],
+    path: /^\/api\/delivery\/(promos|manage\/zones)(\/|$)/,
+    roles: ["manager"],
+    label: "delivery-settings",
+  },
+  // Deleting a QR code, vehicle, online order or expense is a manager decision.
+  {
+    methods: ["DELETE"],
+    path: /^\/api\/(vehicles|table-qr-codes|online-orders|expenses)(\/|$)/,
+    roles: ["manager"],
+    label: "operations-delete",
   },
   // Backups contain the whole tenant database.
   {

@@ -4,6 +4,7 @@
  */
 
 import webpush from "web-push";
+import { storeCurrency, formatMoney } from "./storeTime";
 
 const VAPID_PUBLIC = "BN_VRMNof7tvLBE3u4-dJdq7ZBSOHUqrexcuD2Tf81rQe4t1GSkbUNzRGU9DyoXObqFwUa2ef1w4AWhteWalk08";
 const VAPID_PRIVATE = "SYAn5KRDjhIDKcIb7WJr3kgr_LDsLKQYWEIHmcgfnjY";
@@ -81,13 +82,33 @@ export const pushService = {
     }, tenantId);
   },
 
-  /** Push: new online order notification */
+  /** Push: new online order notification (amount in the store's own currency) */
   async notifyNewOrder(orderNumber: string, total: string | number, tenantId?: number) {
+    const currency = tenantId ? await storeCurrency(tenantId).catch(() => "CHF") : "CHF";
     await this.broadcast({
       type: "new_online_order",
       title: "🛒 New Online Order",
-      body: `Order #${orderNumber} — CHF ${Number(total).toFixed(2)}`,
+      body: `Order #${orderNumber} — ${formatMoney(total, currency)}`,
       data: { type: "new_online_order", orderNumber },
     }, tenantId);
+  },
+
+  /**
+   * Push: a marketplace Quick Order is open for stores to claim. Sent per
+   * store, amount in that store's currency, and without the customer's
+   * name/phone/address (details are in the authenticated POS list).
+   */
+  async notifyBroadcastOrder(broadcastId: number, estimatedTotal: unknown, itemCount: number) {
+    const tenants = new Set(Array.from(subscriptions.values()).map((r) => r.tenantId).filter(Boolean));
+    await Promise.allSettled(Array.from(tenants).map(async (tenantId) => {
+      const currency = await storeCurrency(tenantId).catch(() => "CHF");
+      const amount = Number(estimatedTotal) > 0 ? formatMoney(estimatedTotal, currency) : "?";
+      await this.broadcast({
+        type: "broadcast_new",
+        title: "🛵 New Broadcast Order",
+        body: `${itemCount} item(s) — ${amount}`,
+        data: { id: broadcastId },
+      }, tenantId);
+    }));
   },
 };

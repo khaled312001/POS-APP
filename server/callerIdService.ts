@@ -337,6 +337,27 @@ export class CallerIDService extends EventEmitter {
   }
 
   /**
+   * Deliver to every client that registered a store (tenantId), never to the
+   * anonymous ones (the public /api/events feed, customer pages). For events
+   * all stores must see, e.g. a marketplace Quick Order open for claiming.
+   */
+  public broadcastToStores(payload: object) {
+    const msg = JSON.stringify(payload);
+    let n = 0;
+    if (this.wss) {
+      this.wss.clients.forEach((client: TenantWebSocket) => {
+        if (client.readyState === WebSocket.OPEN && client.tenantId) { n++; client.send(msg); }
+      });
+    }
+    this.sseClients.forEach((sc) => {
+      if (!sc.alive || !sc.tenantId) return;
+      n++;
+      try { sc.res.write(`data: ${msg}\n\n`); } catch { sc.alive = false; }
+    });
+    console.log(`[CallerID] Store broadcast: ${n} client(s)`);
+  }
+
+  /**
    * Returns all currently active calls for a given tenant (for HTTP polling fallback).
    */
   public getActiveCallsForTenant(tenantId: number): ActiveCall[] {

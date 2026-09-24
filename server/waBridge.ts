@@ -217,6 +217,10 @@ function toJid(to: string): string {
   else if (d.startsWith("0") && d.length === 10 && /^07/.test(d)) d = "41" + d.slice(1);
   // Local Syrian mobile (09xx xxx xxx)
   else if (d.startsWith("09") && d.length === 10) d = "963" + d.slice(1);
+  // Syrian mobile without the leading 0 (944 123 456)
+  else if (/^9\d{8}$/.test(d)) d = "963" + d;
+  // Local Egyptian mobile (010 / 011 / 012 / 015 + 8 digits)
+  else if (/^01[0125]\d{8}$/.test(d)) d = "20" + d.slice(1);
   return `${d}@s.whatsapp.net`;
 }
 

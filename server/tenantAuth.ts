@@ -6,6 +6,37 @@ import { JWT_SECRET } from "./jwtSecret";
 export interface TenantAuthRequest extends Request {
   tenantId?: number;
   licenseKey?: string;
+  isSuperAdmin?: boolean;
+}
+
+// ── Signed download links ───────────────────────────────────────────────────
+// The native app opens exports with Linking.openURL, which cannot send the
+// x-license-key header, so those downloads always failed with 401. The app
+// first asks POST /api/downloads/link (licence-authenticated) for a URL that
+// carries a 5-minute token bound to ONE path and ONE store; tenantAuth
+// accepts that token for GET on that path only. Signed with a derived secret
+// so it can never pass as an employee or super-admin token (or vice versa).
+const DOWNLOAD_SECRET = `${JWT_SECRET}:download-link`;
+export const DOWNLOAD_TTL_SECONDS = 300;
+export const DOWNLOADABLE_PATHS: RegExp[] = [
+  /^\/api\/customers\/export$/,
+  /^\/api\/reports\/(sales|inventory|profit|employee-performance)-export$/,
+];
+
+export function signDownloadToken(tenantId: number, path: string, employee?: unknown): string {
+  return jwt.sign({ typ: "dl", t: tenantId, p: path, emp: employee || undefined }, DOWNLOAD_SECRET, {
+    expiresIn: DOWNLOAD_TTL_SECONDS,
+  });
+}
+
+function verifyDownloadToken(token: string, path: string): { t: number; emp?: any } | null {
+  try {
+    const c = jwt.verify(token, DOWNLOAD_SECRET) as any;
+    if (c?.typ !== "dl" || c.p !== path || !Number.isInteger(c.t) || c.t <= 0) return null;
+    return c;
+  } catch {
+    return null;
+  }
 }
 
 const PUBLIC_ROUTES = [
@@ -32,7 +63,7 @@ const PUBLIC_ROUTES = [
   "/api/payments/status/",       // PaymentIntent id is already a bearer secret
   "/api/payments/checkout-session", // plan price comes from the DB, never the caller
   "/api/products/template",
-  "/api/dashboard/subscriptions",
+  "/api/customers/template",        // static sample sheet, no store data
   "/api/caller-id/incoming",  // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
   "/api/caller-id/active-calls", // HTTP polling fallback — tenantId required in query string
   "/api/push/vapid-public-key", // Public — needed for SW push subscription before auth
@@ -141,6 +172,18 @@ export function tenantAuthMiddleware() {
       return res.status(404).json({ error: "Not found" });
     }
 
+    // A signed download link (see signDownloadToken) — GET on its own path only.
+    const dl = typeof req.query.dl === "string" ? req.query.dl : "";
+    if (dl && req.method === "GET" && DOWNLOADABLE_PATHS.some((re) => re.test(req.path))) {
+      const claims = verifyDownloadToken(dl, req.path);
+      if (!claims) return res.status(401).json({ error: "Download link expired or invalid", code: "DOWNLOAD_LINK_INVALID" });
+      req.tenantId = claims.t;
+      if (claims.emp && !(req as any).employee) (req as any).employee = claims.emp;
+      const { dl: _dl, ...rest } = req.query as any;
+      Object.defineProperty(req, "query", { value: { ...rest, tenantId: String(claims.t) }, writable: true, configurable: true, enumerable: true });
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
@@ -150,6 +193,9 @@ export function tenantAuthMiddleware() {
         if (admin && admin.isActive) {
           const tenantId = req.query.tenantId ? Number(req.query.tenantId) : (req.body?.tenantId ? Number(req.body.tenantId) : undefined);
           if (tenantId) req.tenantId = tenantId;
+          // Lets the ownership checks (server/tenantScope.ts) step aside for
+          // the platform operator, who legitimately works across stores.
+          req.isSuperAdmin = true;
           return next();
         }
       } catch (_) { }
@@ -176,7 +222,13 @@ export function tenantAuthMiddleware() {
         return res.status(401).json({ error: `License is ${license.status}` });
       }
 
-      if (tenantId && license.tenantId !== tenantId) {
+      // Query and body are checked separately: before, a matching
+      // ?tenantId= let a body.tenantId of ANOTHER store through (the check
+      // only looked at the query when both were sent).
+      const queryTenant = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const bodyTenant = req.body && typeof req.body === "object" && req.body.tenantId != null && req.body.tenantId !== ""
+        ? Number(req.body.tenantId) : undefined;
+      if ((queryTenant && license.tenantId !== queryTenant) || (bodyTenant && license.tenantId !== bodyTenant)) {
         return res.status(403).json({ error: "License key does not match the requested tenant" });
       }
 
@@ -191,6 +243,14 @@ export function tenantAuthMiddleware() {
 
       req.tenantId = license.tenantId;
       req.licenseKey = licenseKey;
+      // Every tenant route that filters by ?tenantId= used to return ALL
+      // stores' rows when the parameter was left out. Pin it to the licence's
+      // store so those lists are always scoped. (Express 5's req.query is a
+      // getter, so it is shadowed with an own property.)
+      if (!queryTenant) {
+        const q = { ...(req.query as any), tenantId: String(license.tenantId) };
+        Object.defineProperty(req, "query", { value: q, writable: true, configurable: true, enumerable: true });
+      }
       next();
     } catch (error) {
       console.error("[tenantAuth] Error validating license:", error);

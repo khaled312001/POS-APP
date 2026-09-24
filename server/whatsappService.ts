@@ -193,7 +193,8 @@ function orderVars(order: OrderData, ctx: StoreContext) {
         paymentMethod: (payment[order.paymentMethod] || order.paymentMethod) + paid,
         notes: order.notes || "",
         eta: order.estimatedTime ? (ar ? `${order.estimatedTime} دقيقة` : `${order.estimatedTime} min`) : "",
-        trackingLink: order.trackingToken ? `${BASE_URL()}/track/${order.trackingToken}` : "",
+        // The tracking page opens in the message's language.
+        trackingLink: order.trackingToken ? `${BASE_URL()}/track/${order.trackingToken}${ctx.lang === "ar" ? "?lang=ar" : ""}` : "",
     };
 }
 
@@ -288,6 +289,15 @@ export const whatsappService = {
     },
     async storeLogout(tenantId: number): Promise<SessionView> {
         const v = await bridge<SessionView>("POST", "/logout", { key: storeKey(tenantId) });
+        storeCache.delete(tenantId);
+        return v;
+    },
+    /**
+     * Stop the store's session WITHOUT unlinking it: the phone stays paired
+     * (credentials kept) and "connect" resumes it without a new QR scan.
+     */
+    async storeDisconnect(tenantId: number): Promise<SessionView> {
+        const v = await bridge<SessionView>("POST", "/disconnect", { key: storeKey(tenantId) }, 15000);
         storeCache.delete(tenantId);
         return v;
     },

@@ -12,6 +12,8 @@ import { pool } from "./db";
 import { whatsappService, storeKey } from "./whatsappService";
 import { requireAdmin, type EmployeeRequest } from "./employeeAuth";
 import { rateLimit } from "./rateLimit";
+import { asciiDigits, canonicalPhone } from "./phone";
+import { storeTimeZone, dayStart } from "./storeTime";
 import { TEMPLATE_EVENTS, TEMPLATE_VARIABLES, defaultTemplate, resolveTemplate, type TemplateEvent, type TemplateLang } from "./waTemplates";
 
 function tenantOf(req: EmployeeRequest, res: Response): number | null {
@@ -21,6 +23,37 @@ function tenantOf(req: EmployeeRequest, res: Response): number | null {
     return null;
   }
   return tenantId;
+}
+
+/** Digits the bridge can dial: Arabic-Indic digits and local Syrian/Egyptian mobiles normalised. */
+function dialDigits(raw: unknown): string {
+  const typed = asciiDigits(raw).trim();
+  if (!typed) return "";
+  return (canonicalPhone(typed) || typed).replace(/\D/g, "");
+}
+
+/**
+ * The bridge waits for WhatsApp's ack, which on a slow phone connection can
+ * take a minute and left the screen spinning. After 15 s answer "queued" —
+ * the bridge keeps the message and still delivers it (no resend here).
+ */
+const SEND_WAIT_MS = 15_000;
+async function sendCapped(tenantId: number, to: string, text: string): Promise<{ ok: boolean; queued?: boolean; error?: string }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ ok: boolean; queued: boolean }>((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, queued: true }), SEND_WAIT_MS);
+  });
+  try {
+    return await Promise.race([whatsappService.storeSend(tenantId, to, text), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Seconds since midnight in the store's own time zone (Damascus for SYP). */
+async function secondsSinceStoreMidnight(tenantId: number): Promise<number> {
+  const tz = await storeTimeZone(tenantId);
+  return Math.max(0, Math.floor((Date.now() - dayStart(tz, new Date()).getTime()) / 1000));
 }
 
 async function readMeta(tenantId: number): Promise<any> {
@@ -46,7 +79,7 @@ const fail = (res: Response, e: any) => res.status(500).json({ error: e?.message
 
 /** Same number → same key the bridge uses (so opt-outs and duplicates match). */
 function phoneKey(raw: string): string {
-  let d = String(raw || "").replace(/\D/g, "");
+  let d = asciiDigits(raw || "").replace(/\D/g, "");
   if (d.startsWith("00")) d = d.slice(2);
   if (d.startsWith("410") && d.length === 12) d = "41" + d.slice(3);
   else if (d.startsWith("0") && d.length === 10 && /^07/.test(d)) d = "41" + d.slice(1);
@@ -130,6 +163,16 @@ export function registerWhatsAppStoreRoutes(app: Express): void {
     } catch (e) { fail(res, e); }
   });
 
+  // Pause the store's session without unlinking the phone. Unlike logout it
+  // keeps the pairing and the verified admin number (whatsappAdminPhone).
+  app.post("/api/whatsapp/session/disconnect", requireAdmin, async (req: EmployeeRequest, res) => {
+    try {
+      const tenantId = tenantOf(req, res);
+      if (tenantId == null) return;
+      res.json(await whatsappService.storeDisconnect(tenantId));
+    } catch (e) { fail(res, e); }
+  });
+
   app.post("/api/whatsapp/session/logout", requireAdmin, async (req: EmployeeRequest, res) => {
     try {
       const tenantId = tenantOf(req, res);
@@ -156,13 +199,14 @@ export function registerWhatsAppStoreRoutes(app: Express): void {
         if (tenantId == null) return;
         const view = await whatsappService.storeSession(tenantId, true);
         if (view.status !== "connected") return res.status(409).json({ error: "واتساب المتجر غير متصل حالياً" });
-        const to = String(req.body?.phone || "").replace(/\D/g, "") || view.phone || "";
+        const to = dialDigits(req.body?.phone) || view.phone || "";
         if (!to) return res.status(400).json({ error: "اكتب رقماً لإرسال رسالة الاختبار" });
         const tenant = await storage.getTenant(tenantId);
         const text = String(req.body?.text || "").trim() ||
           `✅ رسالة اختبار من ${tenant?.businessName || "Kassenta"}\nواتساب المتجر مربوط ويعمل.\n\nTest message — the store's WhatsApp is connected.`;
-        const r = await whatsappService.storeSend(tenantId, to, text);
-        if (!r.ok) return res.status(502).json({ error: r.error || (r.queued ? "تم وضع الرسالة في الانتظار" : "تعذّر الإرسال") });
+        const r = await sendCapped(tenantId, to, text);
+        if (!r.ok && r.queued) return res.status(202).json({ ok: false, queued: true, to, message: "تم وضع الرسالة في الانتظار وسيتم إرسالها قريباً" });
+        if (!r.ok) return res.status(502).json({ error: r.error || "تعذّر الإرسال" });
         res.json({ ok: true, to });
       } catch (e) { fail(res, e); }
     },
@@ -178,7 +222,7 @@ export function registerWhatsAppStoreRoutes(app: Express): void {
       let where = "session_key = ?";
       if (q) {
         where += " AND (name LIKE ? OR phone LIKE ? OR last_message LIKE ?)";
-        params.push(`%${q}%`, `%${q.replace(/\D/g, "") || q}%`, `%${q}%`);
+        params.push(`%${q}%`, `%${asciiDigits(q).replace(/\D/g, "") || q}%`, `%${q}%`);
       }
       const [rows]: any = await pool.query(
         `SELECT jid, name, phone, is_group AS isGroup, last_message AS lastMessage, last_from_me AS lastFromMe,
@@ -231,7 +275,7 @@ export function registerWhatsAppStoreRoutes(app: Express): void {
       if (tenantId == null) return;
       const text = String(req.body?.text || "").trim();
       if (!text) return res.status(400).json({ error: "الرسالة فارغة" });
-      const r = await whatsappService.storeSend(tenantId, String(req.params.jid), text);
+      const r = await sendCapped(tenantId, String(req.params.jid), text);
       if (!r.ok && !r.queued) return res.status(502).json({ error: r.error || "تعذّر الإرسال" });
       res.json(r);
     } catch (e) { fail(res, e); }
@@ -241,10 +285,10 @@ export function registerWhatsAppStoreRoutes(app: Express): void {
     try {
       const tenantId = tenantOf(req, res);
       if (tenantId == null) return;
-      const phone = String(req.body?.phone || "").replace(/\D/g, "");
+      const phone = dialDigits(req.body?.phone);
       const text = String(req.body?.text || "").trim();
       if (phone.length < 8 || !text) return res.status(400).json({ error: "اكتب الرقم مع رمز الدولة ونص الرسالة" });
-      const r = await whatsappService.storeSend(tenantId, phone, text);
+      const r = await sendCapped(tenantId, phone, text);
       if (!r.ok && !r.queued) return res.status(502).json({ error: r.error || "تعذّر الإرسال" });
       res.json(r);
     } catch (e) { fail(res, e); }
@@ -318,7 +362,8 @@ export function registerWhatsAppStoreRoutes(app: Express): void {
         "SELECT id, audience, body, promo_code AS promoCode, recipients, created_by AS createdBy, created_at AS createdAt FROM wa_campaigns WHERE tenant_id = ? ORDER BY id DESC LIMIT 30",
         [tenantId]);
       const [today]: any = await pool.query(
-        "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= CURDATE()", [tenantId]);
+        "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= NOW() - INTERVAL ? SECOND",
+        [tenantId, await secondsSinceStoreMidnight(tenantId)]);
       const sentToday = Number(today?.[0]?.n || 0);
       res.json({
         audience: { all: all.length, online: online.length, wholesale: wholesale.length, optedOut },
@@ -345,7 +390,8 @@ export function registerWhatsAppStoreRoutes(app: Express): void {
 
         await ensureCampaignTable();
         const [today]: any = await pool.query(
-          "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= CURDATE()", [tenantId]);
+          "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= NOW() - INTERVAL ? SECOND",
+        [tenantId, await secondsSinceStoreMidnight(tenantId)]);
         const remaining = Math.max(0, CAMPAIGN_DAILY_CAP - Number(today?.[0]?.n || 0));
         const list = (await audienceList(tenantId, audience)).slice(0, remaining);
         if (!list.length) {

@@ -28,6 +28,7 @@
  * stripProtectedCustomerFields) so a stale form can never write a balance.
  */
 import { pool } from "./db";
+import { storeTimeZone, dayStart, dayEnd, monthStart as storeMonthStart } from "./storeTime";
 
 async function q(sqlText: string, params: any[] = []): Promise<any[]> {
   const [rows] = await pool.query(sqlText, params);
@@ -691,11 +692,12 @@ export interface StatementEntry {
   entryId: number | null;
 }
 
-function parseDate(v: unknown, endOfDay = false): Date | null {
+/** A statement date: "YYYY-MM-DD" is a whole day in the STORE's time zone. */
+function parseDate(v: unknown, endOfDay = false, tz = "Europe/Zurich"): Date | null {
   const s = String(v ?? "").trim();
   if (!s) return null;
   const d = /^\d{4}-\d{2}-\d{2}$/.test(s)
-    ? new Date(`${s}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    ? (endOfDay ? dayEnd(tz, s) : dayStart(tz, s))
     : new Date(s);
   if (Number.isNaN(d.getTime())) throw new WholesaleError("Invalid date", 400, "INVALID_DATE");
   return d;
@@ -709,8 +711,9 @@ function parseDate(v: unknown, endOfDay = false): Date | null {
  */
 export async function getStatement(tenantId: number, customerId: number, fromRaw?: unknown, toRaw?: unknown) {
   const trader = await getTrader(tenantId, customerId);
-  const from = parseDate(fromRaw);
-  const to = parseDate(toRaw, true);
+  const tz = await storeTimeZone(tenantId);
+  const from = parseDate(fromRaw, false, tz);
+  const to = parseDate(toRaw, true, tz);
 
   const saleRows = await q(
     `SELECT id, receipt_number, total_amount, created_at FROM sales
@@ -784,9 +787,8 @@ export async function getSummary(tenantId: number) {
        FROM customers WHERE tenant_id = ? AND customer_type = 'wholesale'`,
     [tenantId],
   );
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
+  // The 1st of this month at midnight in the store's own time zone.
+  const monthStart = storeMonthStart(await storeTimeZone(tenantId));
   const [collected] = await q(
     `SELECT COALESCE(SUM(amount), 0) AS total FROM wholesale_payments
       WHERE tenant_id = ? AND kind = 'payment' AND created_at >= ?`,

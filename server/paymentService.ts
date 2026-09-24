@@ -61,6 +61,18 @@ function toMinor(major: number | string, label: string): number {
  */
 export async function currencyFor(tenantId?: number | null): Promise<string> {
   if (!tenantId) return DEFAULT_CURRENCY;
+  // The store's own currency (its main branch) is what its prices are in, so
+  // it wins over the gateway setting: charging a Syrian order's 39,000 in
+  // the platform default (CHF) would be catastrophic.
+  try {
+    const rows = await q(
+      `SELECT currency FROM branches WHERE tenant_id = ? AND currency IS NOT NULL AND currency <> ''
+        ORDER BY is_main DESC, id LIMIT 1`,
+      [tenantId],
+    );
+    const c = rows[0]?.currency;
+    if (c) return String(c).toLowerCase();
+  } catch { }
   try {
     const rows = await q(
       `SELECT currency FROM payment_gateway_settings WHERE tenant_id IN (?, 0)
@@ -72,6 +84,15 @@ export async function currencyFor(tenantId?: number | null): Promise<string> {
   } catch {
     return DEFAULT_CURRENCY;
   }
+}
+
+/**
+ * Currencies Stripe cannot charge (sanctioned markets). Stores in these
+ * currencies take cash and Sham Cash only; card checkout is never offered.
+ */
+const CARD_UNSUPPORTED = new Set(["syp", "irr", "kpw", "cup", "sdg"]);
+export function cardSupported(currency: string): boolean {
+  return !CARD_UNSUPPORTED.has(String(currency || "").toLowerCase());
 }
 
 async function buildIntent(opts: {
@@ -87,6 +108,9 @@ async function buildIntent(opts: {
   idempotencyKey?: string;
   stripeCustomerId?: string | null;
 }): Promise<IntentResult> {
+  if (!cardSupported(opts.currency)) {
+    throw badRequest("الدفع بالبطاقة غير متاح لهذا المتجر — ادفع نقداً أو عبر شام كاش. / Card payment is not available for this store.");
+  }
   const stripe = await requireStripeClient();
 
   const metadata: Record<string, string> = { [MK.kind]: opts.kind };

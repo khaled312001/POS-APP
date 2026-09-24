@@ -13,6 +13,15 @@ import { broadcastOrders, broadcastOrderRecipients, onlineOrders, tenants, produ
 import { eq, and, gt, sql, desc, inArray, or, isNull } from "drizzle-orm";
 import { callerIdService } from "./callerIdService";
 import { pushService } from "./pushService";
+import { ensureBroadcastClientRef } from "./serverMigrations";
+
+/** Idempotency-Key header, 1–100 chars. */
+function idempotencyKeyOf(req: Request): string | null {
+  const raw = req.get("Idempotency-Key");
+  const v = String(raw ?? "").trim();
+  return v && v.length <= 100 ? v : null;
+}
+const inflightBroadcasts = new Set<string>();
 
 // ── Auto-migration: ensure broadcast tables exist on boot ───────────────────
 // Runs once per process, idempotent. Skips cleanly if tables already exist.
@@ -244,6 +253,29 @@ export function registerBroadcastRoutes(app: Express) {
         return res.status(400).json({ error: "items must be a non-empty array" });
       }
 
+      // Idempotency: the same Idempotency-Key and phone within 24 h returns
+      // the first Quick Order instead of broadcasting a second one.
+      const idemKey = idempotencyKeyOf(req);
+      let clientRefOk = false;
+      if (idemKey) {
+        await ensureBroadcastClientRef().catch(() => {});
+        try {
+          const [prior]: any = await pool.query(
+            `SELECT id, broadcast_token, status, expires_at FROM broadcast_orders
+              WHERE client_ref = ? AND customer_phone = ? AND created_at >= NOW() - INTERVAL 1 DAY
+              ORDER BY id LIMIT 1`, [idemKey, String(customerPhone).slice(0, 40)]);
+          clientRefOk = true;
+          if (prior?.[0]) {
+            return res.status(200).json({ id: prior[0].id, token: prior[0].broadcast_token, status: prior[0].status, expiresAt: prior[0].expires_at, duplicate: true });
+          }
+        } catch { /* column not there: behave as before */ }
+        if (inflightBroadcasts.has(idemKey)) return res.status(409).json({ error: "This order is already being placed", code: "ORDER_IN_PROGRESS" });
+        inflightBroadcasts.add(idemKey);
+        const release = () => inflightBroadcasts.delete(idemKey);
+        res.on("finish", release);
+        res.on("close", release);
+      }
+
       const token = generateBroadcastToken();
       const expiresAt = new Date(Date.now() + BROADCAST_TTL_MINUTES * 60 * 1000);
 
@@ -265,6 +297,9 @@ export function registerBroadcastRoutes(app: Express) {
 
       // Drizzle MySQL insert returns metadata, not the row — fetch it
       const [row] = await db.select().from(broadcastOrders).where(eq(broadcastOrders.broadcastToken, token)).limit(1);
+      if (idemKey && clientRefOk) {
+        await pool.query("UPDATE broadcast_orders SET client_ref = ? WHERE id = ?", [idemKey, row.id]).catch(() => {});
+      }
 
       // Broadcast WS event to ALL connected POS clients
       const normalizedItems = normalizeItems(row.items);
@@ -281,10 +316,13 @@ export function registerBroadcastRoutes(app: Express) {
         createdAt: row.createdAt,
         expiresAt: row.expiresAt,
       };
-      try { callerIdService.broadcast(payload); } catch (_) {}
+      // Stores only: the customer's name, phone and address used to go to
+      // every connected client, including the anonymous /api/events feed.
+      try { callerIdService.broadcastToStores(payload); } catch (_) {}
 
       // Also send web push so POS gets a banner even if the tab is backgrounded
-      try { pushService.broadcast({ type: "broadcast_new", title: "🛵 New Broadcast Order", body: `${row.customerName} — CHF ${row.estimatedTotal || "?"}`, data: { id: row.id, token: row.broadcastToken } } as any); } catch (_) {}
+      // (per store, in its currency, without personal data).
+      try { void pushService.notifyBroadcastOrder(row.id, row.estimatedTotal, normalizedItems.length); } catch (_) {}
 
       res.status(201).json({
         id: row.id,
@@ -497,10 +535,10 @@ export function registerBroadcastRoutes(app: Express) {
         token: bc.broadcastToken,
         claimedByTenantId: tenantId,
         claimedByName: tenantRow?.businessName || null,
-        orderNumber,
-        trackingToken,
-        onlineOrderId,
       };
+      // Public event (the waiting customer page listens for it): it must not
+      // carry the order's tracking token — the customer fetches that with the
+      // broadcast token (GET /api/delivery/broadcast/:token).
       try { callerIdService.broadcast(claimPayload); } catch (_) {}
 
       // Also notify the winning POS that a NEW online order exists (same event the UI listens for)

@@ -223,22 +223,38 @@ export async function repriceOrder(opts: {
   if ((opts.orderType ?? "delivery") === "delivery") {
     const requested = num(opts.clientDeliveryFee, NaN);
     const [zoneRows]: any = await pool.query(
-      `SELECT delivery_fee FROM delivery_zones WHERE tenant_id = ? AND is_active = 1`,
+      `SELECT delivery_fee, min_order_amount FROM delivery_zones WHERE tenant_id = ? AND is_active = 1`,
       [tenantId],
     );
     const allowed = (zoneRows as any[]).map((z) => money(num(z.delivery_fee, 0)));
 
     const [branchRows]: any = await pool.query(
-      `SELECT delivery_fee FROM branches WHERE tenant_id = ? LIMIT 1`,
+      `SELECT delivery_fee, currency FROM branches WHERE tenant_id = ? LIMIT 1`,
       [tenantId],
     );
     const branchFee = money(num(branchRows?.[0]?.delivery_fee, 0));
+    const zoneFees = allowed.slice();
     if (!allowed.includes(branchFee)) allowed.push(branchFee);
 
     deliveryFee =
       Number.isFinite(requested) && allowed.includes(money(requested))
         ? money(requested)
         : branchFee;
+
+    // Zone minimum order. Applied conservatively: only when the chosen fee
+    // identifies zones (it is not also the store's default fee) and EVERY
+    // active zone charging that fee has a minimum the basket does not reach —
+    // an ambiguous match never blocks an order.
+    if (deliveryFee !== branchFee && zoneFees.includes(deliveryFee)) {
+      const matching = (zoneRows as any[]).filter((z) => money(num(z.delivery_fee, 0)) === deliveryFee);
+      const minimums = matching.map((z) => money(num(z.min_order_amount, 0)));
+      if (minimums.length && minimums.every((m) => m > 0 && subtotal < m)) {
+        const need = Math.min(...minimums);
+        const currency = String(branchRows?.[0]?.currency || "CHF").toUpperCase();
+        const en = `The minimum order for this delivery area is ${need} ${currency}`;
+        throw new PricingError(currency === "SYP" ? `الحد الأدنى للطلب لمنطقة التوصيل هذه هو ${need} ل.س / ${en}` : en);
+      }
+    }
   }
 
   // Discounts only ever come from a server-validated promo, and can never

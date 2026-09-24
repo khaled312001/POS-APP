@@ -18,19 +18,28 @@ import { repriceOrder, PricingError } from "./orderPricing";
 import { sendLicenseKeyEmail } from "./emailService";
 import { whatsappService } from "./whatsappService";
 import { verifiedStorePhone } from "./whatsappVerifyRoutes";
+import { canonicalPhone, asciiDigits } from "./phone";
+import {
+  storeCurrency, storeTimeZone, branchCurrency, formatMoney, compactDate, timeZoneForCurrency, roundMoney,
+  dayStart, dayEnd, localDateString, localMonthString, monthRange,
+} from "./storeTime";
+import { ownedBy, resolvers as own } from "./tenantScope";
+import { salesClientRefReady, orderClientRefReady } from "./serverMigrations";
+import { signDownloadToken, DOWNLOADABLE_PATHS, DOWNLOAD_TTL_SECONDS } from "./tenantAuth";
 import {
   createOtp, verifyOtp, findOrCreateCustomerByPhone,
   findCustomerByEmail, verifyCustomerPassword, setCustomerPassword,
   createCustomerSession, getAuthenticatedCustomer, deleteCustomerSession,
-  generateToken,
+  generateToken, signPhoneProof, verifyPhoneProof, claimCustomerAfterPhoneProof, emailTakenByOther,
 } from "./customerAuthService";
 import {
   validatePromoCode, recordPromoUsage, awardLoyaltyPoints,
   redeemLoyaltyPoints, checkLoyaltyRedemption, settlePosSaleLoyalty,
   assignDriverToOrder, releaseDriver,
   getDeliveryZoneForLocation, generateTrackingToken,
-  creditWallet, deductWallet,
+  creditWallet, deductWallet, getLoyaltyConfig, redeemPointsForOrder,
 } from "./deliveryService";
+import { cardSupported } from "./paymentService";
 import {
   normalizeWholesaleProductFields, stripProtectedCustomerFields,
   holdCreditForSale, releaseCreditHold, reverseCreditSale, creditReturnForSale,
@@ -43,18 +52,347 @@ const TIMESTAMP_FIELDS = [
   "date", "lastRestocked", "completedAt", "processedAt"
 ];
 
+const CLEARABLE_DATE_FIELDS = new Set([
+  "expiryDate", "expectedDate", "receivedDate", "endDate", "endTime",
+  "nextBillingDate", "lastRestocked", "completedAt", "processedAt",
+]);
+
 function sanitizeDates(data: any) {
   const result = { ...data };
   for (const field of TIMESTAMP_FIELDS) {
     if (field in result) {
-      if (result[field] === "" || result[field] === null || result[field] === undefined) {
+      if (result[field] === undefined) {
         delete result[field];
+      } else if (result[field] === "" || result[field] === null) {
+        // An explicit empty value clears an optional date (e.g. removing a
+        // product's expiry date) — dropping it made such a date impossible to
+        // clear. Bookkeeping stamps (createdAt, date, …) are never nulled.
+        if (CLEARABLE_DATE_FIELDS.has(field)) result[field] = null;
+        else delete result[field];
       } else if (typeof result[field] === "string") {
-        result[field] = new Date(result[field]);
+        const d = new Date(result[field]);
+        // An unparseable string must not reach MySQL as "Invalid Date".
+        if (isNaN(d.getTime())) delete result[field];
+        else result[field] = d;
       }
     }
   }
   return result;
+}
+
+/** Duplicate SKU → 409 with a message the POS can show; anything else → 500. */
+function productWriteError(res: Response, e: any) {
+  const msg = String(e?.message || e);
+  if (e?.code === "ER_DUP_ENTRY" || /Duplicate entry/i.test(msg)) {
+    if (/sku/i.test(msg)) {
+      return res.status(409).json({
+        error: "رمز SKU مستخدم لمنتج آخر في متجرك / This SKU is already used by another product in your store",
+        code: "DUPLICATE_SKU",
+      });
+    }
+    return res.status(409).json({ error: "Duplicate value", code: "DUPLICATE" });
+  }
+  if (e?.statusCode) return res.status(e.statusCode).json({ error: e.message, code: e.code });
+  return res.status(500).json({ error: msg });
+}
+
+/**
+ * Store for a report: the licence's store, or — for a super admin — the
+ * ?tenantId= they asked for. Reports never run across every store for a
+ * licence holder.
+ */
+function analyticsTenant(req: any): number | undefined {
+  const t = reqTenant(req);
+  if (t) return t;
+  const q = Number(req?.query?.tenantId);
+  return Number.isFinite(q) && q > 0 ? q : undefined;
+}
+
+const ORDER_STATUSES = new Set([
+  "pending", "accepted", "confirmed", "preparing", "ready", "on_way", "out_for_delivery",
+  "picked_up", "delivered", "completed", "cancelled", "rejected", "refunded",
+]);
+const TERMINAL_ORDER_STATUSES = new Set(["delivered", "completed", "cancelled", "rejected", "refunded"]);
+const PAYMENT_STATUSES = new Set(["pending", "paid", "failed", "refunded", "partially_refunded", "unpaid"]);
+
+/**
+ * The fields the POS may change on an online order. Anything else in the body
+ * (tenantId, trackingToken, stripe ids, paid_at …) is ignored — the route used
+ * to write the body as-is.
+ */
+async function editableOrderFields(req: any, body: any): Promise<
+  { data: Record<string, any> } | { error: string; status: number; code: string }
+> {
+  const out: Record<string, any> = {};
+  const str = (v: unknown, max: number) => (v == null ? null : String(v).slice(0, max));
+  const money = (v: unknown) => {
+    const n = Number(asciiDigits(v).replace(/,/g, ""));
+    return Number.isFinite(n) && n >= 0 ? n.toFixed(2) : undefined;
+  };
+  if (body.status !== undefined) {
+    if (!ORDER_STATUSES.has(String(body.status))) return { error: "Invalid status", status: 400, code: "INVALID_STATUS" };
+    out.status = String(body.status);
+  }
+  if (body.paymentStatus !== undefined) {
+    if (!PAYMENT_STATUSES.has(String(body.paymentStatus))) return { error: "Invalid payment status", status: 400, code: "INVALID_PAYMENT_STATUS" };
+    out.paymentStatus = String(body.paymentStatus);
+  }
+  if (body.paymentMethod !== undefined && body.paymentMethod !== null) out.paymentMethod = str(body.paymentMethod, 32);
+  if (body.estimatedTime !== undefined) {
+    const n = body.estimatedTime === null || body.estimatedTime === "" ? null : Math.round(Number(asciiDigits(body.estimatedTime)));
+    if (n !== null && (!Number.isFinite(n) || n < 0 || n > 24 * 60)) return { error: "Invalid estimatedTime", status: 400, code: "INVALID_TIME" };
+    out.estimatedTime = n;
+  }
+  for (const k of ["notes", "customerAddress", "customerEmail", "tableNumber", "floor", "buildingName", "addressNotes"]) {
+    if (body[k] !== undefined) out[k] = str(body[k], 2000);
+  }
+  if (body.customerName !== undefined) {
+    const v = String(body.customerName ?? "").trim();
+    if (!v) return { error: "customerName cannot be empty", status: 400, code: "INVALID_NAME" };
+    out.customerName = v.slice(0, 200);
+  }
+  if (body.customerPhone !== undefined) {
+    const v = canonicalPhone(body.customerPhone);
+    if (!v) return { error: "customerPhone cannot be empty", status: 400, code: "INVALID_PHONE" };
+    out.customerPhone = v.slice(0, 40);
+  }
+  for (const k of ["subtotal", "totalAmount", "deliveryFee", "discountAmount", "taxAmount"]) {
+    if (body[k] !== undefined && body[k] !== null && body[k] !== "") {
+      const m = money(body[k]);
+      if (m === undefined) return { error: `Invalid ${k}`, status: 400, code: "INVALID_AMOUNT" };
+      out[k] = m;
+    }
+  }
+  if (body.items !== undefined) {
+    if (!Array.isArray(body.items)) return { error: "items must be a list", status: 400, code: "INVALID_ITEMS" };
+    out.items = body.items;
+  }
+  if (body.scheduledAt !== undefined) {
+    const d = body.scheduledAt ? new Date(body.scheduledAt) : null;
+    if (d && isNaN(d.getTime())) return { error: "Invalid scheduledAt", status: 400, code: "INVALID_DATE" };
+    out.scheduledAt = d;
+  }
+  if (body.driverId !== undefined) {
+    if (body.driverId === null || body.driverId === "") out.driverId = null;
+    else if (await ownedBy(req, own.vehicle, Number(body.driverId))) out.driverId = Number(body.driverId);
+    else return { error: "Driver not found", status: 404, code: "NOT_FOUND" };
+  }
+  return { data: out };
+}
+
+/** paid_at (+ clear payment_error) the way the payment webhooks stamp it. */
+async function markOnlineOrderPaid(orderId: number, _method: string | null) {
+  const { pool } = await import("./db");
+  try {
+    await pool.query(
+      "UPDATE online_orders SET paid_at = COALESCE(paid_at, NOW()), payment_error = NULL WHERE id = ?",
+      [orderId],
+    );
+  } catch (e: any) {
+    // Columns come from runStripeMigrations; never fail the edit over them.
+    console.error("[orders] paid_at not stamped:", e?.message || e);
+  }
+}
+
+/**
+ * Promo code body → columns. Dates arrive as strings (drizzle needs Date
+ * objects — a dated promo used to fail with a 500), the code is stored upper
+ * case, amounts accept Arabic-Indic digits.
+ */
+function promoFields(body: any, creating: boolean):
+  { data: Record<string, any> } | { error: string; code: string } {
+  const out: Record<string, any> = {};
+  const bad = (en: string, ar: string, code: string) => ({ error: `${ar} / ${en}`, code });
+  const num = (v: unknown) => Number(asciiDigits(v).replace(/,/g, "").trim());
+  if (body.code !== undefined || creating) {
+    const code = asciiDigits(body.code ?? "").trim().toUpperCase();
+    if (!code || code.length > 32 || /\s/.test(code)) return bad("Promo code must be 1–32 characters without spaces", "رمز الخصم يجب أن يكون من 1 إلى 32 حرفاً بدون مسافات", "INVALID_CODE");
+    out.code = code;
+  }
+  if (body.discountType !== undefined || creating) {
+    const t = String(body.discountType ?? "percent");
+    if (!["percent", "fixed", "free_delivery"].includes(t)) return bad("Invalid discount type", "نوع الخصم غير صالح", "INVALID_TYPE");
+    out.discountType = t;
+  }
+  if (body.discountValue !== undefined || creating) {
+    const v = body.discountValue === undefined || body.discountValue === "" ? (out.discountType === "free_delivery" ? 0 : NaN) : num(body.discountValue);
+    if (!Number.isFinite(v) || v < 0) return bad("Invalid discount value", "قيمة الخصم غير صالحة", "INVALID_VALUE");
+    if ((out.discountType ?? body.discountType) === "percent" && v > 100) return bad("A percentage cannot exceed 100", "النسبة لا يمكن أن تتجاوز 100", "INVALID_VALUE");
+    out.discountValue = v.toFixed(2);
+  }
+  for (const k of ["minOrderAmount", "maxDiscountCap"]) {
+    if (body[k] === undefined) continue;
+    if (body[k] === null || body[k] === "") { out[k] = k === "minOrderAmount" ? "0" : null; continue; }
+    const v = num(body[k]);
+    if (!Number.isFinite(v) || v < 0) return bad(`Invalid ${k}`, "قيمة غير صالحة", "INVALID_AMOUNT");
+    out[k] = v.toFixed(2);
+  }
+  for (const k of ["usageLimit", "perCustomerLimit"]) {
+    if (body[k] === undefined) continue;
+    if (body[k] === null || body[k] === "") { out[k] = null; continue; }
+    const v = num(body[k]);
+    if (!Number.isInteger(v) || v < 0) return bad(`Invalid ${k}`, "عدد غير صالح", "INVALID_LIMIT");
+    out[k] = v;
+  }
+  for (const k of ["validFrom", "validUntil"]) {
+    if (body[k] === undefined) continue;
+    if (body[k] === null || body[k] === "") { out[k] = null; continue; }
+    const d = new Date(body[k]);
+    if (isNaN(d.getTime())) return bad(`Invalid date (${k})`, "تاريخ غير صالح", "INVALID_DATE");
+    out[k] = d;
+  }
+  if (out.validFrom && out.validUntil && out.validUntil < out.validFrom) {
+    return bad("The end date is before the start date", "تاريخ الانتهاء قبل تاريخ البدء", "INVALID_DATE_RANGE");
+  }
+  if (body.description !== undefined) out.description = body.description == null ? null : String(body.description).slice(0, 2000);
+  if (body.isActive !== undefined) out.isActive = !!body.isActive;
+  if (body.applicableOrderTypes !== undefined) {
+    if (!Array.isArray(body.applicableOrderTypes)) return bad("applicableOrderTypes must be a list", "قائمة غير صالحة", "INVALID_TYPES");
+    out.applicableOrderTypes = body.applicableOrderTypes.map((x: any) => String(x));
+  }
+  return { data: out };
+}
+
+function promoWriteError(res: Response, e: any) {
+  const msg = String(e?.message || e);
+  if (e?.code === "ER_DUP_ENTRY" || /Duplicate entry/i.test(msg)) {
+    return res.status(409).json({
+      error: "رمز الخصم هذا موجود مسبقاً في متجرك / This promo code already exists in your store",
+      code: "DUPLICATE_PROMO_CODE",
+    });
+  }
+  return res.status(500).json({ error: msg });
+}
+
+/** The till's idempotency key: Idempotency-Key header, else paymentDetails[].ref. */
+function saleClientRef(req: any): string | null {
+  const header = req.get?.("Idempotency-Key") ?? req.headers?.["idempotency-key"];
+  let ref: unknown = Array.isArray(header) ? header[0] : header;
+  if (!ref && Array.isArray(req.body?.paymentDetails)) {
+    ref = req.body.paymentDetails.find((p: any) => p && p.ref)?.ref;
+  }
+  const s = ref == null ? "" : String(ref).trim();
+  return s && s.length <= 100 ? s : null;
+}
+
+/** Logs (never rejects) a sale whose subtotal disagrees with its own lines. */
+function warnInconsistentSaleTotals(saleData: any, items: any) {
+  try {
+    if (!Array.isArray(items) || !items.length) return;
+    const lines = items.reduce((sum: number, it: any) => {
+      const t = Number(it?.total);
+      return sum + (Number.isFinite(t) ? t : (Number(it?.unitPrice) || 0) * (Number(it?.quantity) || 0));
+    }, 0);
+    const subtotal = Number(saleData?.subtotal);
+    const total = Number(saleData?.totalAmount);
+    const tolerance = Math.max(1, Math.abs(lines) * 0.02);
+    if (!Number.isFinite(total) || !Number.isFinite(subtotal) || Math.abs(subtotal - lines) > tolerance) {
+      console.warn(`[sales] totals disagree with lines: branch=${saleData?.branchId} lines=${lines.toFixed(2)} subtotal=${saleData?.subtotal} total=${saleData?.totalAmount}`);
+    }
+  } catch { /* logging only */ }
+}
+
+/** Payment methods charged through the card gateway (Stripe). */
+const CARD_METHODS = new Set(["card", "stripe", "online", "twint", "apple_pay", "google_pay"]);
+
+/** In-flight idempotency keys (this process), so two concurrent retries cannot both create. */
+const inflightIdempotency = new Set<string>();
+
+/** Idempotency-Key header (storefront / customer app), 1–100 chars. */
+function requestIdempotencyKey(req: any): string | null {
+  const raw = req.get?.("Idempotency-Key") ?? req.headers?.["idempotency-key"];
+  const v = String(Array.isArray(raw) ? raw[0] : raw ?? "").trim();
+  return v && v.length <= 100 ? v : null;
+}
+
+async function findOrderByClientRef(tenantId: number, key: string, phone: string): Promise<any | null> {
+  if (!orderClientRefReady) return null;
+  try {
+    const { pool } = await import("./db");
+    const [rows]: any = await pool.query(
+      `SELECT id, order_number, tracking_token, total_amount FROM online_orders
+        WHERE tenant_id = ? AND client_ref = ? AND customer_phone = ?
+          AND created_at >= NOW() - INTERVAL 1 DAY
+        ORDER BY id LIMIT 1`, [tenantId, key, phone]);
+    return rows?.[0] || null;
+  } catch { return null; }
+}
+
+/**
+ * The store's minimum order: the larger of the storefront setting
+ * (landing_page_config.min_order_amount) and the POS store setting
+ * (tenant metadata minOrderAmount), so neither can be bypassed.
+ */
+async function storeMinOrderAmount(tenantId: number): Promise<number> {
+  const [config, tenant] = await Promise.all([
+    storage.getLandingPageConfigByTenantId(tenantId).catch(() => null),
+    storage.getTenant(tenantId).catch(() => null),
+  ]);
+  const a = Number((config as any)?.minOrderAmount) || 0;
+  const b = Number((tenant?.metadata as any)?.minOrderAmount) || 0;
+  return Math.max(0, a, b);
+}
+
+/** The delivery fee repriceOrder falls back to (same query), for the store APIs. */
+async function storeBaseDeliveryFee(tenantId: number): Promise<number> {
+  try {
+    const { pool } = await import("./db");
+    const [rows]: any = await pool.query("SELECT delivery_fee FROM branches WHERE tenant_id = ? LIMIT 1", [tenantId]);
+    return Math.round((Number(rows?.[0]?.delivery_fee) || 0) * 100) / 100;
+  } catch { return 0; }
+}
+
+/** Real rating from order_ratings (null when there are none). */
+async function storeRating(tenantId: number): Promise<{ rating: number | null; reviewCount: number }> {
+  try {
+    const { pool } = await import("./db");
+    const [rows]: any = await pool.query(
+      `SELECT AVG(r.overall_rating) AS avg, COUNT(*) AS n
+         FROM order_ratings r JOIN online_orders o ON o.id = r.order_id
+        WHERE o.tenant_id = ?`, [tenantId]);
+    const n = Number(rows?.[0]?.n || 0);
+    return { rating: n ? Math.round(Number(rows[0].avg) * 10) / 10 : null, reviewCount: n };
+  } catch { return { rating: null, reviewCount: 0 }; }
+}
+
+/** The licence's store, when the request has one (super admins may have none). */
+function reqTenant(req: any): number | undefined {
+  const t = Number(req?.tenantId);
+  return Number.isFinite(t) && t > 0 ? t : undefined;
+}
+
+/**
+ * The branch a till writes to. Staff without a branch used to send the
+ * placeholder branch 1 (another store's id, or none at all); that now
+ * resolves to the licence store's main branch.
+ */
+async function storeBranch(req: any, branchId: unknown): Promise<number | undefined> {
+  const t = reqTenant(req);
+  const id = Number(branchId);
+  if (Number.isInteger(id) && id > 0) {
+    const b: any = await storage.getBranch(id).catch(() => undefined);
+    if (b && (!t || Number(b.tenantId) === t)) return id;
+  }
+  if (!t) return Number.isInteger(id) && id > 0 ? id : undefined;
+  const list: any[] = await storage.getBranchesByTenant(t).catch(() => []);
+  const main = list.find((b) => b.isMain) || list[0];
+  return main?.id ?? (Number.isInteger(id) && id > 0 ? id : undefined);
+}
+
+/**
+ * New rows belong to the store that created them: the licence's tenant wins
+ * over whatever the body says (tenantAuth already rejects a mismatch, this
+ * covers the body that sends none).
+ */
+function withTenant<T extends Record<string, any>>(req: any, data: T): T {
+  const t = reqTenant(req);
+  return t ? { ...data, tenantId: t } : data;
+}
+
+/** An update never moves a row to another store. */
+function withoutTenant<T extends Record<string, any>>(data: T): T {
+  const { tenantId: _t, id: _id, ...rest } = data as any;
+  return rest as T;
 }
 
 import * as bcrypt from "bcrypt";
@@ -394,19 +732,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Google Authentication & Auto-Trial
   app.post("/api/auth/google", async (req, res) => {
     try {
-      const { idToken, deviceId } = req.body;
-      if (!idToken) return res.status(400).json({ error: "idToken is required" });
+      const { idToken, accessToken, deviceId } = req.body;
+      if (!idToken && !accessToken) return res.status(400).json({ error: "idToken is required" });
 
-      // Without an explicit `audience` the library verifies only the signature,
-      // so an ID token minted for any other Google app would be accepted here
-      // and provision a tenant. Pin it to our own client.
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: GOOGLE_WEB_CLIENT_ID,
-      });
-      const payload = ticket.getPayload();
+      let payload: { email?: string; name?: string } | undefined;
+      if (idToken) {
+        // Without an explicit `audience` the library verifies only the signature,
+        // so an ID token minted for any other Google app would be accepted here
+        // and provision a tenant. Pin it to our own client.
+        const ticket = await googleClient.verifyIdToken({
+          idToken,
+          audience: GOOGLE_WEB_CLIENT_ID,
+        }).catch(() => null);
+        payload = ticket?.getPayload();
+      } else {
+        // Web build: Google's pop-up returns an access token. Google itself
+        // confirms which client it was issued to, and the e-mail comes from
+        // Google's userinfo, never from the request body.
+        const info = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(String(accessToken))}`);
+        const tokenInfo: any = info.ok ? await info.json() : null;
+        if (!tokenInfo || (tokenInfo.aud !== GOOGLE_WEB_CLIENT_ID && tokenInfo.azp !== GOOGLE_WEB_CLIENT_ID)) {
+          return res.status(401).json({ error: "Invalid Google token" });
+        }
+        const ui = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${accessToken}` } });
+        const u: any = ui.ok ? await ui.json() : null;
+        if (!u?.email || u.email_verified === false) return res.status(401).json({ error: "Invalid Google token" });
+        payload = { email: u.email, name: u.name };
+      }
       if (!payload || !payload.email) {
-        return res.status(400).json({ error: "Invalid Google token" });
+        return res.status(401).json({ error: "Invalid Google token" });
       }
 
       const email = payload.email.toLowerCase();
@@ -516,8 +870,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tenant/onboarding-complete", async (req, res) => {
     try {
-      const { tenantId, businessName, ownerPhone, storeType, logo } = req.body;
+      const { ownerPhone, storeType, logo } = req.body || {};
+      // The licence's store, never a body field (a super admin may name one).
+      const tenantId = reqTenant(req) ?? ((req as any).isSuperAdmin ? Number(req.body?.tenantId) || undefined : undefined);
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const businessName = String(req.body?.businessName ?? "").trim();
+      if (!businessName) return res.status(400).json({ error: "businessName is required", code: "BUSINESS_NAME_REQUIRED" });
 
       // 1. Update Tenant Info
       await storage.updateTenant(tenantId, {
@@ -535,7 +893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { landingPageConfig: landingConfig } = await import("@shared/schema");
         await db.insert(landingConfig).values({
           tenantId,
-          slug: businessName.toLowerCase().replace(/\s+/g, '-'),
+          slug: businessName.toLowerCase().replace(/\s+/g, '-') || `store-${tenantId}`,
           heroTitle: businessName,
           phone: ownerPhone,
           socialWhatsapp: ownerPhone,
@@ -562,7 +920,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // cap it so it cannot be used to enumerate keys or as an amplification target.
   app.post(
     "/api/license/validate",
-    rateLimit({ name: "license-ip", max: 30, windowMs: 10 * 60 * 1000 }),
+    // Generous: a store's tablets and Syrian carrier-NAT users share one IP.
+    rateLimit({ name: "license-ip", max: 300, windowMs: 10 * 60 * 1000 }),
     async (req, res) => {
     try {
       const { licenseKey, email, password, deviceId } = req.body;
@@ -774,7 +1133,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Subscription status for dashboard
-  app.get("/api/dashboard/subscriptions", async (_req: Request, res: Response) => {
+  // Every store's plan, owner name and e-mail: platform data, super admin only
+  // (it used to be a public route).
+  app.get("/api/dashboard/subscriptions", requireSuperAdmin as any, async (_req: Request, res: Response) => {
     try {
       const tenantSubs = await storage.getTenantSubscriptions();
       const tenants = await storage.getTenants();
@@ -824,10 +1185,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/branches", async (req, res) => {
-    try { res.json(await storage.createBranch(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createBranch(withTenant(req, sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/branches/:id", async (req, res) => {
-    try { res.json(await storage.updateBranch(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateBranch(Number(req.params.id), withoutTenant(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/branches/:id", async (req, res) => {
     try { await storage.deleteBranch(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -854,7 +1215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/employees", requireAdmin, async (req, res) => {
     try {
-      const data: any = sanitizeDates(req.body);
+      const data: any = withTenant(req, sanitizeDates(req.body));
       if (data.pin) data.pin = await hashPin(String(data.pin));
       const created: any = await storage.createEmployee(data);
       const { pin, ...safe } = created ?? {};
@@ -863,7 +1224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.put("/api/employees/:id", requireAdmin, async (req, res) => {
     try {
-      const data: any = sanitizeDates(req.body);
+      const data: any = withoutTenant(sanitizeDates(req.body));
       // An empty string means "leave the PIN alone", not "clear it".
       if (data.pin) data.pin = await hashPin(String(data.pin));
       else delete data.pin;
@@ -965,14 +1326,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/categories", async (req, res) => {
     try {
-      const c = await storage.createCategory(sanitizeDates(req.body));
+      const c = await storage.createCategory(withTenant(req, sanitizeDates(req.body)));
       callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(c);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/categories/:id", async (req, res) => {
     try {
-      const c = await storage.updateCategory(Number(req.params.id), sanitizeDates(req.body));
+      const c = await storage.updateCategory(Number(req.params.id), withoutTenant(sanitizeDates(req.body)));
       callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(c);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -981,6 +1342,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const c = await storage.getCategory(Number(req.params.id));
       await storage.deleteCategory(Number(req.params.id));
+      // Products stay on the menu: they drop to "uncategorised" instead of
+      // pointing at a hidden category that made them disappear.
+      if (c) await storage.detachProductsFromCategory(c.id);
       if (c) callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1027,7 +1391,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bulk Import Products (must be before :id route)
   app.post("/api/products/import", async (req: any, res) => {
     try {
-      const { fileBase64, tenantId, branchId } = req.body;
+      const { fileBase64, branchId } = req.body;
+      const tenantId = reqTenant(req) ?? Number(req.body.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      if (!fileBase64) return res.status(400).json({ error: "fileBase64 is required" });
       const buffer = Buffer.from(fileBase64, "base64");
       const workbook = xlsx.read(buffer, { type: "buffer" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -1080,23 +1447,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/products", async (req, res) => {
     try {
-      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
+      const body = normalizeWholesaleProductFields(withTenant(req, sanitizeDates(req.body)));
       // Addons are always free
       if (body.isAddon) body.price = "0";
       const p = await storage.createProduct(body);
       callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(p);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { productWriteError(res, e); }
   });
   app.put("/api/products/:id", async (req, res) => {
     try {
-      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
+      const body = normalizeWholesaleProductFields(withoutTenant(sanitizeDates(req.body)));
       // Addons are always free
       if (body.isAddon) body.price = "0";
       const p = await storage.updateProduct(Number(req.params.id), body);
       callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(p);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { productWriteError(res, e); }
   });
   app.delete("/api/products/:id", async (req, res) => {
     try {
@@ -1111,7 +1478,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/inventory", async (req, res) => {
     try {
       const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      // The licence's store; ?tenantId= only matters for a super admin.
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : undefined);
+      if (!tenantId && !branchId) return res.status(400).json({ error: "tenantId is required" });
       res.json(await storage.getInventory(branchId, tenantId));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1163,6 +1532,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Download Customers Excel Template (must be before :id route)
+  // A 5-minute link to one export, for clients that cannot send headers
+  // (the native app opens downloads with Linking.openURL). Body: { path }
+  // e.g. "/api/customers/export" or "/api/reports/sales-export?startDate=…".
+  app.post("/api/downloads/link", async (req: any, res) => {
+    try {
+      const tenantId = reqTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const raw = String(req.body?.path || "");
+      let u: URL;
+      try { u = new URL(raw, "http://x"); } catch { return res.status(400).json({ error: "Invalid path" }); }
+      if (u.origin !== "http://x" || !DOWNLOADABLE_PATHS.some((re) => re.test(u.pathname))) {
+        return res.status(400).json({ error: "This path cannot be downloaded by link", code: "NOT_DOWNLOADABLE" });
+      }
+      u.searchParams.delete("dl");
+      u.searchParams.delete("tenantId");
+      u.searchParams.set("dl", signDownloadToken(tenantId, u.pathname, req.employee));
+      res.json({ url: `${u.pathname}?${u.searchParams.toString()}`, expiresIn: DOWNLOAD_TTL_SECONDS });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   app.get("/api/customers/template", (req, res) => {
     const templateData = [
       { Name: "John Doe", Phone: "+41791234567", Email: "john@example.com", Address: "123 Main St" },
@@ -1252,7 +1641,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bulk Import Customers (must be before :id route)
   app.post("/api/customers/import", async (req: any, res) => {
     try {
-      const { fileBase64, tenantId } = req.body;
+      const { fileBase64 } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : undefined);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       if (!fileBase64) return res.status(400).json({ error: "fileBase64 is required" });
       const buffer = Buffer.from(fileBase64, "base64");
       const workbook = xlsx.read(buffer, { type: "buffer" });
@@ -1262,9 +1653,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customersToInsert = data.map((item: any) => ({
         name: item.Name || item.name || "",
         email: item.Email || item.email || undefined,
-        phone: String(item.Phone || item.phone || ""),
+        // Same spelling as storefront logins and orders (0944… → +963944…),
+        // so an imported customer is recognised when they order online.
+        phone: canonicalPhone(item.Phone || item.phone || ""),
         address: item.Address || item.address || undefined,
-        tenantId: tenantId ? Number(tenantId) : undefined,
+        tenantId,
         isActive: true,
       })).filter((c: any) => c.name);
 
@@ -1274,7 +1667,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk Import from KUNDEN_ALL CSV file on disk
-  app.post("/api/customers/import-csv", async (req: any, res) => {
+  // Imports ONE specific file from the server disk (Pizza Lemon's legacy
+  // customer list). Any store could call it and receive those customers, so it
+  // is a super-admin maintenance tool now.
+  app.post("/api/customers/import-csv", requireSuperAdmin as any, async (req: any, res) => {
     try {
       const tenantId = req.body.tenantId ? Number(req.body.tenantId) : undefined;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
@@ -1409,16 +1805,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/customers", async (req, res) => {
-    try { res.json(await storage.createCustomer(stripProtectedCustomerFields(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = withTenant(req, stripProtectedCustomerFields(sanitizeDates(req.body)));
+      if (data.phone) data.phone = canonicalPhone(data.phone);
+      res.json(await storage.createCustomer(data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/customers/:id", async (req, res) => {
-    try { res.json(await storage.updateCustomer(Number(req.params.id), stripProtectedCustomerFields(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = withoutTenant(stripProtectedCustomerFields(sanitizeDates(req.body)));
+      if (data.phone) data.phone = canonicalPhone(data.phone);
+      res.json(await storage.updateCustomer(Number(req.params.id), data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+  // Soft delete: sales.customer_id is ON DELETE CASCADE, so removing the row
+  // used to delete the customer's whole sales history with it.
   app.delete("/api/customers/:id", async (req, res) => {
-    try { await storage.deleteCustomer(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const cust: any = await storage.getCustomer(Number(req.params.id));
+      if (!cust) return res.status(404).json({ error: "Customer not found" });
+      if (cust.customerType === "wholesale") {
+        return res.status(409).json({
+          error: "هذا تاجر جملة — أوقفه من شاشة الجملة / This is a wholesale trader — deactivate them from the Wholesale screen",
+          code: "WHOLESALE_TRADER",
+        });
+      }
+      await storage.deleteCustomer(cust.id);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/customers/:id/loyalty", async (req, res) => {
-    try { res.json(await storage.addLoyaltyPoints(Number(req.params.id), req.body.points)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const points = Number(asciiDigits(req.body?.points).trim());
+      if (!Number.isInteger(points) || points === 0 || Math.abs(points) > 10_000_000) {
+        return res.status(400).json({ error: "points must be a whole number / يجب أن تكون النقاط عدداً صحيحاً", code: "INVALID_POINTS" });
+      }
+      const cust = await storage.getCustomer(Number(req.params.id));
+      if (!cust) return res.status(404).json({ error: "Customer not found" });
+      if ((cust.loyaltyPoints || 0) + points < 0) {
+        return res.status(400).json({ error: "Not enough points / النقاط غير كافية", code: "INSUFFICIENT_POINTS" });
+      }
+      res.json(await storage.addLoyaltyPoints(cust.id, points));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.get("/api/customers/:id/sales", async (req, res) => {
     try { res.json(await storage.getCustomerSales(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1437,9 +1865,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sales
   app.get("/api/sales", async (req, res) => {
     try {
-      const limit = req.query.limit ? Number(req.query.limit) : undefined;
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      // Newest first, capped: without a limit this returned every sale ever
+      // recorded (default 500, at most 5000 per request).
+      const asked = Number(req.query.limit);
+      const limit = Number.isFinite(asked) && asked > 0 ? Math.min(Math.floor(asked), 5000) : 500;
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : undefined);
       const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      if (!tenantId && !(req as any).isSuperAdmin) return res.status(400).json({ error: "tenantId is required" });
       res.json(await storage.getSales({ limit, tenantId, branchId }));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1454,11 +1886,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sales", async (req: any, res) => {
     try {
       const { items, loyaltyPointsRedeemed, ...saleData } = sanitizeDates(req.body);
+      if (reqTenant(req)) saleData.branchId = await storeBranch(req, saleData.branchId);
       // Loyalty is settled against the licence's tenant, never a body field.
       // A redemption is checked before anything is written, so a stale balance
       // refuses the sale instead of granting a discount the points can't cover.
       const loyaltyTenantId: number | undefined = req.tenantId
         ?? (saleData.customerId ? (await storage.getCustomer(saleData.customerId))?.tenantId ?? undefined : undefined);
+      // Idempotency: a till that retries after a timeout sends the same
+      // Idempotency-Key header / paymentDetails[].ref — hand back the sale it
+      // already made instead of recording (and charging) it twice.
+      const clientRef = saleClientRef(req);
+      const saleTenant = reqTenant(req) ?? loyaltyTenantId
+        ?? (saleData.branchId ? (await storage.getBranch(Number(saleData.branchId)))?.tenantId ?? undefined : undefined);
+      if (clientRef && salesClientRefReady) {
+        const existing = await storage.findSaleByClientRef(clientRef, saleTenant).catch(() => undefined);
+        if (existing) return res.status(200).json(existing);
+      }
       const redeemPoints = Math.max(0, Math.floor(Number(loyaltyPointsRedeemed) || 0));
       if (redeemPoints > 0) {
         const refusal = saleData.customerId && loyaltyTenantId
@@ -1466,8 +1909,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : "A customer is required to redeem points";
         if (refusal) return res.status(400).json({ error: refusal });
       }
-      const swissDateRcp = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
-      const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`);
+      // Receipt date in the store's own calendar (Damascus for SYP stores).
+      const rcpTz = saleData.branchId
+        ? timeZoneForCurrency(await branchCurrency(saleData.branchId))
+        : await storeTimeZone(loyaltyTenantId);
+      const swissDateRcp = compactDate(rcpTz);
+      const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`, rcpTz);
       const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
       // Wholesale credit (آجل): the amount goes on the trader's account under a
       // row lock and is refused over the credit limit — see server/wholesale.ts.
@@ -1482,26 +1929,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         saleData.totalAmount = (creditHold.cents / 100).toFixed(2);
         saleData.paymentStatus = "pending";
       }
-      const sale = await storage.createSale({ ...saleData, receiptNumber }).catch(async (err: any) => {
+      // Totals come from the till (discounts, service fees, wholesale prices
+      // and manual adjustments are all applied there), so they are not
+      // rejected — but a subtotal that disagrees with its own lines is logged.
+      warnInconsistentSaleTotals(saleData, items);
+      // Sale, lines, stock and the idempotency key in one transaction.
+      let sale: any;
+      try {
+        sale = await storage.createSaleWithItems(
+          { ...saleData, receiptNumber },
+          Array.isArray(items) ? items : [],
+          { clientRef: clientRef && salesClientRefReady ? clientRef : null, employeeId: saleData.employeeId },
+        );
+      } catch (err: any) {
         if (creditHold) await releaseCreditHold(creditHold);
-        throw err;
-      });
-      if (items && items.length > 0) {
-        for (const item of items) {
-          await storage.createSaleItem({ ...item, saleId: sale.id });
-          if (saleData.branchId) {
-            await storage.adjustInventory(item.productId, saleData.branchId, -item.quantity);
-            await storage.createInventoryMovement({
-              productId: item.productId,
-              branchId: saleData.branchId,
-              type: "sale",
-              quantity: -item.quantity,
-              referenceType: "sale",
-              referenceId: sale.id,
-              employeeId: saleData.employeeId,
-            });
-          }
+        // A concurrent retry with the same key won the race: return its sale.
+        if (clientRef && err?.code === "ER_DUP_ENTRY" && /client_ref/i.test(String(err?.message))) {
+          const existing = await storage.findSaleByClientRef(clientRef, saleTenant).catch(() => undefined);
+          if (existing) return res.status(200).json(existing);
         }
+        throw err;
       }
       if (saleData.customerId) {
         // Points follow Settings -> Loyalty (on/off, earn rate, point value).
@@ -1535,12 +1982,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Log activity
+      const saleCur = saleData.branchId ? await branchCurrency(saleData.branchId) : await storeCurrency(loyaltyTenantId);
       await storage.createActivityLog({
         employeeId: saleData.employeeId,
         action: "sale_created",
         entityType: "sale",
         entityId: sale.id,
-        details: `Sale ${sale.receiptNumber} completed for $${saleData.totalAmount}`,
+        details: `Sale ${sale.receiptNumber} completed for ${formatMoney(saleData.totalAmount, saleCur)}`,
       });
       // Handle employee commission
       if (saleData.employeeId) {
@@ -1562,7 +2010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         saleData.employeeId,
         "sale_completed",
         "New Sale",
-        `${saleEmp?.name || "Employee"} completed sale ${sale.receiptNumber} for $${saleData.totalAmount} (${saleData.paymentMethod || "cash"})`,
+        `${saleEmp?.name || "Employee"} completed sale ${sale.receiptNumber} for ${formatMoney(saleData.totalAmount, saleCur)} (${saleData.paymentMethod || "cash"})`,
         "sale",
         sale.id
       );
@@ -1580,7 +2028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { onlineOrders, customers, branches, vehicles } = await import("@shared/schema");
           const { eq } = await import("drizzle-orm");
           // Resolve tenantId via branch since POS sales table doesn't carry it.
-          let resolvedTenantId: number | undefined = saleData.tenantId;
+          let resolvedTenantId: number | undefined = reqTenant(req) ?? saleData.tenantId;
           if (!resolvedTenantId && saleData.branchId) {
             const [br] = await db.select({ tenantId: branches.tenantId }).from(branches).where(eq(branches.id, saleData.branchId)).limit(1);
             resolvedTenantId = br?.tenantId ?? undefined;
@@ -1589,6 +2037,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const [veh] = await db.select({ tenantId: vehicles.tenantId }).from(vehicles).where(eq(vehicles.id, saleData.vehicleId)).limit(1);
             resolvedTenantId = veh?.tenantId ?? undefined;
           }
+          // Never guess a store (this used to fall back to tenant 24).
+          if (!resolvedTenantId) throw new Error("cannot resolve the store of this sale");
           const [cust] = saleData.customerId
             ? await db.select().from(customers).where(eq(customers.id, saleData.customerId)).limit(1)
             : [null];
@@ -1608,7 +2058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const trackingToken = require("crypto").randomBytes(24).toString("hex");
           const orderNumber = sale.receiptNumber || `POS-${sale.id}`;
           const [inserted] = await db.insert(onlineOrders).values({
-            tenantId: resolvedTenantId || 24,
+            tenantId: resolvedTenantId,
             orderNumber,
             customerName,
             customerPhone: customerPhone || "—",
@@ -1655,22 +2105,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = Number(req.params.id);
       const { items, ...saleData } = req.body;
-      const sale = await storage.updateSale(id, sanitizeDates(saleData));
-      if (items !== undefined) {
-        await storage.deleteSaleItems(id);
-        for (const item of items) {
-          await storage.createSaleItem({
-            saleId: id,
-            productId: item.productId,
-            productName: item.productName || item.name,
-            quantity: item.quantity,
-            unitPrice: String(item.unitPrice),
-            total: String(item.total),
-            modifiers: item.modifiers || [],
-            notes: item.notes || null,
-          });
-        }
-      }
+      // A sale never moves to another branch/receipt number through an edit.
+      const { id: _id, receiptNumber: _r, branchId: _b, tenantId: _t, ...editable } = saleData || {};
+      // Header and items change together or not at all: a failure half-way
+      // used to leave a sale with its items deleted.
+      const sale = await storage.updateSaleWithItems(id, sanitizeDates(editable), Array.isArray(items) ? items : undefined);
       res.json(sale);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1698,10 +2137,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/suppliers", async (req, res) => {
-    try { res.json(await storage.createSupplier(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createSupplier(withTenant(req, sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/suppliers/:id", async (req, res) => {
-    try { res.json(await storage.updateSupplier(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateSupplier(Number(req.params.id), withoutTenant(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Purchase Orders
@@ -1712,10 +2151,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/purchase-orders", async (req, res) => {
-    try { res.json(await storage.createPurchaseOrder(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = withoutTenant(sanitizeDates(req.body));
+      // order_number is NOT NULL UNIQUE across the platform. Keep the client's
+      // number (PO-YYYYMMDD-xxxxx) when it is free; otherwise make one here.
+      const wanted = typeof data.orderNumber === "string" ? data.orderNumber.trim().slice(0, 64) : "";
+      if (!wanted || (await storage.purchaseOrderNumberExists(wanted))) {
+        const tz = await storeTimeZone(reqTenant(req));
+        let candidate = "";
+        for (let i = 0; i < 5; i++) {
+          candidate = `PO-${compactDate(tz)}-${crypto.randomInt(10000, 99999)}`;
+          if (!(await storage.purchaseOrderNumberExists(candidate))) break;
+        }
+        data.orderNumber = candidate;
+      } else {
+        data.orderNumber = wanted;
+      }
+      res.json(await storage.createPurchaseOrder(data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/purchase-orders/:id", async (req, res) => {
-    try { res.json(await storage.updatePurchaseOrder(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updatePurchaseOrder(Number(req.params.id), withoutTenant(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Shifts
@@ -1741,20 +2197,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/shifts", async (req, res) => {
     try {
-      const shift = await storage.createShift(sanitizeDates(req.body));
+      const shiftData = sanitizeDates(req.body);
+      if (reqTenant(req)) shiftData.branchId = await storeBranch(req, shiftData.branchId);
+      const shift = await storage.createShift(shiftData);
       const emp = await storage.getEmployee(shift.employeeId);
+      const cur = shift.branchId ? await branchCurrency(shift.branchId) : await storeCurrency(reqTenant(req));
       await storage.createActivityLog({
         employeeId: shift.employeeId,
         action: "shift_started",
         entityType: "shift",
         entityId: shift.id,
-        details: `Shift started by ${emp?.name || "Unknown"} with $${shift.openingCash || 0} opening cash`,
+        details: `Shift started by ${emp?.name || "Unknown"} with ${formatMoney(shift.openingCash || 0, cur)} opening cash`,
       });
       await storage.notifyAdmins(
         shift.employeeId,
         "shift_started",
         "Shift Started",
-        `${emp?.name || "Employee"} has started a new shift with $${shift.openingCash || 0} opening cash`,
+        `${emp?.name || "Employee"} has started a new shift with ${formatMoney(shift.openingCash || 0, cur)} opening cash`,
         "shift",
         shift.id,
         "normal"
@@ -1772,18 +2231,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shift = await storage.closeShift(Number(req.params.id), sanitizeDates(req.body));
       const emp = await storage.getEmployee(shift.employeeId);
+      const cur = shift.branchId ? await branchCurrency(shift.branchId) : await storeCurrency(reqTenant(req));
       await storage.createActivityLog({
         employeeId: shift.employeeId,
         action: "shift_closed",
         entityType: "shift",
         entityId: shift.id,
-        details: `Shift closed with ${shift.totalTransactions || 0} transactions and $${shift.closingCash || 0} closing cash`,
+        details: `Shift closed with ${shift.totalTransactions || 0} transactions and ${formatMoney(shift.closingCash || 0, cur)} closing cash`,
       });
       await storage.notifyAdmins(
         shift.employeeId,
         "shift_ended",
         "Shift Ended",
-        `${emp?.name || "Employee"} has ended their shift. Transactions: ${shift.totalTransactions || 0}, Sales: $${shift.totalSales || 0}`,
+        `${emp?.name || "Employee"} has ended their shift. Transactions: ${shift.totalTransactions || 0}, Sales: ${formatMoney(shift.totalSales || 0, cur)}`,
         "shift",
         shift.id,
         "normal"
@@ -1800,7 +2260,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json({ count: await storage.getUnreadNotificationCount(Number(req.params.employeeId)) }); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/notifications", async (req, res) => {
-    try { res.json(await storage.createNotification(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = sanitizeDates(req.body);
+      // Only to a colleague in the same store.
+      if (data.recipientId && !(await ownedBy(req, own.employee, Number(data.recipientId)))) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      res.json(await storage.createNotification(data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/notifications/:id/read", async (req, res) => {
     try { res.json(await storage.markNotificationRead(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1817,18 +2284,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/expenses", async (req, res) => {
-    try { res.json(await storage.createExpense(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = withTenant(req, sanitizeDates(req.body));
+      // The POS sends categoryId (its expense-category key) or category.
+      if ((data.category == null || data.category === "") && data.categoryId != null && data.categoryId !== "") {
+        data.category = String(data.categoryId);
+      }
+      delete data.categoryId;
+      if (!data.category) return res.status(400).json({ error: "category is required" });
+      if (data.amount != null) data.amount = asciiDigits(data.amount).replace(/,/g, "");
+      res.json(await storage.createExpense(data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Tables
   app.get("/api/tables", async (req, res) => {
-    try { res.json(await storage.getTables(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : undefined);
+      if (!branchId && !tenantId) return res.status(400).json({ error: "tenantId or branchId is required" });
+      res.json(await storage.getTables(branchId, tenantId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/tables", async (req, res) => {
-    try { res.json(await storage.createTable(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = withoutTenant(sanitizeDates(req.body));
+      // A table always hangs off one of this store's branches (the ownership
+      // middleware has already checked a branchId that was sent).
+      if (!data.branchId) {
+        const tenantId = reqTenant(req);
+        if (!tenantId) return res.status(400).json({ error: "branchId is required" });
+        const brs = await storage.getBranchesByTenant(tenantId);
+        const main: any = brs.find((b: any) => b.isMain) || brs[0];
+        if (!main) return res.status(400).json({ error: "branchId is required" });
+        data.branchId = main.id;
+      }
+      res.json(await storage.createTable(data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/tables/:id", async (req, res) => {
-    try { res.json(await storage.updateTable(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateTable(Number(req.params.id), withoutTenant(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete("/api/tables/:id", async (req, res) => {
+    try {
+      const table = await storage.getTable(Number(req.params.id));
+      if (!table) return res.status(404).json({ error: "Table not found" });
+      await storage.deleteTable(table.id);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // ── Table QR Codes ──
@@ -1842,8 +2345,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/table-qr-codes", async (req, res) => {
     try {
-      const { tenantId, tableId, branchId, tableName } = req.body;
+      const { tableId, branchId, tableName } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : undefined);
       if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
+      if (!(await ownedBy(req, own.table, Number(tableId)))) return res.status(404).json({ error: "Table not found" });
       const qrToken = `TBL-${crypto.randomBytes(16).toString("hex")}`;
       const qr = await storage.createTableQrCode({
         tenantId: Number(tenantId),
@@ -1859,9 +2364,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/table-qr-codes/generate-all", async (req, res) => {
     try {
-      const { tenantId, branchId } = req.body;
+      const { branchId } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : undefined);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      const allTables = await storage.getTables(branchId ? Number(branchId) : undefined);
+      // Only this store's tables (without a branch it used to take every
+      // store's tables and mint QR codes for them).
+      const allTables = await storage.getTables(branchId ? Number(branchId) : undefined, Number(tenantId));
       const existing = await storage.getTableQrCodes(Number(tenantId));
       const existingTableIds = new Set(existing.map((q: any) => q.tableId));
       const created: any[] = [];
@@ -1883,7 +2391,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put("/api/table-qr-codes/:id", async (req, res) => {
-    try { res.json(await storage.updateTableQrCode(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      // The token and owner are fixed; a QR code may be renamed or switched off.
+      const { tableName, isActive } = req.body || {};
+      const data: any = {};
+      if (typeof tableName === "string" && tableName.trim()) data.tableName = tableName.trim().slice(0, 100);
+      if (typeof isActive === "boolean") data.isActive = isActive;
+      if (req.body?.tableId != null) {
+        if (!(await ownedBy(req, own.table, Number(req.body.tableId)))) return res.status(404).json({ error: "Table not found" });
+        data.tableId = Number(req.body.tableId);
+      }
+      if (!Object.keys(data).length) return res.status(400).json({ error: "Nothing to update" });
+      res.json(await storage.updateTableQrCode(Number(req.params.id), data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.delete("/api/table-qr-codes/:id", async (req, res) => {
@@ -1895,6 +2415,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const qr = await storage.getTableQrCodeByToken(req.params.token);
       if (!qr || !qr.isActive) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      // When the page names the store it is showing, a QR code of another
+      // store is not valid there.
+      const viewedTenant = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      if (viewedTenant && viewedTenant !== qr.tenantId) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      if (typeof req.query.slug === "string" && req.query.slug) {
+        const cfg = await storage.getLandingPageConfigBySlug(req.query.slug);
+        if (cfg && cfg.tenantId !== qr.tenantId) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      }
       await storage.incrementQrScanCount(req.params.token);
       const config = await storage.getLandingPageConfigByTenantId(qr.tenantId);
       res.json({
@@ -1910,10 +2438,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Kitchen Orders
   app.get("/api/kitchen-orders", async (req, res) => {
-    try { res.json(await storage.getKitchenOrders(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : undefined);
+      if (!branchId && !tenantId) return res.status(400).json({ error: "tenantId or branchId is required" });
+      res.json(await storage.getKitchenOrders(branchId, tenantId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/kitchen-orders", async (req, res) => {
-    try { res.json(await storage.createKitchenOrder(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = sanitizeDates(req.body);
+      if (data.saleId && !(await ownedBy(req, own.sale, Number(data.saleId)))) return res.status(404).json({ error: "Sale not found" });
+      res.json(await storage.createKitchenOrder(data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/kitchen-orders/:id", async (req, res) => {
     try { res.json(await storage.updateKitchenOrder(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1923,11 +2460,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/subscription-plans", async (_req, res) => {
     try { res.json(await storage.getSubscriptionPlans()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.post("/api/subscription-plans", async (req, res) => {
+  // Plans are one platform-wide list (no tenant column): only the platform
+  // operator may add to it.
+  app.post("/api/subscription-plans", requireSuperAdmin as any, async (req, res) => {
     try { res.json(await storage.createSubscriptionPlan(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.get("/api/subscriptions", async (_req, res) => {
-    try { res.json(await storage.getSubscriptions()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.get("/api/subscriptions", async (req, res) => {
+    try { res.json(await storage.getSubscriptions(reqTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/subscriptions", async (req, res) => {
     try { res.json(await storage.createSubscription(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1974,17 +2513,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analytics/top-products", async (req, res) => {
     try {
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
-      res.json(await storage.getTopProducts(limit));
+      res.json(await storage.getTopProducts(limit, analyticsTenant(req)));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.get("/api/analytics/sales-by-payment", async (_req, res) => {
-    try { res.json(await storage.getSalesByPaymentMethod()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.get("/api/analytics/sales-by-payment", async (req, res) => {
+    try { res.json(await storage.getSalesByPaymentMethod(analyticsTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.get("/api/analytics/sales-range", async (req, res) => {
     try {
-      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(0);
-      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
-      res.json(await storage.getSalesByDateRange(startDate, endDate));
+      const tenantId = analyticsTenant(req);
+      const tz = await storeTimeZone(tenantId);
+      // A bare YYYY-MM-DD is a store calendar day (start → 00:00, end → 23:59:59.999).
+      const parse = (v: unknown, end: boolean, fallback: Date) => {
+        const s = String(v ?? "").trim();
+        if (!s) return fallback;
+        const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? (end ? dayEnd(tz, s) : dayStart(tz, s)) : new Date(s);
+        return isNaN(d.getTime()) ? fallback : d;
+      };
+      const startDate = parse(req.query.startDate, false, new Date(0));
+      const endDate = parse(req.query.endDate, true, new Date());
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      res.json(await storage.getSalesByDateRange(startDate, endDate, tenantId, branchId));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -2060,6 +2609,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/returns", async (req, res) => {
     try {
       const { items, ...returnData } = sanitizeDates(req.body);
+      if (returnData.originalSaleId && !(await ownedBy(req, own.sale, Number(returnData.originalSaleId)))) {
+        return res.status(404).json({ error: "Sale not found" });
+      }
       const ret = await storage.createReturn(returnData);
       if (items && items.length > 0) {
         for (const item of items) {
@@ -2089,12 +2641,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       // Log activity
+      const retCur = returnData.branchId ? await branchCurrency(returnData.branchId) : await storeCurrency(reqTenant(req));
       await storage.createActivityLog({
         employeeId: returnData.employeeId,
         action: "return_created",
         entityType: "return",
         entityId: ret.id,
-        details: `Return/refund processed for sale #${returnData.originalSaleId}, amount: $${returnData.totalAmount}`,
+        details: `Return/refund processed for sale #${returnData.originalSaleId}, amount: ${formatMoney(returnData.totalAmount, retCur)}`,
       });
       // Notify admins about the return
       const retEmp = await storage.getEmployee(returnData.employeeId);
@@ -2102,7 +2655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         returnData.employeeId,
         "return_processed",
         "Return Processed",
-        `${retEmp?.name || "Employee"} processed a ${returnData.type || "refund"} for $${returnData.totalAmount}`,
+        `${retEmp?.name || "Employee"} processed a ${returnData.type || "refund"} for ${formatMoney(returnData.totalAmount, retCur)}`,
         "return",
         ret.id,
         "high"
@@ -2117,14 +2670,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/cash-drawer", async (req, res) => {
     try {
+      if (req.body?.shiftId && !(await ownedBy(req, own.shift, Number(req.body.shiftId)))) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
       const op = await storage.createCashDrawerOperation(sanitizeDates(req.body));
-      await storage.createActivityLog({ employeeId: req.body.employeeId, action: "cash_drawer_" + req.body.type, entityType: "cash_drawer", entityId: op.id, details: `Cash drawer ${req.body.type}: $${req.body.amount}` });
+      const cdCur = await storeCurrency(reqTenant(req));
+      await storage.createActivityLog({ employeeId: req.body.employeeId, action: "cash_drawer_" + req.body.type, entityType: "cash_drawer", entityId: op.id, details: `Cash drawer ${req.body.type}: ${formatMoney(req.body.amount, cdCur)}` });
       const cdEmp = await storage.getEmployee(req.body.employeeId);
       await storage.notifyAdmins(
         req.body.employeeId,
         "cash_drawer",
         `Cash Drawer: ${req.body.type}`,
-        `${cdEmp?.name || "Employee"} performed ${req.body.type} of $${req.body.amount}${req.body.reason ? ` - ${req.body.reason}` : ""}`,
+        `${cdEmp?.name || "Employee"} performed ${req.body.type} of ${formatMoney(req.body.amount, cdCur)}${req.body.reason ? ` - ${req.body.reason}` : ""}`,
         "cash_drawer",
         op.id,
         req.body.type === "withdrawal" ? "high" : "normal"
@@ -2145,15 +2702,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.createWarehouse(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/warehouses/:id", async (req, res) => {
-    try { res.json(await storage.updateWarehouse(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateWarehouse(Number(req.params.id), withoutTenant(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Warehouse Transfers
-  app.get("/api/warehouse-transfers", async (_req, res) => {
-    try { res.json(await storage.getWarehouseTransfers()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.get("/api/warehouse-transfers", async (req, res) => {
+    try { res.json(await storage.getWarehouseTransfers(reqTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/warehouse-transfers", async (req, res) => {
     try {
+      for (const key of ["fromWarehouseId", "toWarehouseId"]) {
+        const wid = Number(req.body?.[key]);
+        if (!wid || !(await ownedBy(req, own.warehouse, wid))) return res.status(404).json({ error: "Warehouse not found" });
+      }
       const transfer = await storage.createWarehouseTransfer(sanitizeDates(req.body));
       await storage.createInventoryMovement({ productId: req.body.productId, branchId: null, type: "transfer", quantity: req.body.quantity, referenceType: "transfer", referenceId: transfer.id, employeeId: req.body.employeeId, notes: `Transfer from warehouse ${req.body.fromWarehouseId} to ${req.body.toWarehouseId}` });
       res.json(transfer);
@@ -2172,7 +2733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.createProductBatch(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/product-batches/:id", async (req, res) => {
-    try { res.json(await storage.updateProductBatch(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateProductBatch(Number(req.params.id), withoutTenant(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/product-batches/:id", async (req, res) => {
     try { res.json(await storage.updateProductBatch(Number(req.params.id), { isActive: false })); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2183,13 +2744,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const productId = req.query.productId ? Number(req.query.productId) : undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
-      res.json(await storage.getInventoryMovements(productId, limit));
+      res.json(await storage.getInventoryMovements(productId, limit, analyticsTenant(req)));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Stock Counts (Physical Inventory)
-  app.get("/api/stock-counts", async (_req, res) => {
-    try { res.json(await storage.getStockCounts()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.get("/api/stock-counts", async (req, res) => {
+    try { res.json(await storage.getStockCounts(reqTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.get("/api/stock-counts/:id", async (req, res) => {
     try {
@@ -2228,21 +2789,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Supplier Contracts
   app.get("/api/supplier-contracts", async (req, res) => {
-    try { res.json(await storage.getSupplierContracts(req.query.supplierId ? Number(req.query.supplierId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.getSupplierContracts(req.query.supplierId ? Number(req.query.supplierId) : undefined, reqTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/supplier-contracts", async (req, res) => {
     try { res.json(await storage.createSupplierContract(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/supplier-contracts/:id", async (req, res) => {
-    try { res.json(await storage.updateSupplierContract(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateSupplierContract(Number(req.params.id), withoutTenant(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Employee Commissions
   app.get("/api/employee-commissions", async (req, res) => {
-    try { res.json(await storage.getEmployeeCommissions(req.query.employeeId ? Number(req.query.employeeId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.getEmployeeCommissions(req.query.employeeId ? Number(req.query.employeeId) : undefined, reqTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/employee-commissions", async (req, res) => {
-    try { res.json(await storage.createEmployeeCommission(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      if (req.body?.saleId && !(await ownedBy(req, own.sale, Number(req.body.saleId)))) return res.status(404).json({ error: "Sale not found" });
+      res.json(await storage.createEmployeeCommission(sanitizeDates(req.body)));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Advanced Analytics
@@ -2250,25 +2814,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getEmployeeSalesReport(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.get("/api/analytics/slow-moving", async (req, res) => {
-    try { res.json(await storage.getSlowMovingProducts(req.query.days ? Number(req.query.days) : 30)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.getSlowMovingProducts(req.query.days ? Number(req.query.days) : 30, analyticsTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.get("/api/analytics/profit-by-product", async (_req, res) => {
-    try { res.json(await storage.getProfitByProduct()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.get("/api/analytics/profit-by-product", async (req, res) => {
+    try { res.json(await storage.getProfitByProduct(analyticsTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.get("/api/analytics/cashier-performance", async (_req, res) => {
-    try { res.json(await storage.getCashierPerformance()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.get("/api/analytics/cashier-performance", async (req, res) => {
+    try { res.json(await storage.getCashierPerformance(analyticsTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.get("/api/analytics/returns-report", async (_req, res) => {
-    try { res.json(await storage.getReturnsReport()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.get("/api/analytics/returns-report", async (req, res) => {
+    try { res.json(await storage.getReturnsReport(analyticsTenant(req))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Daily Sales Report (for Tagesabschluss print)
   app.get("/api/reports/daily-sales-report", async (req, res) => {
     try {
-      const date = req.query.date as string || new Date().toISOString().split("T")[0];
-      const startOfDay = new Date(date + "T00:00:00.000Z");
-      const endOfDay = new Date(date + "T23:59:59.999Z");
-      const salesData = await storage.getSalesWithCustomerByDateRange(startOfDay, endOfDay);
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      // The store's calendar day (Damascus / Zurich), not the UTC day.
+      const tz = await storeTimeZone(tenantId);
+      const raw = String(req.query.date || "").trim();
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localDateString(tz);
+      const salesData = await storage.getSalesWithCustomerByDateRange(dayStart(tz, date), dayEnd(tz, date), tenantId);
       res.json(salesData);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -2276,9 +2843,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Report Exports
   app.get("/api/reports/sales-export", async (req, res) => {
     try {
-      const startDate = req.query.startDate as string || "2000-01-01";
-      const endDate = req.query.endDate as string || "2099-12-31";
-      const salesData = await storage.getSalesByDateRange(new Date(startDate), new Date(endDate));
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const tz = await storeTimeZone(tenantId);
+      const startDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.startDate || "")) ? String(req.query.startDate) : "2000-01-01";
+      const endDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.endDate || "")) ? String(req.query.endDate) : "2099-12-31";
+      const salesData = await storage.getSalesByDateRange(dayStart(tz, startDate), dayEnd(tz, endDate), tenantId);
 
       const headers = ["Receipt #", "Date", "Total", "Payment Method", "Status", "Employee ID", "Customer ID"];
       const rows = salesData.map((s: any) => [
@@ -2299,9 +2869,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CSV Export for Inventory
-  app.get("/api/reports/inventory-export", async (_req, res) => {
+  app.get("/api/reports/inventory-export", async (req, res) => {
     try {
-      const allProducts = await storage.getProducts();
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const allProducts = await storage.getProductsByTenant(tenantId);
       const headers = ["ID", "Name", "Category", "Barcode", "Price", "Cost Price", "Stock Qty", "Low Stock Threshold", "Status"];
       const rows = allProducts.map((p: any) => [
         p.id,
@@ -2323,9 +2895,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CSV Export for Profit Report
-  app.get("/api/reports/profit-export", async (_req, res) => {
+  app.get("/api/reports/profit-export", async (req, res) => {
     try {
-      const profitData = await storage.getProfitByProduct();
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const profitData = await storage.getProfitByProduct(tenantId);
       const headers = ["Product", "Total Sold", "Revenue", "Total Cost", "Profit", "Cost Price"];
       const rows = profitData.map((p: any) => [
         `"${p.productName}"`,
@@ -2344,9 +2918,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CSV Export for Employee Performance
-  app.get("/api/reports/employee-performance-export", async (_req, res) => {
+  app.get("/api/reports/employee-performance-export", async (req, res) => {
     try {
-      const perfData = await storage.getCashierPerformance();
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const perfData = await storage.getCashierPerformance(tenantId);
       const headers = ["Employee", "Role", "Sales Count", "Total Revenue", "Avg Sale Value"];
       const rows = perfData.map((p: any) => [
         `"${p.employeeName}"`,
@@ -2366,22 +2942,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Smart Predictions / Analytics
   app.get("/api/analytics/predictions", async (req, res) => {
     try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       const stats = await storage.getDashboardStats(tenantId);
-      const limit = 10;
       const topProducts = stats.topProducts || [];
-      const slowMoving = await storage.getSlowMovingProducts(30); // Need to update slowMoving to tenantId if needed
-      const allProds = tenantId ? await storage.getProductsByTenant(tenantId) : await storage.getProducts();
-      let lowStockData: any[] = [];
-      if (tenantId) {
-        const tenantBranches = await storage.getBranchesByTenant(tenantId);
-        for (const branch of tenantBranches) {
-          const items = await storage.getLowStockItems(branch.id);
-          lowStockData.push(...items);
-        }
-      } else {
-        lowStockData = await storage.getLowStockItems();
+      const slowMoving = await storage.getSlowMovingProducts(30, tenantId);
+      const allProds = await storage.getProductsByTenant(tenantId);
+      const lowStockData: any[] = [];
+      const tenantBranches = await storage.getBranchesByTenant(tenantId);
+      for (const branch of tenantBranches) {
+        const items = await storage.getLowStockItems(branch.id);
+        lowStockData.push(...items);
       }
+      const predCur = await storeCurrency(tenantId);
 
       // Simple predictions based on trends
       const avgDailyRevenue = Number(stats.monthRevenue || 0) / 30;
@@ -2429,7 +3002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemsSold: data.count,
         })),
         insights: [
-          avgDailyRevenue > 0 ? `Average daily revenue: $${avgDailyRevenue.toFixed(2)}` : "No sales data yet for predictions",
+          avgDailyRevenue > 0 ? `Average daily revenue: ${formatMoney(avgDailyRevenue, predCur)}` : "No sales data yet for predictions",
           slowMoving.length > 0 ? `${slowMoving.length} products with low sales in the last 30 days - consider promotions` : "All products are selling well",
           stockAlerts.filter((a: any) => a.urgency === "critical").length > 0 ? `${stockAlerts.filter((a: any) => a.urgency === "critical").length} products critically low on stock - reorder immediately` : "Stock levels are healthy",
         ],
@@ -2506,7 +3079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create product with initial stock
   app.post("/api/products-with-stock", async (req, res) => {
     try {
-      const { initialStock, branchId, ...productData } = normalizeWholesaleProductFields(sanitizeDates(req.body));
+      const { initialStock, branchId, ...productData } = normalizeWholesaleProductFields(withTenant(req, sanitizeDates(req.body)));
       const product = await storage.createProduct(productData);
       if (initialStock && initialStock > 0 && branchId) {
         await storage.upsertInventory({ productId: product.id, branchId: Number(branchId), quantity: Number(initialStock) });
@@ -2522,8 +3095,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get active shift for employee
   app.get("/api/shifts/active/:employeeId", async (req, res) => {
     try {
-      // Pass the tenantId if provided to getShifts
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      // Only this store's shifts (the employee's store is also checked by
+      // enforceTenantOwnership).
+      const tenantId = reqTenant(req) ?? (req.query.tenantId ? Number(req.query.tenantId) : undefined);
       const shifts = await storage.getShifts(tenantId);
       const active = shifts.find((s: any) => s.employeeId === Number(req.params.employeeId) && s.status === "open");
       res.json(active || null);
@@ -2867,6 +3441,7 @@ async function test(){
   app.post("/api/online-orders/public", async (req, res) => {
     try {
       const { slug, tenantId: bodyTenantId, ...orderData } = req.body;
+      if (orderData.customerPhone) orderData.customerPhone = canonicalPhone(orderData.customerPhone);
       let resolvedTenantId: number | undefined;
       if (slug) {
         const config = await storage.getLandingPageConfigBySlug(slug);
@@ -2877,8 +3452,10 @@ async function test(){
       }
       if (!resolvedTenantId) return res.status(404).json({ error: "Store not found" });
 
-      const swissDateOnl = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
-      const dailySeqOnl = await storage.getNextSequenceNumber(`tenant-${resolvedTenantId}`);
+      // Order date and daily counter in the store's own calendar.
+      const onlTz = await storeTimeZone(resolvedTenantId);
+      const swissDateOnl = compactDate(onlTz);
+      const dailySeqOnl = await storage.getNextSequenceNumber(`tenant-${resolvedTenantId}`, onlTz);
       const orderNumber = `${resolvedTenantId}-${swissDateOnl}-${dailySeqOnl}`;
       const order = await storage.createOnlineOrder({
         ...orderData,
@@ -2967,10 +3544,28 @@ async function test(){
   app.put("/api/online-orders/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const order = await storage.updateOnlineOrder(id, req.body);
+      const before: any = await storage.getOnlineOrder(id);
+      if (!before) return res.status(404).json({ error: "Order not found" });
+      const parsed = await editableOrderFields(req, req.body || {});
+      if ("error" in parsed) return res.status(parsed.status).json({ error: parsed.error, code: parsed.code });
+      const update: any = parsed.data;
+      if (!Object.keys(update).length) return res.status(400).json({ error: "Nothing to update", code: "NO_FIELDS" });
+      const order: any = await storage.updateOnlineOrder(id, update);
 
-      // Broadcast status update to all clients
-      callerIdService.broadcast({ type: "online_order_updated", order });
+      // Marked paid by hand (cash on delivery, Sham Cash transfer, …): stamp
+      // when, like the payment webhooks do.
+      if (update.paymentStatus === "paid" && before.paymentStatus !== "paid") {
+        await markOnlineOrderPaid(id, null);
+      }
+      // A finished or cancelled order frees its driver (only the driver app
+      // did this before, so drivers stayed "on delivery" forever).
+      if (update.status && TERMINAL_ORDER_STATUSES.has(update.status) && order?.driverId) {
+        try { await storage.releaseDriverFromOrder(Number(order.driverId), id); } catch (e) { console.error("[orders] driver release failed:", e); }
+      }
+
+      // Broadcast to this store's clients only — without a tenant the full
+      // order (name, phone, address) went to every connected client.
+      if (order?.tenantId) callerIdService.broadcast({ type: "online_order_updated", order }, Number(order.tenantId));
       // Notify SSE clients tracking this order
       if ((app as any)._broadcastOrderStatus) {
         (app as any)._broadcastOrderStatus(id, { type: "status_update", order });
@@ -2994,8 +3589,53 @@ async function test(){
   // Internal: delete online order
   app.delete("/api/online-orders/:id", async (req, res) => {
     try {
-      await storage.deleteOnlineOrder(Number(req.params.id));
+      const order: any = await storage.getOnlineOrder(Number(req.params.id));
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (order.driverId) {
+        try { await storage.releaseDriverFromOrder(Number(order.driverId), order.id); } catch { /* non-fatal */ }
+      }
+      await storage.deleteOnlineOrder(order.id);
       res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Sham Cash paid by transfer to the store's own wallet: the cashier checks
+  // the Sham Cash app and confirms here. Marks the order paid (with paid_at)
+  // and the order's open Sham Cash invoice, if any, as paid.
+  app.post("/api/online-orders/:id/confirm-shamcash", requireManager, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const order: any = await storage.getOnlineOrder(id);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      const tranId = typeof req.body?.tranId === "string" ? asciiDigits(req.body.tranId).trim().slice(0, 64) || null : null;
+      const { pool } = await import("./db");
+      await pool.query(
+        `UPDATE online_orders
+            SET payment_status = 'paid', payment_method = 'shamcash',
+                paid_at = COALESCE(paid_at, NOW()), payment_error = NULL, updated_at = NOW()
+          WHERE id = ?`,
+        [id],
+      );
+      let invoice: any = null;
+      try {
+        const [rows]: any = await pool.query(
+          "SELECT id FROM shamcash_invoices WHERE online_order_id = ? AND tenant_id = ? ORDER BY (status = 'pending') DESC, id DESC LIMIT 1",
+          [id, order.tenantId],
+        );
+        if (rows?.[0]) {
+          await pool.query(
+            "UPDATE shamcash_invoices SET status = 'paid', tran_id = COALESCE(?, tran_id), paid_at = COALESCE(paid_at, NOW()) WHERE id = ?",
+            [tranId, rows[0].id],
+          );
+          invoice = { id: rows[0].id, status: "paid" };
+        }
+      } catch (e: any) {
+        if (!/doesn't exist/i.test(String(e?.message))) throw e;
+      }
+      const fresh: any = await storage.getOnlineOrder(id);
+      callerIdService.broadcast({ type: "online_order_updated", order: fresh }, Number(order.tenantId));
+      if ((app as any)._broadcastOrderStatus) (app as any)._broadcastOrderStatus(id, { type: "status_update", order: fresh });
+      res.json({ success: true, order: fresh, invoice });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -3139,9 +3779,19 @@ async function test(){
 
   // ── SSE: Customer order status tracking ───────────────────────────────────
   const orderSseClients: Map<number, Set<any>> = new Map();
+  // One map for every order stream (this one, the delivery-app one and the
+  // driver-location push): the delivery stream used to register in a map
+  // nothing ever broadcast to.
+  (app as any)._orderSseClients = orderSseClients;
 
-  app.get("/api/online-orders/:id/status-stream", (req, res) => {
+  app.get("/api/online-orders/:id/status-stream", async (req, res) => {
     const orderId = Number(req.params.id);
+    // The order's own tracking token is required (ids are guessable).
+    const order: any = Number.isFinite(orderId) ? await storage.getOnlineOrder(orderId).catch(() => null) : null;
+    const token = String(req.query.token || req.query.trackingToken || "");
+    if (!order || !order.trackingToken || token !== order.trackingToken) {
+      return res.status(404).json({ error: "Order not found" });
+    }
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -3358,10 +4008,14 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/vehicles", async (req, res) => {
-    try { res.json(await storage.createVehicle(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createVehicle(withTenant(req, req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/vehicles/:id", async (req, res) => {
-    try { res.json(await storage.updateVehicle(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      // The driver's access token is the key to their app — not editable here.
+      const { driverAccessToken: _tok, ...data } = withoutTenant(req.body || {});
+      res.json(await storage.updateVehicle(Number(req.params.id), data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/vehicles/:id", async (req, res) => {
     try { await storage.deleteVehicle(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -3370,31 +4024,42 @@ async function test(){
   // ── Printer Configurations ─────────────────────────────────────────────────
   app.get("/api/printer-configs", async (req, res) => {
     try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      // Never another store's printers (this defaulted to tenant 1).
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
       res.json(await storage.getPrinterConfigs(tenantId, branchId));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/printer-configs", async (req, res) => {
-    try { res.json(await storage.upsertPrinterConfig(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data: any = withTenant(req, req.body || {});
+      if (!data.tenantId) return res.status(400).json({ error: "tenantId is required" });
+      res.json(await storage.upsertPrinterConfig(data));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // ── Daily Closings (TAGESABSCHLUSS) ───────────────────────────────────────
   app.get("/api/daily-closings", async (req, res) => {
     try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
       res.json(await storage.getDailyClosings(tenantId, branchId));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/daily-closings", async (req, res) => {
     try {
-      const { tenantId, branchId, closingDate } = req.body;
-      // Auto-compute from today's sales
-      const today = closingDate || new Date().toISOString().split("T")[0];
-      const startOfDay = new Date(today + "T00:00:00.000Z");
-      const endOfDay = new Date(today + "T23:59:59.999Z");
-      const daySales = await storage.getSalesByDateRange(startOfDay, endOfDay);
+      const { branchId, closingDate } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : undefined);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      // This store's sales of the store's calendar day (Damascus / Zurich) —
+      // it used to add up every store's sales of the UTC day.
+      const tz = await storeTimeZone(tenantId);
+      const today = /^\d{4}-\d{2}-\d{2}$/.test(String(closingDate || "")) ? String(closingDate) : localDateString(tz);
+      const startOfDay = dayStart(tz, today);
+      const endOfDay = dayEnd(tz, today);
+      const daySales = await storage.getSalesByDateRange(startOfDay, endOfDay, tenantId, branchId ? Number(branchId) : undefined);
       const totalSales = daySales.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
       const totalCash = daySales.filter((s: any) => s.paymentMethod === "cash").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
       const totalCard = daySales.filter((s: any) => s.paymentMethod === "card").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
@@ -3419,24 +4084,27 @@ async function test(){
   // ── Monthly Closings (MONATSABSCHLUSS) ────────────────────────────────────
   app.get("/api/monthly-closings", async (req, res) => {
     try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const tenantId = analyticsTenant(req);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
       res.json(await storage.getMonthlyClosings(tenantId, branchId));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/monthly-closings", async (req, res) => {
     try {
-      const { tenantId, branchId, closingMonth } = req.body;
-      const month = closingMonth || new Date().toISOString().slice(0, 7);
-      const startOfMonth = new Date(month + "-01T00:00:00.000Z");
-      const endOfMonth = new Date(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0).toISOString().split("T")[0] + "T23:59:59.999Z");
-      const monthSales = await storage.getSalesByDateRange(startOfMonth, endOfMonth);
+      const { branchId, closingMonth } = req.body;
+      const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : undefined);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const tz = await storeTimeZone(tenantId);
+      const month = /^\d{4}-\d{2}$/.test(String(closingMonth || "")) ? String(closingMonth) : localMonthString(tz);
+      const [startOfMonth, endOfMonth] = monthRange(tz, month)!;
+      const monthSales = await storage.getSalesByDateRange(startOfMonth, endOfMonth, tenantId, branchId ? Number(branchId) : undefined);
       const totalSales = monthSales.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
       const totalCash = monthSales.filter((s: any) => s.paymentMethod === "cash").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
       const totalCard = monthSales.filter((s: any) => s.paymentMethod === "card").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
       const totalMobile = monthSales.filter((s: any) => s.paymentMethod === "mobile").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
       const totalDiscounts = monthSales.reduce((s: number, sale: any) => s + Number(sale.discountAmount || 0), 0);
-      const expenses = await storage.getExpensesByDateRange(startOfMonth, endOfMonth);
+      const expenses = await storage.getExpensesByDateRange(startOfMonth, endOfMonth, tenantId);
       const totalExpenses = expenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
       const mc = await storage.createMonthlyClosing({
         tenantId, branchId: branchId || null, employeeId: req.body.employeeId || null,
@@ -3455,9 +4123,12 @@ async function test(){
   });
 
   // ── Temporary maintenance: fix NULL tenant_ids (one-time migration fix) ───
-  app.post("/api/maintenance/fix-tenant-ids", async (req: any, res: any) => {
+  // One-time migration from the single-store days: it stamps EVERY row with
+  // a NULL tenant_id with the first tenant. Its secret sat in the source, so
+  // it now needs a super-admin login as well.
+  app.post("/api/maintenance/fix-tenant-ids", requireSuperAdmin as any, async (req: any, res: any) => {
     const secret = req.headers["x-maintenance-secret"] || req.query.secret;
-    if (secret !== "fix-tenant-2024-barmagly") {
+    if (!process.env.MAINTENANCE_SECRET || secret !== process.env.MAINTENANCE_SECRET) {
       return res.status(403).json({ error: "Forbidden" });
     }
     try {
@@ -3515,14 +4186,15 @@ async function test(){
       name: "customer-otp",
       max: 5,
       windowMs: 15 * 60 * 1000,
-      keyFn: (req: any) => `${req.body?.tenantId}:${String(req.body?.phone || "").replace(/\D/g, "")}`,
+      keyFn: (req: any) => `${req.body?.tenantId}:${canonicalPhone(req.body?.phone).replace(/\D/g, "")}`,
       message: "محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة. / Too many attempts, try again shortly.",
     }),
     async (req: Request, res: Response) => {
     try {
-      const { phone, tenantId } = req.body;
-      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
-      if (String(phone).replace(/\D/g, "").length < 8) return res.status(400).json({ error: "رقم الهاتف غير صالح — اكتبه مع رمز الدولة" });
+      const { tenantId } = req.body;
+      const phone = canonicalPhone(req.body?.phone);
+      if (!phone || !tenantId) return res.status(400).json({ error: "رقم الهاتف والمتجر مطلوبان / phone and tenantId required" });
+      if (String(phone).replace(/\D/g, "").length < 8) return res.status(400).json({ error: "رقم الهاتف غير صالح — اكتبه مع رمز الدولة / Invalid phone number — include the country code" });
       const otp = await createOtp(phone, Number(tenantId));
       // In production: send via WhatsApp. For now return in dev.
       if (process.env.NODE_ENV === "development") {
@@ -3538,7 +4210,7 @@ async function test(){
           `صالح لمدة 10 دقائق. لا تشاركه مع أحد.`,
       );
       if (!sent) {
-        return res.status(503).json({ error: "تعذّر إرسال الرمز عبر واتساب. تأكد أن الرقم مسجّل على واتساب ومكتوب مع رمز الدولة، أو سجّل الدخول بـ Google." });
+        return res.status(503).json({ error: "تعذّر إرسال الرمز عبر واتساب. تأكد أن الرقم مسجّل على واتساب ومكتوب مع رمز الدولة، أو سجّل الدخول بـ Google. / Could not send the code via WhatsApp. Check the number is on WhatsApp and includes the country code, or sign in with Google." });
       }
       res.json({ success: true, channel: "whatsapp" });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -3546,13 +4218,23 @@ async function test(){
 
   app.post("/api/delivery/auth/verify-otp", async (req: Request, res: Response) => {
     try {
-      const { phone, tenantId, otp } = req.body;
-      if (!phone || !tenantId || !otp) return res.status(400).json({ error: "phone, tenantId, otp required" });
+      const { tenantId } = req.body;
+      const phone = canonicalPhone(req.body?.phone);
+      const otp = String(req.body?.otp ?? "").replace(/\D/g, "");
+      if (!phone || !tenantId || !otp) return res.status(400).json({ error: "رقم الهاتف والرمز مطلوبان / phone, tenantId, otp required" });
       const result = await verifyOtp(phone, Number(tenantId), otp);
       if (!result.success) return res.status(400).json({ error: result.error });
       const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
+      // Revoke sessions someone else may have opened on a guest/till row
+      // before its real owner proved the phone.
+      await claimCustomerAfterPhoneProof(customer);
       const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
-      res.json({ success: true, token, customer: { id: customer.id, name: customer.name, phone: customer.phone, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
+      res.json({
+        success: true, token,
+        // 15-minute proof of this phone, accepted by /api/delivery/auth/register.
+        phoneToken: signPhoneProof(phone, Number(tenantId)),
+        customer: { id: customer.id, name: customer.name, phone: customer.phone, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance },
+      });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -3580,13 +4262,38 @@ async function test(){
 
   app.post("/api/delivery/auth/register", async (req: Request, res: Response) => {
     try {
-      const { name, email, phone, password, tenantId, referralCode } = req.body;
-      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
-      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
+      const { name, password, tenantId } = req.body || {};
+      const phone = canonicalPhone(req.body?.phone);
+      const email = req.body?.email ? String(req.body.email).trim().toLowerCase() : "";
+      if (!phone || !tenantId) return res.status(400).json({ error: "رقم الهاتف والمتجر مطلوبان / phone and tenantId required" });
+      const tid = Number(tenantId);
+      // Registering onto a phone that already belongs to a customer needs
+      // proof of that phone (OTP → phoneToken) or that customer's own session;
+      // it used to set a new password on anyone's account.
+      const existing = await storage.findCustomerByPhoneExact(phone, tid);
+      const phoneProven = verifyPhoneProof(req.body?.phoneToken, phone, tid);
+      if (existing) {
+        const session = await getAuthenticatedCustomer(req.headers.authorization);
+        const proven = phoneProven || session?.id === existing.id;
+        if (!proven) {
+          return res.status(409).json({
+            error: "هذا الرقم مسجّل مسبقاً — سجّل الدخول برمز واتساب / This phone number is already registered — log in with the WhatsApp code",
+            code: "PHONE_VERIFICATION_REQUIRED",
+          });
+        }
+      }
+      if (email && await emailTakenByOther(email, tid, existing?.id)) {
+        return res.status(409).json({
+          error: "هذا البريد الإلكتروني مستخدم لحساب آخر / This e-mail is already used by another account",
+          code: "EMAIL_IN_USE",
+        });
+      }
+      const customer = existing ?? await findOrCreateCustomerByPhone(phone, tid);
+      if (phoneProven) await claimCustomerAfterPhoneProof(customer);
       // Update with registration details
-      const updates: any = { name: name || customer.name, hasAccount: true };
+      const updates: any = { name: name || customer.name, hasAccount: true, isActive: true };
       if (email) updates.email = email;
-      if (password) { await setCustomerPassword(customer.id, password); }
+      if (password) { await setCustomerPassword(customer.id, String(password)); }
       await storage.updateCustomer(customer.id, updates);
       const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
       res.json({ success: true, token, customer: { id: customer.id, name: updates.name, phone } });
@@ -3603,7 +4310,13 @@ async function test(){
     try {
       const { credential, accessToken, profile, tenantId } = req.body || {};
       const tid = Number(tenantId) || 24;
-      const expectedAud = process.env.GOOGLE_CLIENT_ID || "";
+      // Tokens must have been issued to OUR OAuth client: a token any other
+      // site obtained from a user would otherwise log in as that user here.
+      const allowedAud = new Set(
+        [...String(process.env.GOOGLE_CLIENT_ID || "").split(","), GOOGLE_WEB_CLIENT_ID,
+          "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com"]
+          .map((s) => s.trim()).filter(Boolean),
+      );
 
       let payload: any = null;
 
@@ -3613,13 +4326,19 @@ async function test(){
         const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
         if (!verifyRes.ok) return res.status(401).json({ error: "Invalid Google credential" });
         payload = await verifyRes.json();
-        if (expectedAud && payload.aud !== expectedAud) {
+        if (!allowedAud.has(String(payload.aud || ""))) {
           return res.status(401).json({ error: "Token audience mismatch" });
         }
       } else if (accessToken) {
         // Path 2: OAuth popup fallback. We can't trust the JSON the client
         // POSTs us; re-fetch userinfo using the access_token straight from
         // Google so the server sees authoritative claims.
+        const info = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(String(accessToken))}`);
+        if (!info.ok) return res.status(401).json({ error: "Invalid Google access token" });
+        const tokenInfo: any = await info.json();
+        if (!allowedAud.has(String(tokenInfo.aud || "")) && !allowedAud.has(String(tokenInfo.azp || ""))) {
+          return res.status(401).json({ error: "Token audience mismatch" });
+        }
         const ui = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
@@ -3633,6 +4352,9 @@ async function test(){
       }
 
       if (!payload || !payload.email) return res.status(400).json({ error: "Email not present in token" });
+      if (payload.email_verified === false || payload.email_verified === "false") {
+        return res.status(401).json({ error: "Google e-mail is not verified" });
+      }
       const email = String(payload.email).toLowerCase();
       const name = payload.name || payload.given_name || email.split("@")[0];
       const picture = payload.picture || null;
@@ -3700,10 +4422,18 @@ async function test(){
     try {
       const customer = await getAuthenticatedCustomer(req.headers.authorization);
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { name, email, dateOfBirth, gender, preferredLanguage } = req.body;
+      const { name, dateOfBirth, gender, preferredLanguage } = req.body || {};
+      const email = req.body?.email ? String(req.body.email).trim().toLowerCase() : "";
       const updates: any = {};
       if (name) updates.name = name;
-      if (email) updates.email = email;
+      if (email && email !== String(customer.email || "").toLowerCase()) {
+        // An e-mail shared by two accounts would let Google sign-in land in
+        // the wrong one.
+        if (customer.tenantId && await emailTakenByOther(email, customer.tenantId, customer.id)) {
+          return res.status(409).json({ error: "هذا البريد الإلكتروني مستخدم لحساب آخر / This e-mail is already used by another account", code: "EMAIL_IN_USE" });
+        }
+        updates.email = email;
+      }
       if (dateOfBirth) updates.dateOfBirth = dateOfBirth;
       if (gender) updates.gender = gender;
       if (preferredLanguage) updates.preferredLanguage = preferredLanguage;
@@ -3736,7 +4466,11 @@ async function test(){
     try {
       const customer = await getAuthenticatedCustomer(req.headers.authorization);
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const address = await storage.updateCustomerAddress(Number(req.params.id), req.body);
+      // Only the customer's own address, and it stays theirs.
+      const existing = await storage.getCustomerAddress(Number(req.params.id));
+      if (!existing || existing.customerId !== customer.id) return res.status(404).json({ error: "Address not found" });
+      const { id: _id, customerId: _c, tenantId: _t, ...changes } = req.body || {};
+      const address = await storage.updateCustomerAddress(existing.id, { ...changes, customerId: customer.id });
       res.json(address);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -3745,7 +4479,9 @@ async function test(){
     try {
       const customer = await getAuthenticatedCustomer(req.headers.authorization);
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      await storage.deleteCustomerAddress(Number(req.params.id));
+      const existing = await storage.getCustomerAddress(Number(req.params.id));
+      if (!existing || existing.customerId !== customer.id) return res.status(404).json({ error: "Address not found" });
+      await storage.deleteCustomerAddress(existing.id);
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -3754,7 +4490,9 @@ async function test(){
     try {
       const customer = await getAuthenticatedCustomer(req.headers.authorization);
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      await storage.setDefaultAddress(Number(req.params.id), customer.id);
+      const existing = await storage.getCustomerAddress(Number(req.params.id));
+      if (!existing || existing.customerId !== customer.id) return res.status(404).json({ error: "Address not found" });
+      await storage.setDefaultAddress(existing.id, customer.id);
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -3773,11 +4511,11 @@ async function test(){
         logo: c.logo || c.logomark || null,
         coverImage: c.coverImage || c.headerBgImage || null,
         cuisine: c.cuisineType || c.cuisine || "",
-        rating: c.rating || 4.5,
-        reviewCount: c.reviewCount || 0,
+        rating: null as number | null,
+        reviewCount: 0,
         deliveryTime: c.minDeliveryTime || 25,
-        deliveryFee: c.deliveryFee || 0,
-        minOrder: c.minOrderAmount || 0,
+        deliveryFee: 0,
+        minOrder: 0,
         isOpen: c.isOpen !== false,
         primaryColor: c.primaryColor || "#FF5722",
       }));
@@ -3788,16 +4526,19 @@ async function test(){
         if (r.name === "Restaurant" && r.slug) {
           r.name = r.slug.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
         }
-        if (!r.cuisine || !r.coverImage || !r.reviewCount) {
+        // Real figures only (this used to show 4.5 stars / "50 reviews" for
+        // every store).
+        try {
+          Object.assign(r, await storeRating(r.id));
+          r.deliveryFee = await storeBaseDeliveryFee(r.id);
+          r.minOrder = await storeMinOrderAmount(r.id);
+        } catch {}
+        if (!r.cuisine) {
           try {
             const cats = await storage.getCategories(r.id);
-            if (!r.cuisine && cats.length > 0) {
+            if (cats.length > 0) {
               const catNames = cats.filter((c: any) => c.isActive !== false).map((c: any) => c.name).slice(0, 3);
               r.cuisine = catNames.join(", ");
-            }
-            if (!r.reviewCount) {
-              const prods = await storage.getProductsByTenant(r.id);
-              r.reviewCount = Math.max(50, prods.length * 3);
             }
           } catch {}
         }
@@ -3829,17 +4570,9 @@ async function test(){
       }
       return config;
     }
-    // Try direct slug lookup
-    let config = await storage.getLandingPageConfigBySlug(slug);
-    if (config) return config;
-    // Fallback: demo restaurant slug → use primary tenant data
-    config = await storage.getLandingPageConfigBySlug("pizza-lemon");
-    if (config) {
-      const displayName = slug.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-      (config as any).storeName = displayName;
-      (config as any).heroTitle = displayName;
-    }
-    return config;
+    // Unknown slugs are "not found" — they used to serve Pizza Lemon's menu
+    // (and send the orders to Pizza Lemon) under the name in the URL.
+    return storage.getLandingPageConfigBySlug(slug);
   }
 
   // ── Storefront / Menu (Public) ────────────────────────────────────────────
@@ -3862,8 +4595,9 @@ async function test(){
         phone: config.phone,
         address: config.address,
         openingHours: config.openingHours,
-        minOrderAmount: config.minOrderAmount,
-        deliveryFee: (config as any).deliveryFee || 0,
+        // What checkout actually enforces / charges by default.
+        minOrderAmount: await storeMinOrderAmount(config.tenantId),
+        deliveryFee: await storeBaseDeliveryFee(config.tenantId),
         estimatedDeliveryTime: config.estimatedDeliveryTime,
         enableDelivery: config.enableDelivery !== false,
         enablePickup: config.enablePickup !== false,
@@ -3879,8 +4613,7 @@ async function test(){
         coverImage: (config as any).coverImage || (config as any).headerBgImage,
         socialWhatsapp: config.socialWhatsapp,
         supportPhone: (config as any).supportPhone || config.phone || "",
-        rating: (config as any).rating || 4.5,
-        reviewCount: (config as any).reviewCount || 0,
+        ...(await storeRating(config.tenantId)),
         cuisine: (config as any).cuisineType || (config as any).cuisine || "",
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -3954,62 +4687,144 @@ async function test(){
   app.post("/api/delivery/orders", async (req: Request, res: Response) => {
     try {
       const {
-        tenantId, customerName, customerPhone, customerEmail,
+        tenantId, customerName, customerPhone: rawCustomerPhone, customerEmail,
         customerAddress, items, subtotal, deliveryFee, totalAmount,
         paymentMethod, orderType, notes, promoCode, promoCodeId,
         discountAmount, customerLat, customerLng, floor, buildingName,
         addressNotes, scheduledAt, loyaltyPointsUsed, walletAmountUsed,
         savedAddressId, tableQrToken, tableNumber,
       } = req.body;
+      const customerPhone = rawCustomerPhone ? canonicalPhone(rawCustomerPhone) : rawCustomerPhone;
 
       if (!tenantId || !customerPhone || !items?.length) {
         return res.status(400).json({ error: "tenantId, customerPhone, items required" });
+      }
+      const tid = Number(tenantId);
+      const type = orderType || "delivery";
+      const currency = await storeCurrency(tid);
+      // Arabic + English for Syrian stores; Swiss stores keep English.
+      const bi = (ar: string, en: string) => (currency === "SYP" ? `${ar} / ${en}` : en);
+
+      // Idempotency: a checkout retried with the same Idempotency-Key (same
+      // store and phone, within 24 h) gets the first order back.
+      const idemKey = requestIdempotencyKey(req);
+      if (idemKey) {
+        const prior = await findOrderByClientRef(tid, idemKey, customerPhone);
+        if (prior) {
+          return res.status(200).json({ success: true, orderId: prior.id, orderNumber: prior.order_number, trackingToken: prior.tracking_token, totalAmount: Number(prior.total_amount), duplicate: true });
+        }
+        const lockKey = `order:${tid}:${idemKey}`;
+        if (inflightIdempotency.has(lockKey)) {
+          return res.status(409).json({ error: bi("الطلب قيد المعالجة", "This order is already being placed"), code: "ORDER_IN_PROGRESS" });
+        }
+        inflightIdempotency.add(lockKey);
+        const release = () => inflightIdempotency.delete(lockKey);
+        res.on("finish", release);
+        res.on("close", release);
+      }
+
+      // Card payments only where the gateway can charge the store's currency.
+      if (CARD_METHODS.has(String(paymentMethod || "").toLowerCase()) && !cardSupported(currency)) {
+        return res.status(400).json({
+          error: bi("الدفع بالبطاقة غير متاح لهذا المتجر — اختر طريقة دفع أخرى", "Card payment is not available for this store — choose another payment method"),
+          code: "CARD_NOT_SUPPORTED",
+        });
       }
 
       const trackingToken = generateTrackingToken();
       const isDineIn = orderType === "dine_in" && tableQrToken;
       const orderNumber = isDineIn ? `DIN-${Date.now()}` : `DEL-${Date.now()}`;
-
-      // Verify promo if provided
-      let finalDiscount = Number(discountAmount ?? 0);
-      let resolvedPromoId = promoCodeId ? Number(promoCodeId) : null;
-
-      if (promoCode && !promoCodeId) {
-        const promoResult = await validatePromoCode(Number(tenantId), promoCode, Number(subtotal), orderType || "delivery");
-        if (promoResult.valid && promoResult.promoCode) {
-          finalDiscount = promoResult.discountAmount ?? 0;
-          resolvedPromoId = promoResult.promoCode.id;
-        }
-      }
-
-      // Wallet deduction
       const customer = await getAuthenticatedCustomer(req.headers.authorization);
-      let walletUsed = Number(walletAmountUsed ?? 0);
-      if (walletUsed > 0 && customer) {
-        const walletResult = await deductWallet(customer.id, Number(tenantId), walletUsed);
-        if (!walletResult.success) {
-          return res.status(400).json({ error: walletResult.error });
-        }
-      }
 
       // Re-price from the tenant's own product rows. The body's subtotal /
-      // deliveryFee / totalAmount are advisory only: this endpoint is public,
-      // and the stored total is what Stripe will charge.
+      // deliveryFee / totalAmount / discountAmount are advisory only: this
+      // endpoint is public, and the stored total is what gets charged.
+      let base;
+      try {
+        base = await repriceOrder({ tenantId: tid, items, clientDeliveryFee: deliveryFee, orderType: type });
+      } catch (e: any) {
+        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+
+      // The store's minimum order (delivery orders).
+      if (type === "delivery") {
+        const min = await storeMinOrderAmount(tid);
+        if (min > 0 && base.subtotal < min) {
+          return res.status(400).json({
+            error: bi(`الحد الأدنى للطلب هو ${formatMoney(min, currency)}`, `The minimum order is ${formatMoney(min, currency)}`),
+            code: "MIN_ORDER_NOT_MET",
+            minOrderAmount: min,
+          });
+        }
+      }
+
+      // A discount only ever comes from a promo that validates now, on the
+      // server's subtotal. A client-sent discountAmount used to be applied
+      // as-is, with or without a promo.
+      let finalDiscount = 0;
+      let resolvedPromoId: number | null = null;
+      if (promoCode || promoCodeId) {
+        let code = promoCode ? String(promoCode) : "";
+        if (!code && promoCodeId) {
+          const { pool } = await import("./db");
+          const [rows]: any = await pool.query("SELECT code FROM promo_codes WHERE id = ? AND tenant_id = ? LIMIT 1", [Number(promoCodeId), tid]);
+          code = rows?.[0]?.code || "";
+        }
+        const promo = code
+          ? await validatePromoCode(tid, code, base.subtotal, type, customer?.id)
+          : { valid: false, error: "Invalid promo code" } as any;
+        if (!promo.valid || !promo.promoCode) {
+          return res.status(400).json({ error: promo.error || "Invalid promo code", code: "PROMO_INVALID" });
+        }
+        finalDiscount = promo.promoCode.discountType === "free_delivery" ? base.deliveryFee : Number(promo.discountAmount ?? 0);
+        resolvedPromoId = promo.promoCode.id;
+      } else if (Number(discountAmount) > 0) {
+        console.warn(`[delivery/orders] tenant ${tid}: ignored client discountAmount ${discountAmount} without a promo code`);
+      }
+
+      // Loyalty points: checked now, taken once the order exists.
+      let loyaltyPoints = 0;
+      let loyaltyValue = 0;
+      const wantPoints = Math.floor(Number(loyaltyPointsUsed) || 0);
+      if (wantPoints > 0) {
+        const refusal = customer
+          ? await checkLoyaltyRedemption(customer.id, tid, wantPoints)
+          : "Log in to redeem points";
+        if (refusal) return res.status(400).json({ error: refusal, code: "LOYALTY_REFUSED" });
+        const cfg = await getLoyaltyConfig(tid);
+        loyaltyPoints = wantPoints;
+        loyaltyValue = roundMoney(wantPoints * cfg.redemptionRate, currency);
+      }
+
+      const discountTotal = Math.min(base.subtotal, roundMoney(finalDiscount + loyaltyValue, currency));
+      const gross = Math.max(0, base.subtotal - discountTotal + base.deliveryFee);
+      // Wallet: only a logged-in customer's own balance, never more than the
+      // order (an anonymous walletAmountUsed used to lower the total for free).
+      const walletUsed = customer ? roundMoney(Math.min(Math.max(0, Number(walletAmountUsed ?? 0) || 0), gross), currency) : 0;
+
       let pricing;
       try {
         pricing = await repriceOrder({
-          tenantId: Number(tenantId),
+          tenantId: tid,
           items,
           clientSubtotal: subtotal,
           clientDeliveryFee: deliveryFee,
           clientTotal: totalAmount,
-          discountAmount: finalDiscount,
+          discountAmount: discountTotal,
           walletUsed,
-          orderType: orderType || "delivery",
+          orderType: type,
         });
       } catch (e: any) {
         if (e instanceof PricingError) return res.status(400).json({ error: e.message });
         throw e;
+      }
+
+      if (walletUsed > 0 && customer) {
+        const walletResult = await deductWallet(customer.id, tid, walletUsed);
+        if (!walletResult.success) {
+          return res.status(400).json({ error: walletResult.error });
+        }
       }
 
       const order = await storage.createOnlineOrder({
@@ -4030,13 +4845,14 @@ async function test(){
         orderType: orderType || "delivery",
         notes: notes ?? null,
         estimatedTime: 35,
-        language: req.body.language || "en",
+        // Syrian stores' customers get Arabic messages unless they chose.
+        language: req.body.language || (currency === "SYP" ? "ar" : "en"),
         trackingToken,
         sourceChannel: isDineIn ? "dine_in_qr" : "web",
         tableNumber: tableNumber ?? null,
         tableQrToken: tableQrToken ?? null,
         promoCodeId: resolvedPromoId ?? undefined,
-        discountAmount: finalDiscount.toFixed(2),
+        discountAmount: discountTotal.toFixed(2),
         customerLat: customerLat ? String(customerLat) : null,
         customerLng: customerLng ? String(customerLng) : null,
         floor: floor ?? null,
@@ -4044,9 +4860,22 @@ async function test(){
         addressNotes: addressNotes ?? null,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         walletAmountUsed: walletUsed.toFixed(2),
-        loyaltyPointsUsed: Number(loyaltyPointsUsed ?? 0),
+        loyaltyPointsUsed: loyaltyPoints,
         savedAddressId: savedAddressId ? Number(savedAddressId) : null,
-      } as any);
+      } as any).catch(async (err: any) => {
+        // Nothing was ordered: give the wallet money back.
+        if (walletUsed > 0 && customer) await creditWallet(customer.id, tid, walletUsed, "refund").catch(() => {});
+        throw err;
+      });
+
+      if (idemKey && orderClientRefReady) {
+        const { pool } = await import("./db");
+        await pool.query("UPDATE online_orders SET client_ref = ? WHERE id = ?", [idemKey, order.id]).catch(() => {});
+      }
+      if (loyaltyPoints > 0 && customer) {
+        await redeemPointsForOrder(customer.id, tid, loyaltyPoints, order.id, loyaltyValue)
+          .catch((e: any) => console.error("[loyalty] order", order.id, e?.message || e));
+      }
 
       // Record promo usage
       if (resolvedPromoId && finalDiscount > 0) {
@@ -4066,8 +4895,8 @@ async function test(){
       try {
         callerIdService.broadcast({
           type: "new_online_order",
-          order: { id: order.id, orderNumber, customerName, totalAmount, orderType }
-        }, Number(tenantId));
+          order: { id: order.id, orderNumber, customerName, totalAmount: order.totalAmount, orderType }
+        }, tid);
       } catch (_) {}
 
       res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken, totalAmount: Number(order.totalAmount) });
@@ -4125,19 +4954,34 @@ async function test(){
       const { overallRating, foodRating, deliveryRating, comment } = req.body;
       if (!overallRating) return res.status(400).json({ error: "overallRating required" });
       const orderId = Number(req.params.id);
-      const order = await storage.getOnlineOrder(orderId);
+      const order: any = await storage.getOnlineOrder(orderId);
       if (!order) return res.status(404).json({ error: "Order not found" });
+      // Only the customer who placed the order (by login, or holding the
+      // order's tracking link) may rate it — ids are guessable.
+      const token = String(req.body?.trackingToken || req.query.token || "");
+      const byToken = !!order.trackingToken && token === order.trackingToken;
+      const byCustomer = !!customer && customer.tenantId === order.tenantId
+        && !!customer.phone && canonicalPhone(customer.phone) === canonicalPhone(order.customerPhone);
+      if (!byToken && !byCustomer) return res.status(404).json({ error: "Order not found" });
+      const stars = (v: unknown) => {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
+      };
+      if (!stars(overallRating)) return res.status(400).json({ error: "overallRating must be 1–5" });
       const rating = await storage.createOrderRating({
         orderId,
         customerId: customer?.id ?? null,
         driverId: (order as any).driverId ?? null,
-        overallRating: Number(overallRating),
-        foodRating: foodRating ? Number(foodRating) : null,
-        deliveryRating: deliveryRating ? Number(deliveryRating) : null,
-        comment: comment ?? null,
+        overallRating: stars(overallRating)!,
+        foodRating: stars(foodRating),
+        deliveryRating: stars(deliveryRating),
+        comment: comment == null ? null : String(comment).slice(0, 2000),
       });
       res.json(rating);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) {
+      if (e?.code === "ER_DUP_ENTRY") return res.status(409).json({ error: "This order has already been rated", code: "ALREADY_RATED" });
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // ── Driver Routes ─────────────────────────────────────────────────────────
@@ -4328,6 +5172,7 @@ async function test(){
     try {
       const { tenantId, status, orderType } = req.query;
       const tid = (req as any).tenantId || Number(tenantId);
+      if (!tid) return res.status(400).json({ error: "tenantId is required" });
       const orders = await storage.getDeliveryOrders(tid, { status: status as string, orderType: orderType as string });
       res.json(orders);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -4338,6 +5183,10 @@ async function test(){
       const { vehicleId } = req.body;
       if (!vehicleId) return res.status(400).json({ error: "vehicleId required" });
       const orderId = Number(req.params.id);
+      // The ownership middleware has checked the order and the vehicle belong
+      // to this store; a missing / inactive vehicle is refused here.
+      const vehicle: any = await storage.getVehicle(Number(vehicleId));
+      if (!vehicle || vehicle.isActive === false) return res.status(404).json({ error: "Driver not found" });
       await storage.assignDriverToOrder(orderId, Number(vehicleId));
       const driver = await storage.getVehicle(Number(vehicleId));
       const order = await storage.getOnlineOrder(orderId);
@@ -4356,9 +5205,13 @@ async function test(){
     try {
       const { status } = req.body;
       if (!status) return res.status(400).json({ error: "status required" });
+      if (!ORDER_STATUSES.has(String(status))) return res.status(400).json({ error: "Invalid status", code: "INVALID_STATUS" });
       const orderId = Number(req.params.id);
       await storage.updateOnlineOrder(orderId, { status });
       const order = await storage.getOnlineOrder(orderId);
+      if (order?.driverId && TERMINAL_ORDER_STATUSES.has(String(status))) {
+        try { await storage.releaseDriverFromOrder(Number(order.driverId), orderId); } catch { /* non-fatal */ }
+      }
       // WhatsApp to the customer from the store's own number, with the whole
       // order (statuses without a template are skipped).
       if (order?.customerPhone && order.tenantId) {
@@ -4369,6 +5222,20 @@ async function test(){
       if (order?.tenantId) {
         callerIdService.broadcast({ type: "delivery_status_change", orderId, status }, order.tenantId);
       }
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Take the driver off an order (wrong driver picked, order goes back to the pool).
+  app.put("/api/delivery/manage/orders/:id/unassign", async (req: Request, res: Response) => {
+    try {
+      const orderId = Number(req.params.id);
+      const order: any = await storage.getOnlineOrder(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      const previous = order.driverId ? Number(order.driverId) : null;
+      await storage.updateOnlineOrder(orderId, { driverId: null } as any);
+      if (previous) await storage.releaseDriverFromOrder(previous, orderId);
+      if (order.tenantId) callerIdService.broadcast({ type: "delivery_status_change", orderId, status: order.status, vehicleId: null }, Number(order.tenantId));
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -4401,14 +5268,17 @@ async function test(){
   app.post("/api/delivery/manage/zones", async (req: Request, res: Response) => {
     try {
       const tid = (req as any).tenantId;
-      const zone = await storage.createDeliveryZone({ ...req.body, tenantId: tid });
+      if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      const { id: _id, createdAt: _c, ...body } = req.body || {};
+      const zone = await storage.createDeliveryZone({ ...body, tenantId: tid });
       res.status(201).json(zone);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.put("/api/delivery/manage/zones/:id", async (req: Request, res: Response) => {
     try {
-      const zone = await storage.updateDeliveryZone(Number(req.params.id), req.body);
+      const { id: _id, createdAt: _c, ...body } = withoutTenant(req.body || {});
+      const zone = await storage.updateDeliveryZone(Number(req.params.id), body);
       res.json(zone);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -4432,16 +5302,22 @@ async function test(){
   app.post("/api/delivery/promos", async (req: Request, res: Response) => {
     try {
       const tid = (req as any).tenantId;
-      const promo = await storage.createPromoCode({ ...req.body, tenantId: tid });
+      if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      const parsed = promoFields(req.body || {}, true);
+      if ("error" in parsed) return res.status(400).json({ error: parsed.error, code: parsed.code });
+      const promo = await storage.createPromoCode({ ...parsed.data, tenantId: tid } as any);
       res.status(201).json(promo);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { promoWriteError(res, e); }
   });
 
   app.put("/api/delivery/promos/:id", async (req: Request, res: Response) => {
     try {
-      const promo = await storage.updatePromoCode(Number(req.params.id), req.body);
+      const parsed = promoFields(req.body || {}, false);
+      if ("error" in parsed) return res.status(400).json({ error: parsed.error, code: parsed.code });
+      if (!Object.keys(parsed.data).length) return res.status(400).json({ error: "Nothing to update", code: "NO_FIELDS" });
+      const promo = await storage.updatePromoCode(Number(req.params.id), parsed.data as any);
       res.json(promo);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { promoWriteError(res, e); }
   });
 
   app.delete("/api/delivery/promos/:id", async (req: Request, res: Response) => {
@@ -4469,9 +5345,15 @@ async function test(){
     try {
       const customer = await getAuthenticatedCustomer(req.headers.authorization);
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { points } = req.body;
-      const result = await redeemLoyaltyPoints(customer.id, customer.tenantId!, Number(points));
-      res.json(result);
+      // Validation only: the points are taken when the order is placed
+      // (POST /api/delivery/orders with loyaltyPointsUsed). This used to
+      // deduct them here, before (and even without) any order.
+      const points = Math.floor(Number(req.body?.points) || 0);
+      const tenantId = Number(req.body?.tenantId) || customer.tenantId!;
+      const refusal = await checkLoyaltyRedemption(customer.id, tenantId, points);
+      if (refusal) return res.json({ success: false, discountAmount: 0, error: refusal });
+      const cfg = await getLoyaltyConfig(tenantId);
+      res.json({ success: true, discountAmount: roundMoney(points * cfg.redemptionRate, await storeCurrency(tenantId)), deferred: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -4491,16 +5373,13 @@ async function test(){
     try {
       const customer = await getAuthenticatedCustomer(req.headers.authorization);
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
-      const { amount } = req.body;
-      if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "Valid amount required" });
-      // Create Stripe PaymentIntent for wallet top-up
-      const stripe = await getUncachableStripeClient();
-      const intent = await stripe.paymentIntents.create({
-        amount: Math.round(Number(amount) * 100),
-        currency: "chf",
-        metadata: { type: "wallet_topup", customerId: customer.id, tenantId: customer.tenantId },
+      // Disabled: it charged in CHF whatever the store's currency and the
+      // payment never reached the wallet (wrong metadata for the webhook).
+      // Top-ups go through POST /api/payments/wallet/topup.
+      return res.status(410).json({
+        error: "شحن المحفظة غير متاح حالياً / Wallet top-up is not available at the moment",
+        code: "WALLET_TOPUP_DISABLED",
       });
-      res.json({ clientSecret: intent.client_secret, paymentIntentId: intent.id });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -4534,7 +5413,16 @@ async function test(){
       try {
         let orderId: number;
         if (/^\d+$/.test(idOrToken)) {
-          orderId = Number(idOrToken);
+          // A numeric id also needs the order's tracking token (?token=).
+          const byId: any = await storage.getOnlineOrder(Number(idOrToken)).catch(() => null);
+          const token = String(req.query.token || req.query.trackingToken || "");
+          if (!byId || !byId.trackingToken || token !== byId.trackingToken) {
+            res.write(`data: ${JSON.stringify({ type: "error", error: "Order not found" })}\n\n`);
+            clearInterval(heartbeat);
+            res.end();
+            return;
+          }
+          orderId = byId.id;
         } else {
           const order = await storage.getOnlineOrderByTrackingToken(idOrToken);
           if (!order) {
@@ -4590,6 +5478,29 @@ async function test(){
       const orderId = Number(req.params.id);
       const originalOrder = await storage.getOnlineOrder(orderId);
       if (!originalOrder) return res.status(404).json({ error: "Order not found" });
+      // Anyone could duplicate any store's order by guessing its id. Only the
+      // logged-in customer who placed it may reorder it.
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      const token = String(req.body?.trackingToken || req.query.token || "");
+      const byToken = !!originalOrder.trackingToken && token === originalOrder.trackingToken;
+      const byCustomer = !!customer && customer.tenantId === originalOrder.tenantId && !!customer.phone
+        && canonicalPhone(customer.phone) === canonicalPhone(originalOrder.customerPhone);
+      if (!byToken && !byCustomer) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      // Today's prices, not the old order's.
+      let repriced;
+      try {
+        repriced = await repriceOrder({
+          tenantId: originalOrder.tenantId,
+          items: (originalOrder.items as any[]) || [],
+          clientDeliveryFee: originalOrder.deliveryFee,
+          orderType: (originalOrder as any).orderType || "delivery",
+        });
+      } catch (e: any) {
+        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
 
       const trackingToken = generateTrackingToken();
       const orderNumber = `DEL-${Date.now()}`;
@@ -4601,11 +5512,11 @@ async function test(){
         customerPhone: originalOrder.customerPhone,
         customerEmail: originalOrder.customerEmail ?? null,
         customerAddress: originalOrder.customerAddress ?? null,
-        items: originalOrder.items as any,
-        subtotal: originalOrder.subtotal,
+        items: repriced.items as any,
+        subtotal: repriced.subtotal.toFixed(2),
         taxAmount: "0",
-        deliveryFee: originalOrder.deliveryFee ?? "0",
-        totalAmount: originalOrder.totalAmount,
+        deliveryFee: repriced.deliveryFee.toFixed(2),
+        totalAmount: repriced.totalAmount.toFixed(2),
         paymentMethod: originalOrder.paymentMethod || "cash",
         paymentStatus: "pending",
         status: "pending",
@@ -4621,7 +5532,7 @@ async function test(){
       try {
         callerIdService.broadcast({
           type: "new_online_order",
-          order: { id: newOrder.id, orderNumber, customerName: originalOrder.customerName, totalAmount: originalOrder.totalAmount, orderType: (originalOrder as any).orderType }
+          order: { id: newOrder.id, orderNumber, customerName: originalOrder.customerName, totalAmount: repriced.totalAmount.toFixed(2), orderType: (originalOrder as any).orderType }
         }, originalOrder.tenantId);
       } catch (_) {}
 
